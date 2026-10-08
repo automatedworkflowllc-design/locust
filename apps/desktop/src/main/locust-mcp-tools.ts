@@ -1,9 +1,23 @@
 import type { MissionStarter } from '@teammate/mission-store'
-import type { CodexMissionStartRequest, CodexMissionStartResponse, MissionMode, MissionReadResponse, TeammateListResponse } from '../shared/ipc.js'
+import type { CodexMissionStartRequest, CodexMissionStartResponse, MissionMode, MissionReadResponse, PublicRecoveredMission, PublicRoutine, RoutineRunResponse, TeammateListResponse } from '../shared/ipc.js'
 import type { PublicBackgroundRun } from '../shared/background.js'
 import { joinMessageFragments } from '../shared/messageFragments.js'
 import { unwrapProtocolTags } from '../shared/protocolTags.js'
 import { mcpText, type McpToolResult } from './locust-mcp-host.js'
+
+/** A routine step in flight, as the routine runner reports it. */
+export interface McpRoutineStep {
+  readonly routineId: string
+  readonly teammateId: string
+  readonly step: number
+  readonly of: number
+  readonly missionId: string
+}
+
+/** Modes that change nothing: a routine made only of these may run from outside with the switch off. */
+const READ_ONLY: ReadonlySet<MissionMode> = new Set(['ask', 'plan'])
+/** The words Locust's own mode control uses, for a sentence a person may read. */
+const MODE_NAME: Readonly<Record<MissionMode, string>> = { ask: 'Ask', plan: 'Plan', 'accept-edits': 'Edit', 'approve-each': 'Approve each action', auto: 'Auto' }
 
 /** Only adapters to the window's existing roster, start and ledger readers. */
 export function createLocustMcpTools(options: {
@@ -19,8 +33,20 @@ export function createLocustMcpTools(options: {
   readonly ownMode?: () => boolean
   /** A card of this turn is waiting in Locust's window. */
   readonly waiting?: (missionId: string) => boolean
+  /*
+   * ROUTINES (0.704, Colin: "would be sick if we could actually integrate
+   * workflows from here"). The routine runner's own run path -- the one Run
+   * on a routine card takes -- so every check it makes still holds.
+   */
+  readonly routines?: () => Promise<readonly PublicRoutine[]>
+  readonly runRoutine?: (routineId: string, values: Readonly<Record<string, string>> | undefined) => Promise<RoutineRunResponse>
+  readonly routineSteps?: () => readonly McpRoutineStep[]
+  /** The newest step a routine started, kept as each one starts, so a step that ended between two reads is not missed. */
+  readonly routineLastStep?: (routineId: string) => string | undefined
 }) {
   const starting = new Set<string>()
+  // The routines this server started. Their status is readable here; a person's own runs are not.
+  const routinesStartedHere = new Set<string>()
   const text = (value: unknown, max = 200): value is string => typeof value === 'string' && value.trim().length > 0 && value.length <= max && !value.includes('\0')
   const lookup = async (id: string) => {
     const root = await options.read(id)
@@ -47,6 +73,32 @@ export function createLocustMcpTools(options: {
     const result = await options.start({ ...request, mode, keepSavedRoute: true } as CodexMissionStartRequest, { kind: 'mcp' })
     return result.ok ? mcpText(JSON.stringify({ conversation_id: conversation ?? result.data.missionId, mode })) : mcpText(result.error.message, true)
   }
+  /** A finished turn's answer, or Locust's own words for why there is none. */
+  const answerOf = (mission: PublicRecoveredMission): McpToolResult => {
+    const failed = mission.events.findLast(e => e.type === 'run.failed')
+    if (mission.phase === 'failed') return mcpText(mission.hostFailureMessage ?? (failed?.type === 'run.failed' ? failed.payload.message : 'The AI agent ended without an answer.'), true)
+    if (mission.phase !== 'completed') return mcpText('The run was interrupted or stopped before it finished.', true)
+    const final = joinMessageFragments(mission.events).findLast(e => e.type === 'message.delta' && e.payload.final)
+    return mcpText(final?.type === 'message.delta' ? unwrapProtocolTags(final.payload.text) : 'The AI agent finished without a text answer.')
+  }
+  /*
+   * The mode each step runs in, as the runner decides it: the routine's saved
+   * mode for its own teammate's steps, and a step handed to another teammate
+   * runs on THAT teammate's route (routine-runner.ts, 0.435).
+   */
+  const stepModes = (routine: PublicRoutine, team: TeammateListResponse): readonly MissionMode[] =>
+    routine.steps.map((_, index) => {
+      const owner = routine.handOffs?.[index]?.teammateId ?? routine.teammateId
+      if (owner === routine.teammateId) return routine.route.mode
+      return (team.ok ? team.data.teammates.find(t => t.teammateId === owner)?.route?.mode : undefined) ?? 'ask'
+    })
+  const findRoutine = async (given: unknown): Promise<PublicRoutine | string> => {
+    if (options.routines === undefined) return 'This Locust does not offer routines to other apps.'
+    if (!text(given)) return 'Name a routine by its id or name from list_routines.'
+    const all = await options.routines()
+    const matches = all.filter(r => r.routineId === given || r.name.toLowerCase() === given.toLowerCase())
+    return matches.length === 1 ? matches[0]! : 'That routine could not be identified. Use its id from list_routines.'
+  }
   return async (name: string, arguments_: unknown): Promise<McpToolResult> => {
     const args = typeof arguments_ === 'object' && arguments_ !== null && !Array.isArray(arguments_) ? arguments_ as Record<string, unknown> : {}
     if (name === 'list_teammates') {
@@ -66,6 +118,77 @@ export function createLocustMcpTools(options: {
       const matches = list.data.teammates.filter(t => t.teammateId === args.teammate || t.name.toLowerCase() === (args.teammate as string).toLowerCase())
       if (matches.length !== 1) return mcpText('That teammate could not be identified. Use its id from list_teammates. Nothing was started.', true)
       return started({ prompt: args.message, teammateId: matches[0]!.teammateId })
+    }
+    if (name === 'list_routines') {
+      if (options.routines === undefined) return mcpText('This Locust does not offer routines to other apps.', true)
+      const [all, team] = await Promise.all([options.routines(), options.teammates()])
+      const own = options.ownMode?.() === true
+      const nameOf = (id: string) => (team.ok ? team.data.teammates.find(t => t.teammateId === id)?.name : undefined) ?? 'a teammate no longer here'
+      return mcpText(JSON.stringify(all.map(routine => {
+        const modes = stepModes(routine, team)
+        const writes = modes.some(mode => !READ_ONLY.has(mode))
+        const folder = (routine.inputs ?? []).some(input => input.kind === 'folder')
+        return {
+          id: routine.routineId, name: routine.name,
+          steps: routine.steps.map((_, index) => ({ teammate: nameOf(routine.handOffs?.[index]?.teammateId ?? routine.teammateId), mode: modes[index], ...(routine.handOffs?.[index]?.check === true ? { checks_the_work: true } : {}) })),
+          inputs: (routine.inputs ?? []).map(input => ({ key: input.key, label: input.label, kind: input.kind, required: input.required,
+            ...(input.default === undefined ? {} : { default: input.default }), ...(input.choices === undefined ? {} : { choices: input.choices }) })),
+          changes_files: writes,
+          // Whether run_routine would start it now, and why not.
+          runs_from_here: !folder && (!writes || own),
+          ...(folder ? { why_not: "It asks for a folder, which is chosen in Locust's own picker." } : writes && !own ? { why_not: "It changes files, and \"Use each teammate's own mode\" is off in Locust." } : {})
+        }
+      })))
+    }
+    if (name === 'run_routine') {
+      const routine = await findRoutine(args.routine)
+      if (typeof routine === 'string') return mcpText(`${routine} Nothing was started.`, true)
+      if (options.runRoutine === undefined) return mcpText('This Locust does not offer routines to other apps. Nothing was started.', true)
+      if ((routine.inputs ?? []).some(input => input.kind === 'folder')) {
+        return mcpText(`"${routine.name}" asks for a folder, which is chosen in Locust's own picker. Run it from Locust. Nothing was started.`, true)
+      }
+      const team = await options.teammates()
+      const modes = stepModes(routine, team)
+      const writing = modes.findIndex(mode => !READ_ONLY.has(mode))
+      if (writing >= 0 && options.ownMode?.() !== true) {
+        return mcpText(`"${routine.name}" changes files (step ${String(writing + 1)} runs in ${MODE_NAME[modes[writing]!]}). Turn on "Use each teammate's own mode" in Locust's Settings to let other apps run it. Nothing was started.`, true)
+      }
+      // Strings only; the runner's own reader checks each against the routine's inputs.
+      let values: Record<string, string> | undefined
+      if (args.values !== undefined) {
+        if (typeof args.values !== 'object' || args.values === null || Array.isArray(args.values)) return mcpText('values must be an object of input keys to text. Nothing was started.', true)
+        const entries = Object.entries(args.values as Record<string, unknown>)
+        if (entries.length > 12 || entries.some(([key, value]) => !text(key, 80) || typeof value !== 'string' || value.length > 4_000)) return mcpText('values must be at most 12 input keys, each to text of up to 4,000 characters. Nothing was started.', true)
+        values = Object.fromEntries(entries) as Record<string, string>
+      }
+      const result = await options.runRoutine(routine.routineId, values)
+      if (!result.ok) return mcpText(result.error.message, true)
+      routinesStartedHere.add(routine.routineId)
+      return mcpText(JSON.stringify({ routine_id: routine.routineId, steps: routine.steps.length, first_conversation_id: result.data.missionId }))
+    }
+    if (name === 'routine_status') {
+      const routine = await findRoutine(args.routine)
+      if (typeof routine === 'string') return mcpText(routine, true)
+      if (!routinesStartedHere.has(routine.routineId)) return mcpText('This server has not started that routine since Locust opened. Its runs are in Locust.', true)
+      const step = options.routineSteps?.().find(entry => entry.routineId === routine.routineId)
+      if (step !== undefined) {
+        // This app cannot answer a card: there is no tool for it, by design.
+        if (options.waiting?.(step.missionId) === true) return mcpText(`Waiting for the person to approve or deny an action in Locust's window (step ${String(step.step)} of ${String(step.of)}). This app cannot answer it; routine_status again later.`)
+        return mcpText(`Still working: step ${String(step.step)} of ${String(step.of)}.`)
+      }
+      const execution = routine.execution
+      if (execution !== undefined && execution.status === 'held') {
+        return mcpText(`Stopped at step ${String(execution.step)} of ${String(execution.of)} and waiting for the person in Locust${execution.reason === undefined ? '.' : `: ${execution.reason}`}`, true)
+      }
+      if (execution !== undefined && execution.status !== 'abandoned') return mcpText(`Still working: step ${String(execution.step)} of ${String(execution.of)}.`)
+      if (routine.lastFailed !== undefined) return mcpText(`The run ended with its check still failing: ${routine.lastFailed}`, true)
+      const last = options.routineLastStep?.(routine.routineId)
+      if (last === undefined) return mcpText('The run ended, and Locust has no answer from it to give.', true)
+      const read = await options.read(await options.newest(last))
+      if (!read.ok) return mcpText('The run ended, but its last answer could not be read from the local ledger.', true)
+      const answer = answerOf(read.data.mission)
+      if (answer.isError === true || routine.staged === undefined) return answer
+      return mcpText(`Its changes are waiting in Locust under Routines for the person to Keep or Discard; nothing has reached the folder yet.\n\n${answer.content[0]!.text}`)
     }
     if (name === 'send_message' || name === 'read_reply') {
       if (!text(args.conversation_id)) return mcpText('Give a conversation id returned by start_conversation.', true)
@@ -90,11 +213,7 @@ export function createLocustMcpTools(options: {
           if (owner === undefined) return mcpText('That conversation no longer has a teammate. Nothing was sent.', true)
           return started({ prompt: args.message, teammateId: owner, followUpOf: mission.missionId }, id)
         }
-        const failed = mission.events.findLast(e => e.type === 'run.failed')
-        if (mission.phase === 'failed') return mcpText(mission.hostFailureMessage ?? (failed?.type === 'run.failed' ? failed.payload.message : 'The AI agent ended without an answer.'), true)
-        if (mission.phase !== 'completed') return mcpText('The run was interrupted or stopped before it finished.', true)
-        const final = joinMessageFragments(mission.events).findLast(e => e.type === 'message.delta' && e.payload.final)
-        return mcpText(final?.type === 'message.delta' ? unwrapProtocolTags(final.payload.text) : 'The AI agent finished without a text answer.')
+        return answerOf(mission)
       } finally { if (name === 'send_message') starting.delete(id) }
     }
     return mcpText('That tool is not offered by Locust.', true)

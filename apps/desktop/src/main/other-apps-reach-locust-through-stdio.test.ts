@@ -52,10 +52,10 @@ async function fixture(executable = process.execPath) {
   return { directory, connection, host, call, rpc }
 }
 describe('other apps reach Locust through stdio', () => {
-  it('advertises exactly the five tools, with Ask mode and spend made explicit', async () => {
+  it('advertises exactly the eight tools, with Ask mode and spend made explicit', async () => {
     const f = await fixture()
     const answer = await f.rpc('tools/list')
-    expect(answer.result.tools.map((tool: { name: string }) => tool.name)).toEqual(['list_teammates', 'start_conversation', 'send_message', 'read_reply', 'list_background_runs'])
+    expect(answer.result.tools.map((tool: { name: string }) => tool.name)).toEqual(['list_teammates', 'start_conversation', 'send_message', 'read_reply', 'list_background_runs', 'list_routines', 'run_routine', 'routine_status'])
     const described = (name: string): string => answer.result.tools.find((tool: { name: string }) => tool.name === name).description
     expect(described('start_conversation')).toContain('Ask mode (read only), unless the person has turned on')
     expect(described('start_conversation')).toContain("answered by the person in Locust's window, never from here")
@@ -65,7 +65,7 @@ describe('other apps reach Locust through stdio', () => {
   })
   it('answers every tool call with the required plain sentence when Locust is not running', async () => {
     const f = await fixture()
-    for (const name of ['list_teammates', 'start_conversation', 'send_message', 'read_reply', 'list_background_runs']) {
+    for (const name of ['list_teammates', 'start_conversation', 'send_message', 'read_reply', 'list_background_runs', 'list_routines', 'run_routine', 'routine_status']) {
       expect((await f.rpc('tools/call', { name, arguments: {} })).result).toEqual(mcpText('Locust is not running. Open it and try again.', true))
     }
     expect(f.call).not.toHaveBeenCalled()

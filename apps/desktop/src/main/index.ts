@@ -1904,6 +1904,8 @@ if (!ownsSingleInstanceLock) {
     // Bound late: the relay starts runs through the service that calls it.
     let relay: Relay | undefined
     let routineRunner: RoutineRunner | undefined
+    // The newest step each routine started (0.704): the MCP server's routine_status reads its answer from it.
+    const routineLastStep = new Map<string, string>()
     let memoryReader: MemoryReader | undefined
     let attentionReader: AttentionReader | undefined
     // Bound late for the same reason: it reads the ledger the service writes.
@@ -3329,7 +3331,10 @@ if (!ownsSingleInstanceLock) {
         tracker.track(recovered.events)
         return tracker.latestFinal
       },
-      notify: sendToWindow
+      notify: (update) => {
+        if (update.kind === 'mission-started' && update.startedBy?.kind === 'routine') routineLastStep.set(update.startedBy.routineId, update.missionId)
+        sendToWindow(update)
+      }
     })
     // Scheduled routines: one tick a minute, the first after the runtimes
     // have had a moment to be discovered. Only with a project folder chosen
@@ -7278,7 +7283,12 @@ if (!ownsSingleInstanceLock) {
       background: async () => (await backgroundRuns.list()).map(publicRun),
       // Called per tool call, after mcpHost below exists.
       ownMode: () => mcpHost.ownMode(),
-      waiting: id => raisedApprovals.waitingOn(id)
+      waiting: id => raisedApprovals.waitingOn(id),
+      // The routine card's own Run path, with the same folder check (0.704).
+      routines: async () => { await routineRunner?.reconcile(); return routines.list() },
+      runRoutine: (id, values) => workspaceChosen ? routineIO.run(id, values) : Promise.resolve(routineRejected(NO_WORKSPACE_MESSAGE)),
+      routineSteps: () => routineRunner?.running() ?? [],
+      routineLastStep: id => routineLastStep.get(id)
     })
     const mcpHost = createLocustMcpHost({ directory: app.getPath('userData'), node: process.execPath,
       bridge: app.isPackaged ? join(process.resourcesPath, 'locust-mcp-bridge.mjs') : join(__dirname, '../../resources/locust-mcp-bridge.mjs'), call: mcpTools })
