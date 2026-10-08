@@ -4,6 +4,7 @@ import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 
 import { cleanAvatar, isAvatarSpec, seedAvatar } from '../shared/avatar.js'
+import { MAX_TEAMMATE_INSTRUCTIONS } from '../shared/ipc.js'
 import type { PublicTeammate, TeammateHue, TeammateRole, TeammateRoute, WorkspaceSettings, MemoryMode, LayoutPreference, TubePreference, ReplyTextSize } from '../shared/ipc.js'
 import { DEFAULT_RELAY_HOP_CAP, MAX_RELAY_HOP_CAP, MIN_RELAY_HOP_CAP, DEFAULT_MEMORY_MODE } from '../shared/ipc.js'
 import { isMissionRuntime } from '../shared/runtimes.js'
@@ -90,14 +91,14 @@ export const TEAMMATE_ROLES: readonly TeammateRole[] = [
 
 export interface TeammateStore {
   list(): Promise<readonly PublicTeammate[]>
-  create(input: { name: unknown; hue: unknown; role: unknown; roleTitle?: unknown; worktree?: unknown; avatar?: unknown; monthlyLimitUsd?: unknown; starters?: unknown }): Promise<PublicTeammate>
+  create(input: { name: unknown; hue: unknown; role: unknown; roleTitle?: unknown; worktree?: unknown; avatar?: unknown; monthlyLimitUsd?: unknown; starters?: unknown; instructions?: unknown }): Promise<PublicTeammate>
   remove(teammateId: unknown): Promise<void>
   /**
    * Change what a person may change; the id and the missions filed under it
    * stay. `monthlyLimitUsd`: a number sets it, `null` removes it, omitted
    * keeps it.
    */
-  update(input: { teammateId: unknown; name: unknown; hue: unknown; role: unknown; roleTitle?: unknown; worktree?: unknown; avatar: unknown; monthlyLimitUsd?: unknown }): Promise<PublicTeammate>
+  update(input: { teammateId: unknown; name: unknown; hue: unknown; role: unknown; roleTitle?: unknown; worktree?: unknown; avatar: unknown; monthlyLimitUsd?: unknown; instructions?: unknown }): Promise<PublicTeammate>
   /** Record the route a person just started this teammate on. Unknown teammate or bad route: nothing changes. */
   rememberRoute(teammateId: unknown, route: unknown): Promise<void>
   /**
@@ -303,6 +304,13 @@ function parsedStarters(value: unknown): readonly string[] | undefined {
 }
 
 /** Only a Custom role keeps a title, and only a valid one. Anything else is dropped, never rejected. */
+/** A teammate's own instructions (0.706): trimmed text up to the cap, or nothing. */
+function parsedInstructions(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const text = value.trim()
+  return text.length > 0 && text.length <= MAX_TEAMMATE_INSTRUCTIONS && !text.includes('\0') ? text : undefined
+}
+
 function roleTitleFor(role: TeammateRole, value: unknown): string | undefined {
   if (role !== 'Custom' || !validRoleTitle(value)) return undefined
   return value.trim()
@@ -407,7 +415,9 @@ export function parsedTeammate(value: unknown): PublicTeammate | undefined {
     ...(safeId(record.hubMissionId) ? { hubMissionId: record.hubMissionId } : {}),
     // A limit that does not read is NO limit, the same as a record from
     // before limits existed -- never zero, which would refuse every run.
-    ...(isMonthlyLimit(record.monthlyLimitUsd) ? { monthlyLimitUsd: record.monthlyLimitUsd } : {})
+    ...(isMonthlyLimit(record.monthlyLimitUsd) ? { monthlyLimitUsd: record.monthlyLimitUsd } : {}),
+    // Instructions that do not read are dropped, not the teammate (0.706).
+    ...(parsedInstructions(record.instructions) === undefined ? {} : { instructions: parsedInstructions(record.instructions) })
   }
 }
 
@@ -659,7 +669,8 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
           ...(input.worktree === true ? { worktree: true } : {}),
           avatar: input.avatar === undefined ? seedAvatar(teammateId) : cleanAvatar(input.avatar),
           createdAt: new Date().toISOString(),
-          ...(isMonthlyLimit(input.monthlyLimitUsd) ? { monthlyLimitUsd: input.monthlyLimitUsd } : {})
+          ...(isMonthlyLimit(input.monthlyLimitUsd) ? { monthlyLimitUsd: input.monthlyLimitUsd } : {}),
+          ...(parsedInstructions(input.instructions) === undefined ? {} : { instructions: parsedInstructions(input.instructions) })
         }
         await write({ ...file, teammates: [...file.teammates, teammate] })
         return teammate
@@ -675,6 +686,9 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
         if (!isAvatarSpec(input.avatar)) throw new Error('Teammate avatar is invalid')
         if (input.monthlyLimitUsd !== undefined && input.monthlyLimitUsd !== null && !isMonthlyLimit(input.monthlyLimitUsd)) {
           throw new Error('Teammate limit is invalid')
+        }
+        if (input.instructions !== undefined && input.instructions !== null && (typeof input.instructions !== 'string' || input.instructions.trim().length > MAX_TEAMMATE_INSTRUCTIONS)) {
+          throw new Error('Teammate instructions are invalid')
         }
         const file = await read()
         const existing = file.teammates.find((teammate) => teammate.teammateId === input.teammateId)
@@ -712,7 +726,11 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
             ? { monthlyLimitUsd: input.monthlyLimitUsd }
             : input.monthlyLimitUsd === undefined && existing.monthlyLimitUsd !== undefined
               ? { monthlyLimitUsd: existing.monthlyLimitUsd }
-              : {})
+              : {}),
+          // Set, removed (null or empty), or -- omitted -- carried, like the limit (0.706).
+          ...(input.instructions === undefined
+            ? existing.instructions === undefined ? {} : { instructions: existing.instructions }
+            : parsedInstructions(input.instructions) === undefined ? {} : { instructions: parsedInstructions(input.instructions) })
         }
         await write({
           ...file,

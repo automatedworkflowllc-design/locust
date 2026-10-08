@@ -175,6 +175,12 @@ export function groupSection(groupName: string, instructions: string): string {
 ${instructions}`
 }
 
+/** A teammate's own standing instructions (0.706), quoted whole. */
+export function teammateSection(teammateName: string, instructions: string): string {
+  return `Standing instructions for you, ${teammateName}, from the person. Every turn you take is given these:
+${instructions}`
+}
+
 export function worktreeSection(): string {
   return 'Your missions run in your own copy of this project, so work only inside the folder you were started in.'
 }

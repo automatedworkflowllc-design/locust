@@ -13511,6 +13511,22 @@ textarea {
   margin-top: var(--lc-space-5);
 }
 
+/* A teammate's own instructions (0.706): the limit's column, a box sized for a few sentences. */
+.lc-field--instructions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-3);
+  margin-top: var(--lc-space-5);
+}
+
+.lc-field__text {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.6;
+}
+
 .lc-limitinput {
   position: relative;
   display: flex;

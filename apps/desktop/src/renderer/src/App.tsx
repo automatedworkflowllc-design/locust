@@ -5241,12 +5241,12 @@ export default function App(): ReactElement {
   })()
 
   // Returns the save, so the dialog can hold its button until it lands (L22).
-  const createTeammate = ({ monthlyLimitUsd, ...input }: TeammateDraft): Promise<void> => {
+  const createTeammate = ({ monthlyLimitUsd, instructions, ...input }: TeammateDraft): Promise<void> => {
     const bridge = window.desktop
     if (!bridge) return Promise.resolve()
     return bridge
-      // A new teammate has no limit to lift: an amount, or nothing.
-      .createTeammate({ ...input, ...(typeof monthlyLimitUsd === 'number' ? { monthlyLimitUsd } : {}) })
+      // A new teammate has no limit to lift, nor instructions to clear: a value, or nothing.
+      .createTeammate({ ...input, ...(typeof monthlyLimitUsd === 'number' ? { monthlyLimitUsd } : {}), ...(typeof instructions === 'string' ? { instructions } : {}) })
       .then((response) => {
         if (!response.ok) {
           setTeammateError(response.error.message)

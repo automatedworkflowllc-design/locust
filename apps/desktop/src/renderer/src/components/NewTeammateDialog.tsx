@@ -8,7 +8,7 @@ import { useTerminalFaces } from '../botLook.js'
 import { usePetList, usePetLook } from '../pets.js'
 import { isPetPick } from '../../../shared/pet-picks.js'
 import type { MissionMode, PublicPet, PublicTeammate, TeammateHue, TeammateRole, PublicConnector, PublicModel, PublicRuntimeStatus, TeammateRoute } from '../../../shared/ipc.js'
-import { ROLE_DESCRIPTIONS } from '../../../shared/ipc.js'
+import { MAX_TEAMMATE_INSTRUCTIONS, ROLE_DESCRIPTIONS } from '../../../shared/ipc.js'
 import { defaultEffort, modelFamily, modeRunsOn, modesFor, modeSummary } from '../status.js'
 import { effortFooter } from '../effortLevels.js'
 import { effortScale, joinEffort, splitEffort } from '../effortScale.js'
@@ -33,6 +33,8 @@ export interface TeammateDraft {
   readonly avatar: AvatarSpec
   readonly route?: TeammateRoute
   readonly monthlyLimitUsd?: number | null
+  /** Its own standing instructions (0.706); `null` when an edit clears them. */
+  readonly instructions?: string | null
 }
 
 /**
@@ -278,6 +280,8 @@ export function NewTeammateDialog({
    */
   const [limitText, setLimitText] = useState(initial?.monthlyLimitUsd === undefined ? '' : initial.monthlyLimitUsd.toFixed(2))
   const limit = parsedLimit(limitText)
+  // THIS TEAMMATE'S OWN INSTRUCTIONS (0.706, from the Paperclip scrub): what a group's are, for one teammate.
+  const [instructions, setInstructions] = useState(initial?.instructions ?? '')
   /*
    * THE TEAMMATE'S OWN MODEL, chosen here (0.311). Colin, 2026-09-24: "do we
    * have the ability to switch a teammates model? like not when youre in the
@@ -852,6 +856,22 @@ export function NewTeammateDialog({
             </span>
           </label>
 
+          <label className="lc-field lc-field--instructions">
+            <span className="lc-fieldlabel lc-mono">Instructions</span>
+            <textarea
+              className="lc-input lc-field__text"
+              aria-label="Instructions for this teammate"
+              rows={3}
+              maxLength={MAX_TEAMMATE_INSTRUCTIONS}
+              placeholder="Answer in short bullet points. Ask before adding a dependency."
+              value={instructions}
+              onChange={(event) => setInstructions(event.target.value)}
+            />
+            <span className="lc-field__hint">
+              {`Optional. Every turn ${trimmed.length === 0 ? 'this teammate' : trimmed} takes is given these, after a group's instructions.`}
+            </span>
+          </label>
+
           <div className="lc-dialog__summary">
             {/*
               * The mode the next mission will ACTUALLY run in. This said
@@ -896,7 +916,9 @@ export function NewTeammateDialog({
                   ...(picked === undefined ? {} : { route: picked }),
                   // An edit always says: an amount, or null to lift one. A new
                   // teammate only says when there is an amount.
-                  ...(typeof limit === 'number' ? { monthlyLimitUsd: limit } : editing ? { monthlyLimitUsd: null } : {})
+                  ...(typeof limit === 'number' ? { monthlyLimitUsd: limit } : editing ? { monthlyLimitUsd: null } : {}),
+                  // The same rule as the limit: an edit always says (null clears); a new teammate only when there are some.
+                  ...(instructions.trim().length > 0 ? { instructions: instructions.trim() } : editing ? { instructions: null } : {})
                 })
               ).finally(() => {
                 pressed.current = false

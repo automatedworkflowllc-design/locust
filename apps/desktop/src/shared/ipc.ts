@@ -1499,7 +1499,17 @@ export interface PublicTeammate {
    * requests are not dollars (shared/spend.ts). Absent means no limit.
    */
   readonly monthlyLimitUsd?: number
+  /**
+   * THIS TEAMMATE'S OWN STANDING INSTRUCTIONS (0.706, from the Paperclip
+   * scrub: "agents keep their own files"). Every turn this teammate takes is
+   * briefed with them, after a group's and before memory. At most
+   * MAX_TEAMMATE_INSTRUCTIONS characters; absent means none.
+   */
+  readonly instructions?: string
 }
+
+/** The longest a teammate's own instructions may be, as a group's (0.706). */
+export const MAX_TEAMMATE_INSTRUCTIONS = 4_000
 
 export interface TeammateRoute {
   readonly runtime: MissionRuntimeId
@@ -1554,6 +1564,8 @@ export interface TeammateCreateRequest {
   readonly route?: TeammateRoute
   /** Dollars a month; omitted, no limit. */
   readonly monthlyLimitUsd?: number
+  /** Its own standing instructions (0.706); omitted or empty, none. */
+  readonly instructions?: string
   /** A template's first messages for this teammate; omitted, the role's are offered. */
   readonly starters?: readonly string[]
 }
@@ -1582,6 +1594,8 @@ export interface TeammateUpdateRequest {
    * so no other edit can quietly lift a limit the person set.
    */
   readonly monthlyLimitUsd?: number | null
+  /** Its own standing instructions (0.706): text sets them, `null` or empty removes them, OMITTED keeps them. */
+  readonly instructions?: string | null
 }
 
 export type TeammateListResponse =

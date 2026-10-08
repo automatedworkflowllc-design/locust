@@ -146,7 +146,7 @@ import { createRoutineRunner } from './routine-runner.js'
 import { createMemoryStore } from './memory-store.js'
 import { WorktreeHasChangesError, createWorktreeManager, defaultRunGit } from './worktrees.js'
 import { readRuntimeSetup } from './runtime-setup.js'
-import { folderSentences, readWorkspaceBrief, groupSection } from './workspace-brief.js'
+import { folderSentences, readWorkspaceBrief, groupSection, teammateSection } from './workspace-brief.js'
 import { createConversationChain, groupBriefFor } from './conversation-chain.js'
 import { createMemoryReader } from './memory-reader.js'
 import { createAttentionReader } from './attention-reader.js'
@@ -1780,6 +1780,10 @@ if (!ownsSingleInstanceLock) {
           const inGroup = groupBriefFor(await conversationChain.keysBefore(conversation?.previousMissionId), listedGroups)
           if (inGroup !== undefined) sections.push(groupSection(inGroup.name, inGroup.instructions))
         }
+        // This teammate's own instructions (0.706), after the group's: the
+        // narrower word comes later, as the folder's comes before the group's.
+        const own = peer === undefined ? undefined : (await teammates.list().catch(() => [])).find((entry) => entry.teammateId === peer.self.teammateId)
+        if (own?.instructions !== undefined) sections.push(teammateSection(own.name, own.instructions))
         const settings = await teammates.readSettings()
         // About you (0.423): the person's own standing note, before memory
         // and whatever the memory mode says -- switching teammate memory off
@@ -5177,7 +5181,7 @@ if (!ownsSingleInstanceLock) {
       try {
         // roleTitle was dropped here since Custom teammates got titles: every
         // one read "Custom" on the sidebar and in the brief (found 2026-09-05).
-        const teammate = await teammates.create({ name: input.name, hue: input.hue, role: input.role, roleTitle: input.roleTitle, worktree: input.worktree, avatar: input.avatar, monthlyLimitUsd: input.monthlyLimitUsd, starters: input.starters })
+        const teammate = await teammates.create({ name: input.name, hue: input.hue, role: input.role, roleTitle: input.roleTitle, worktree: input.worktree, avatar: input.avatar, monthlyLimitUsd: input.monthlyLimitUsd, starters: input.starters, instructions: input.instructions })
         // The model picked on the dialog's Model row, kept exactly as a
         // started mission keeps one (rememberRoute validates it).
         if (!isTeammateRoute(input.route)) return { ok: true, data: { teammate } } as const
@@ -5209,7 +5213,8 @@ if (!ownsSingleInstanceLock) {
           roleTitle: input.roleTitle,
           worktree: input.worktree,
           avatar: input.avatar,
-          monthlyLimitUsd: input.monthlyLimitUsd
+          monthlyLimitUsd: input.monthlyLimitUsd,
+          instructions: input.instructions
         })
         // A model picked on the Model row (0.311): until then a teammate's
         // model changed only when a message was sent to them on another.
