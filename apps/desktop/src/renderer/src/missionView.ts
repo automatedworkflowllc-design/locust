@@ -4398,10 +4398,17 @@ export function buildThread(
   // Past the window, the turn says its start is kept but not drawn (0.627): it must not read as if it began there.
   if (options.trimmed === true) items.unshift({ key: 'trimmed', type: 'diagnostic', level: 'info', message: TRIMMED_TURN_LINE })
   if (busyAt >= 0 && options.running !== true) {
-    return items.map((item) => {
-      if (item.type !== 'diagnostic' || item.retrying !== true) return item
+    // The red card already quoting the provider's words says them once, there
+    // (0.705; sweep 7 drew the note's "Endpoint is unavailable" right above the
+    // card's "OpenCode stopped: ... Endpoint is unavailable."). A card without them keeps the note.
+    let failure = ''
+    for (const event of events) if (event.type === 'run.failed') failure = event.payload.message
+    return items.flatMap((item) => {
+      if (item.type !== 'diagnostic' || item.retrying !== true) return [item]
+      const said = /answered "(.+)"/.exec(item.message)?.[1]?.replace(/\.$/, '').trim()
+      if (said !== undefined && said.length > 0 && failure.includes(said)) return []
       const { busy: _busy, retrying: _retrying, ...rest } = item
-      return { ...rest, message: item.message.replace(/,? and OpenCode is trying again on its own\.(?: To go on now, press Stop and pick another model\.)?$/, '.') }
+      return [{ ...rest, message: item.message.replace(/,? and OpenCode is trying again on its own\.(?: To go on now, press Stop and pick another model\.)?$/, '.') }]
     })
   }
   return items

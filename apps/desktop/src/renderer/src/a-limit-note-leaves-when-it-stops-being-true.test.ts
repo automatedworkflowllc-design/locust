@@ -47,8 +47,12 @@ describe("OpenCode's other provider error (0.550, Sol on 0.546)", () => {
     const failed = [event('step.started', { stepKind: 'turn' }, 0), OTHER, event('run.failed', { kind: 'process-failed', message: 'Error from provider (Console): Upstream request failed: Endpoint is unavailable.' }, 64)]
     const said = buildThread(failed, { running: false, mayEdit: false, startedAt: at(0) }).map((item) => JSON.stringify(item)).join('\n')
     expect(said).not.toContain('trying again on its own')
-    // What the provider said is still the reason, and stays (0.551).
-    const note = buildThread(failed, { running: false, mayEdit: false, startedAt: at(0) }).find((item) => item.type === 'diagnostic')
+    // The red card quotes the provider's words, so the note does not say them a second time (0.705).
+    expect(buildThread(failed, { running: false, mayEdit: false, startedAt: at(0) }).some((item) => item.type === 'diagnostic' && /provider answered/.test(item.message))).toBe(false)
+  })
+  it('keeps what the provider said when the card does not say it (0.551)', () => {
+    const failed = [event('step.started', { stepKind: 'turn' }, 0), OTHER, event('run.failed', { kind: 'process-failed', message: 'OpenCode stopped.' }, 64)]
+    const note = buildThread(failed, { running: false, mayEdit: false, startedAt: at(0) }).find((item) => item.type === 'diagnostic' && /provider answered/.test(item.message))
     expect(note?.type === 'diagnostic' ? note.message : undefined).toBe('The model’s provider answered "Upstream request failed: Endpoint is unavailable.".')
   })
 })
