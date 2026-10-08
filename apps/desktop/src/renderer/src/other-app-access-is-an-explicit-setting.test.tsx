@@ -45,6 +45,8 @@ describe('other-app access is an explicit setting', () => {
     expect(html).toContain('claude mcp add example')
     expect(html).toContain('[mcp_servers.locust]')
     expect(html).toContain('New turns are Ask mode (read only)')
+    // Since 0.704 they can run routines too, and the line says so.
+    expect(html).toContain('can ask teammates, run your routines and read replies')
     expect(html).toContain('with no automatic teammate handoffs')
     expect(html).toContain('Locust must be running')
     expect(html).toContain('monthly limits still apply')

@@ -25,7 +25,7 @@ export function LocustMcpSettings({ heading, api = typeof window === 'undefined'
       <div className="lc-settingline__text">
         {heading}
         <p className="lc-settings__lede">{state?.enabled
-          ? `On. Other apps on this computer can ask teammates and read replies. ${state.ownMode ? "New turns use each teammate's own mode" : 'New turns are Ask mode (read only)'}, with no automatic teammate handoffs. Locust must be running; your AI account usage and monthly limits still apply.`
+          ? `On. Other apps on this computer can ask teammates, run your routines and read replies. ${state.ownMode ? "New turns use each teammate's own mode" : 'New turns are Ask mode (read only)'}, with no automatic teammate handoffs. Locust must be running; your AI account usage and monthly limits still apply.`
           : 'Off. No local server is listening.'}</p>
       </div>
       <button type="button" className={`lc-switch${state?.enabled ? ' is-on' : ''}`} role="switch" aria-label="Let your other AI apps use Locust" aria-checked={state?.enabled === true} disabled={!state || busy} onClick={() => { void toggle() }}><span /></button>
