@@ -39,7 +39,7 @@ const FREE_MODELS = [
   // Muse Spark left out 2026-10-06: rate-limited all day, each drive on it waited out OpenCode's retries.
   'opencode/space-bunny-free',
   'opencode/nemotron-3-ultra-free',
-  'opencode/fledge-alpha-free',
+  // Fledge Alpha left out 2026-10-08: gone from `opencode models`; every drive given it failed first.
   'opencode/longcat-2.5-preview-free',
   'opencode/nemotron-3.5-lightning-free',
   'opencode/mimo-v2.6-flash-free',

@@ -60,6 +60,14 @@ export const FREE_ROUTE = { runtime: 'opencode', model: process.env.LOCUST_FREE_
  */
 export const FREE_ROW = '/' + FREE_ROUTE.model.replace(/^opencode\//, '').replace(/-free$/, '').split('-').map((word) => word.replace(/[.*+?^$()|[\]\\{}]/g, (character) => '\\' + character)).join('.*') + '/i'
 /**
+ * What to type to find that row: its own words, not "free". A search shows 12
+ * rows a group (ROUTE_SEARCH_GROUP_LIMIT); OpenCode listed 10 free models on
+ * 2026-10-08 and adds them on its own clock, so "free" alone stops reaching the
+ * last of them once the list passes the cut. (That day's "the free route is not
+ * there yet" was not the cut: the list itself came 14 s late, 0.709.)
+ */
+export const FREE_SEARCH = FREE_ROUTE.model.replace(/^opencode\//, '').replace(/-free$/, '').replace(/[-.]+/g, ' ')
+/**
  * The folder a drive keeps its record in: docs/<folder> for a drive run by
  * hand, or <LOCUST_DRIVE_OUT>/<folder> when the sweep runs it, so a sweep
  * never writes into the repository.
@@ -587,7 +595,8 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
          * 2026-09-23). Up to four picks, five seconds apart.
          */
         for (let attempt = 0; attempt < 4 && !isFree(route); attempt += 1) {
-          const said = await evaluate(pickRouteScript({ group: '/opencode/i', search: 'free', row: FREE_ROW }))
+          // Its own name first; "free" on alternate tries, for a model the picker names otherwise.
+          const said = await evaluate(pickRouteScript({ group: '/opencode/i', search: attempt % 2 === 0 ? FREE_SEARCH : 'free', row: FREE_ROW }))
           route = await routeText()
           if (!isFree(route) && attempt < 3) {
             say(`the free route is not there yet (${String(said).slice(0, 140)}); trying again`)
