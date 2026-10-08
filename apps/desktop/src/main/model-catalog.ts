@@ -23,6 +23,8 @@ import { antigravityUsageText, readAntigravityUsage } from './antigravity-usage.
 const PROBE_TIMEOUT_MS = 20_000
 /** How long a successful read stays good. Models change on release, not hourly. */
 const CACHE_MS = 10 * 60 * 1000
+/** How long the model list waits for Antigravity's usage before going without it (0.709). */
+const USAGE_WAIT_MS = 1_500
 const MAX_MODELS = 40
 /**
  * The route a fresh profile starts on, before any model is chosen.
@@ -38,6 +40,10 @@ export interface ModelCatalogOptions {
   readonly now?: () => number
   /** The models Claude Code's own handshake listed this session, when it has (0.697). */
   readonly claudeListed?: () => readonly ClaudeListedModel[] | undefined
+  /** Antigravity's usage, without a model turn (0.685). Injected by tests; the real reader otherwise. */
+  readonly readAntigravity?: (runtime: RuntimeDiscovery) => Promise<string | undefined>
+  /** A usage reading arrived after the list it belonged to went out: the window should read again. */
+  readonly onLateUsage?: () => void
 }
 
 export interface ModelCatalog {
@@ -512,6 +518,20 @@ export function createModelCatalog(options: ModelCatalogOptions): ModelCatalog {
   let inFlight: Promise<ModelCatalogResponse> | undefined
   /** A ready runtime whose own list came back empty on the last probe (0.552). */
   let missingAList = false
+  /*
+   * ANTIGRAVITY'S USAGE NO LONGER HOLDS THE LIST (0.709). `agy -p /usage`
+   * took 7.3 s on Colin's machine on 2026-10-08, and every runtime's models
+   * waited for it: OpenCode's free rows reached the picker 14 s after
+   * "ready", Home's "Use a free model" was missing for that long, and drives
+   * that pick a free model gave up. The list waits a moment for the reading;
+   * a reading that comes later is kept here, joins every answer from then on
+   * (a cached one too), and tells the window to read again.
+   */
+  let antigravityReading: string | undefined
+  const withAntigravity = (response: ModelCatalogResponse): ModelCatalogResponse =>
+    !response.ok || antigravityReading === undefined
+      ? response
+      : { ...response, data: { ...response.data, usageWindows: { ...response.data.usageWindows, antigravity: antigravityReading } } }
 
   const probe = async (): Promise<ModelCatalogResponse> => {
     const runtimes = await options.discover()
@@ -527,17 +547,21 @@ export function createModelCatalog(options: ModelCatalogOptions): ModelCatalog {
       ...antigravityModelsFrom(runtimes)
     ]
     const antigravity = runtimes.find((entry) => entry.id === 'antigravity')
+    const readAntigravity = options.readAntigravity ?? (async (runtime: RuntimeDiscovery) =>
+      runtime.executable === undefined ? undefined : antigravityUsageText(await readAntigravityUsage(runtime.executable, runtime.version)))
+    let answered = false
     const usage = antigravity?.readiness === 'ready' && antigravity.executable?.commandName === 'agy'
-      ? readAntigravityUsage(antigravity.executable, antigravity.version).then(antigravityUsageText).catch(() => undefined)
-      : Promise.resolve(undefined)
+      ? readAntigravity(antigravity).catch(() => undefined).then((reading) => {
+          if (reading === undefined) return
+          antigravityReading = `${reading} · as of ${new Date(now()).toISOString()}`
+          if (answered) options.onLateUsage?.()
+        })
+      : Promise.resolve()
     // Independent of Codex: a missing server or an older method loses no other reading.
     const withUsage = async (response: ModelCatalogResponse): Promise<ModelCatalogResponse> => {
-      const reading = await usage
-      if (!response.ok || reading === undefined) return response
-      return { ...response, data: { ...response.data, usageWindows: {
-        ...response.data.usageWindows,
-        antigravity: `${reading} · as of ${new Date().toISOString()}`
-      } } }
+      await Promise.race([usage, new Promise<void>((resolve) => setTimeout(resolve, USAGE_WAIT_MS))])
+      answered = true
+      return withAntigravity(response)
     }
     const codex = runtimes.find((entry) => entry.id === 'codex')
     if (codex?.readiness !== 'ready' || codex.executable === undefined) {
@@ -611,7 +635,7 @@ export function createModelCatalog(options: ModelCatalogOptions): ModelCatalog {
     },
     read(): Promise<ModelCatalogResponse> {
       const held = cached
-      if (held !== undefined && now() - held.at < CACHE_MS) return Promise.resolve(held.response)
+      if (held !== undefined && now() - held.at < CACHE_MS) return Promise.resolve(withAntigravity(held.response))
       // One probe at a time. Two windows asking at once must not start two
       // servers, and the second caller gets the first one's answer.
       if (inFlight !== undefined) return inFlight

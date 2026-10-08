@@ -2515,7 +2515,9 @@ if (!ownsSingleInstanceLock) {
     const modelCatalog = createModelCatalog({
       discover: discoverForStart,
       spawn: spawnAppServer,
-      claudeListed: () => claudeListed
+      claudeListed: () => claudeListed,
+      // Antigravity's usage came after the list went out (0.709): read again to show it.
+      onLateUsage: () => sendToWindow({ kind: 'models-changed' })
     })
     const adoptClaudeListed = (models: readonly ClaudeListedModel[]): void => {
       if (claudeListed !== undefined && JSON.stringify(claudeListed) === JSON.stringify(models)) return
