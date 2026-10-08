@@ -220,6 +220,21 @@ describe('testing an endpoint', () => {
     ])
   })
 
+  it('lists the models of Anthropic’s OpenAI-compatible endpoint, which wants a version header there', async () => {
+    const anthropic = (async (url: string, init?: RequestInit) => {
+      const headers = (init?.headers ?? {}) as Record<string, string>
+      if (url.endsWith('/models') && headers['anthropic-version'] === undefined) {
+        return new Response(JSON.stringify({ type: 'error', error: { type: 'invalid_request_error', message: 'anthropic-version: header is required' } }), { status: 400, statusText: 'Bad Request' })
+      }
+      return new Response(JSON.stringify(url.endsWith('/models') ? { data: [{ id: 'claude-haiku-5-5' }] } : { choices: [] }), { status: 200 })
+    }) as unknown as typeof fetch
+    expect(await testOwnEndpoint({ baseUrl: 'https://api.anthropic.com/v1', model: 'claude-haiku-5-5', key: 'sk-ant-x' }, anthropic)).toEqual({
+      ok: true,
+      said: 'It answered, and serves claude-haiku-5-5. It can use tools.',
+      tools: true
+    })
+  })
+
   it('says it could not be reached, rather than throwing', async () => {
     const down = (async () => {
       throw new Error('connect ECONNREFUSED 127.0.0.1:11434')

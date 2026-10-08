@@ -308,7 +308,9 @@ async function listedModels(
   const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
     const response = await fetcher(`${input.baseUrl}/models`, {
-      headers: input.key === undefined ? {} : { authorization: `Bearer ${input.key}` },
+      // Anthropic's OpenAI-compatible endpoint lists its models only with a version header ("anthropic-version: header
+      // is required", 400, measured 2026-10-07); its chat route needs none. Other servers ignore a header they don't know.
+      headers: { 'anthropic-version': '2023-06-01', ...(input.key === undefined ? {} : { authorization: `Bearer ${input.key}` }) },
       signal: controller.signal
     })
     if (response.status === 401 || response.status === 403) return { ok: false, said: 'It answered, and refused the key.' }

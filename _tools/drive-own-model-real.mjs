@@ -46,8 +46,14 @@ const only = new Set((arg('--only') ?? 'a,b,c,d,e').split(','))
 const MINUTES = Number(process.env.LOCUST_DRIVE_RUN_MINUTES ?? '15')
 const FREE_MODEL = process.env.LOCUST_FREE_MODEL ?? 'opencode/muse-spark-1.3-contributor-free'
 
+// A hosted provider's key (Anthropic's OpenAI-compatible endpoint, 10/07): read once from this process's memory,
+// typed into the Key field as a person would, never printed, and taken out of the environment before Locust starts.
+const KEY = process.env.LOCUST_OWN_MODEL_KEY || undefined
+delete process.env.LOCUST_OWN_MODEL_KEY
+const authHeaders = KEY === undefined ? {} : { Authorization: `Bearer ${KEY}`, 'x-api-key': KEY, 'anthropic-version': '2023-06-01' }
+
 // The server first: a drive against nothing proves nothing.
-const listed = await fetch(`${BASE}/models`).then((response) => response.json()).catch(() => undefined)
+const listed = await fetch(`${BASE}/models`, { headers: authHeaders }).then((response) => response.json()).catch(() => undefined)
 const ids = Array.isArray(listed?.data) ? listed.data.map((entry) => entry.id) : []
 if (!ids.includes(MODEL)) {
   say(`the server at ${BASE} does not list ${MODEL} (it lists: ${ids.join(', ') || 'nothing'}); start it first`)
@@ -251,6 +257,7 @@ try {
   await drive.evaluate(type(inputs(1), NAME))
   await drive.evaluate(type(inputs(2), MODEL))
   await drive.evaluate(type(inputs(3), BASE))
+  if (KEY !== undefined && !(await drive.evaluate(type(inputs(4), KEY)))) say('  the Key field was not found')
   const began = Date.now()
   const tested = String(await drive.capture('(a) Test, against the real server', () => drive.evaluate(pressIn('.lc-ownmodel__actions', 'Test', 90))))
   const testSeconds = Math.round((Date.now() - began) / 1000)
