@@ -44,7 +44,9 @@ const LISTED: Readonly<Record<string, { readonly places: number; readonly said: 
   'locust-mcp-host.ts': { places: 1, said: ['Let your other AI apps use Locust', 'authenticates the token before reading the request body'] },
   'antigravity-cascade.ts': { places: 1, said: ['Antigravity\'s own local server, at `127.0.0.1`'] },
   // Test: the models the address serves, then one capped chat request with a tool.
-  'own-models.ts': { places: 2, said: ['Testing one of your own models', 'When you press Test'] }
+  'own-models.ts': { places: 2, said: ['Testing one of your own models', 'When you press Test'] },
+  // The default fetch, and the one request every look and keep goes through.
+  'skill-library.ts': { places: 2, said: ['Skills from GitHub', 'Redirects are followed only to those two hosts'] }
 }
 
 describe('every place Locust reaches the network is in docs/NETWORK.md', () => {

@@ -24,6 +24,8 @@ import { join } from 'node:path'
  *   - `personal`, from `~/.claude/skills` -- only when the person has said so
  *     in Settings (`claudeOwnSkills`). Their own skills are theirs, written
  *     for their own sessions; a teammate gets them when asked, not by default.
+ *   - `library`, the skills the person kept from a GitHub repository
+ *     (0.710, skill-library.ts) -- always: keeping one is the asking.
  *
  * COPIED, never linked. A junction would always be current, but the run's
  * folder is removed when the run ends, and a removal that followed a link
@@ -31,8 +33,10 @@ import { join } from 'node:path'
  * Only folders holding a SKILL.md are copied, within a size bound, so a stray
  * build folder beside the skills is never carried along.
  *
- * Auto needs none of this: it runs without `--restricted`, as the person, and
- * Claude Code finds both folders itself.
+ * Auto needs none of this for the first two: it runs without `--restricted`,
+ * as the person, and Claude Code finds both folders itself. It does need the
+ * library, which lives in Locust's profile where nothing else looks, so an
+ * Auto run is handed that one alone (`auto`).
  */
 
 /** Claude Code's own rule for a plugin's skill: `skills/<name>/SKILL.md`. */
@@ -43,7 +47,13 @@ const MOST_BYTES_A_SKILL = 5 * 1024 * 1024
 const MOST_BYTES_ALL = 40 * 1024 * 1024
 const MOST_SKILLS = 200
 
-export type SkillPluginName = 'project' | 'personal'
+export type SkillPluginName = 'project' | 'personal' | 'library'
+
+const PLUGIN_DESCRIPTION: Record<SkillPluginName, string> = {
+  project: "This folder's own skills",
+  personal: 'Your own Claude Code skills',
+  library: 'Skills you kept from GitHub'
+}
 
 export interface SkillPlugin {
   readonly name: SkillPluginName
@@ -114,7 +124,7 @@ async function buildPlugin(base: string, name: SkillPluginName, from: string): P
   await mkdir(join(dir, '.claude-plugin'), { recursive: true })
   await writeFile(
     join(dir, '.claude-plugin', 'plugin.json'),
-    `${JSON.stringify({ name, description: name === 'project' ? "This folder's own skills" : 'Your own Claude Code skills', version: '1.0.0' })}\n`
+    `${JSON.stringify({ name, description: PLUGIN_DESCRIPTION[name], version: '1.0.0' })}\n`
   )
   const copied: string[] = []
   for (const skill of names) {
@@ -142,6 +152,10 @@ export async function prepareClaudeSkills(options: {
   readonly workspacePath: string
   readonly ownSkills: boolean
   readonly homeDirectory?: string
+  /** The kept skills' folder (skill-library.ts `skillsFolder`). */
+  readonly libraryFolder?: string
+  /** An Auto run: it finds the folder's skills and the person's itself, so only the library is built. */
+  readonly auto?: boolean
 }): Promise<PreparedSkills> {
   const base = join(options.scratchRoot, randomUUID())
   const dispose = async (): Promise<void> => {
@@ -149,11 +163,17 @@ export async function prepareClaudeSkills(options: {
   }
   try {
     const plugins: SkillPlugin[] = []
-    const project = await buildPlugin(base, 'project', join(options.workspacePath, '.claude', 'skills'))
-    if (project !== undefined) plugins.push(project)
-    if (options.ownSkills) {
+    if (options.auto !== true) {
+      const project = await buildPlugin(base, 'project', join(options.workspacePath, '.claude', 'skills'))
+      if (project !== undefined) plugins.push(project)
+    }
+    if (options.ownSkills && options.auto !== true) {
       const personal = await buildPlugin(base, 'personal', join(options.homeDirectory ?? homedir(), '.claude', 'skills'))
       if (personal !== undefined) plugins.push(personal)
+    }
+    if (options.libraryFolder !== undefined) {
+      const library = await buildPlugin(base, 'library', options.libraryFolder)
+      if (library !== undefined) plugins.push(library)
     }
     if (plugins.length === 0) await dispose()
     return { plugins, dispose }

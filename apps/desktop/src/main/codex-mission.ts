@@ -544,7 +544,7 @@ interface CodexMissionServiceOptions {
    * built for it alone (0.679, claude-skills.ts); `dispose` removes them when
    * the run's process ends. Absent: no skills beyond Claude Code's own.
    */
-  readonly claudeSkills?: (workspacePath: string) => Promise<PreparedSkills>
+  readonly claudeSkills?: (workspacePath: string, run: { readonly auto: boolean }) => Promise<PreparedSkills>
   /** Connectors a Cursor teammate can call, by name, for its briefing. */
   readonly readyConnectors?: () => Promise<string | undefined>
   /**
@@ -1939,11 +1939,12 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         /*
          * SKILLS (0.679). `--restricted` keeps a Claude run from finding the
          * folder's skills or the person's, so they are handed to it as
-         * plugins, copied for this run. Auto finds them itself.
+         * plugins, copied for this run. Auto finds them itself -- all but
+         * the skills kept from GitHub (0.710), which live in Locust's profile.
          */
         const skills =
-          runtime === 'claude' && effectiveSandbox !== 'full-access' && options.claudeSkills !== undefined
-            ? await options.claudeSkills(runCwd).catch(() => undefined)
+          runtime === 'claude' && options.claudeSkills !== undefined
+            ? await options.claudeSkills(runCwd, { auto: effectiveSandbox === 'full-access' }).catch(() => undefined)
             : undefined
         const skillPlugins = skills?.plugins.map((plugin) => plugin.dir) ?? []
         if (skills !== undefined && skills.plugins.length > 0) {

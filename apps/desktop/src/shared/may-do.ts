@@ -43,7 +43,7 @@ const NO_COMMANDS: MayDoRow = { verdict: 'deny', text: 'running commands' }
 /** A command with nothing around it but the person's own account. */
 const OPEN_COMMANDS: MayDoRow = { verdict: 'allow', wide: true, text: 'run commands, which can reach anything your account can' }
 const THE_WEB: MayDoRow = { verdict: 'allow', wide: true, text: 'search the web and open web pages' }
-const CLAUDE_SKILLS: MayDoRow = { verdict: 'allow', text: "use this folder's skills, and yours when Settings lends them, with only the tools listed here" }
+const CLAUDE_SKILLS: MayDoRow = { verdict: 'allow', text: "use this folder's skills, yours when Settings lends them, and the ones you kept from GitHub, with only the tools listed here" }
 const NOT_OUTSIDE: MayDoRow = { verdict: 'deny', text: 'opening files outside this folder, other than by running a command' }
 
 /**

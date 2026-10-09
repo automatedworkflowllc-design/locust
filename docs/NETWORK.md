@@ -22,6 +22,7 @@ until it is listed here.
 | Keeping Codex CLI and Copilot CLI current | the npm registry, and `raw.githubusercontent.com/automatedworkflowllc-design/locust-releases/main/runtime-canary.json` | 45 seconds after the installed Locust starts, then at most every 6 hours |
 | The pet gallery | `openpets.dev`, addresses under `/pets/` only | When you open the gallery, and when you take a pet |
 | Testing one of your own models | the address you gave it in Settings > Your own models | When you press Test |
+| Skills from GitHub | `api.github.com` and `raw.githubusercontent.com`, for the public repository you name | When you press Look, Look for changes, or Keep in Settings > Teammates |
 | Voice typing's one-time files | `github.com/ggml-org/whisper.cpp`, `huggingface.co/ggerganov/whisper.cpp`, and their download CDNs | On Windows x64, only when you press Download in the microphone's first-use prompt |
 | OpenAI voice typing | `https://api.openai.com/v1/audio/transcriptions` | Only after choosing Your OpenAI account, saving your API key, allowing audio upload, and recording with the microphone |
 | A web page a teammate made, open in the preview | eight public hosts, for libraries and fonts only | While the page is open |
@@ -54,6 +55,15 @@ a single word and carrying one tool that does nothing, to see whether it can
 use tools. A key you gave goes with both, to that address and nowhere else.
 Nothing of your work is in either request. A teammate's runs on the model go
 through OpenCode, below.
+
+**Skills from GitHub.** Look asks GitHub's API for the repository you named,
+the commit its branch points to, and the list of its files at that commit,
+then reads each skill's SKILL.md for its description. Keep downloads the files
+of the skills you ticked, at that same commit, and checks each against the
+file id GitHub's list gives it. No sign-in is asked for or sent, so only public
+repositories can be read, and GitHub allows 60 looks an hour from one address.
+Redirects are followed only to those two hosts. Nothing is checked again on its
+own: a kept skill changes only when you look for changes and keep again.
 
 **Voice typing's one-time files.** Download retrieves the pinned Windows x64 CPU
 archive `b5454/whisper-bin-x64.zip` and the selected pinned model:

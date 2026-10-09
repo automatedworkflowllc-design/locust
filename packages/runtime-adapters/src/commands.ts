@@ -470,7 +470,8 @@ export interface RuntimeCommandOptions {
    * MEASURED 2026-10-04 drops the folder's `.claude/skills` and the person's
    * own; a plugin named on the command line is the one way a skill still
    * loads (FINDING-claude-skills-under-restricted.md). Auto runs as the
-   * person and finds them itself, so it is never sent there. Claude Code only.
+   * person and finds those itself; it is sent only the skills kept from
+   * GitHub (0.710), which live in Locust's profile. Claude Code only.
    */
   readonly skillPlugins?: readonly string[];
 }
@@ -932,16 +933,16 @@ export function createClaudePrintCommand(
           requireText(options.permissionBridge.toolName, "Permission tool"),
         ]),
   ];
-  if (!auto) {
-    // `--add-dir` too: `--restricted` confines the file tools to the working
-    // directories, and a skill reads the files kept beside its SKILL.md.
-    // MEASURED 2026-10-06 on Haiku in Ask: the skill loaded, and its own
-    // second-word.md was refused, "not permitted to use Read". The folder is
-    // a copy made for this run alone (claude-skills.ts), removed after it.
-    for (const dir of options.skillPlugins ?? []) {
-      const folder = requireText(dir, "Skill folder");
-      args.push("--plugin-dir", folder, "--add-dir", folder);
-    }
+  // `--add-dir` too outside Auto: `--restricted` confines the file tools to
+  // the working directories, and a skill reads the files kept beside its
+  // SKILL.md. MEASURED 2026-10-06 on Haiku in Ask: the skill loaded, and its
+  // own second-word.md was refused, "not permitted to use Read". The folder
+  // is a copy made for this run alone (claude-skills.ts), removed after it.
+  // Auto is sent only the skills kept from GitHub (0.710), which nothing
+  // else finds; it runs as the person, so needs no `--add-dir`.
+  for (const dir of options.skillPlugins ?? []) {
+    const folder = requireText(dir, "Skill folder");
+    args.push("--plugin-dir", folder, ...(auto ? [] : ["--add-dir", folder]));
   }
   if (options.model !== undefined) {
     args.push("--model", requireText(options.model, "Model"));

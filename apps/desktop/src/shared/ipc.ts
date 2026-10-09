@@ -1269,6 +1269,84 @@ export const MEMORY_UPDATE_CHANNEL = 'memory:update'
 export const MEMORY_REMOVE_CHANNEL = 'memory:remove'
 export const MEMORY_CLEAR_CHANNEL = 'memory:clear'
 export const MEMORY_RESTORE_CHANNEL = 'memory:restore'
+export const SKILL_LIBRARY_PREVIEW_CHANNEL = 'skill-library:preview'
+export const SKILL_LIBRARY_INSTALL_CHANNEL = 'skill-library:install'
+export const SKILL_LIBRARY_LIST_CHANNEL = 'skill-library:list'
+export const SKILL_LIBRARY_REMOVE_CHANNEL = 'skill-library:remove'
+
+/**
+ * SKILLS FROM A GITHUB REPOSITORY (0.710, skill-library.ts). A person names a
+ * public repository; Locust lists the skill folders in it (a folder holding a
+ * SKILL.md) with every file each carries, the files a run could execute
+ * marked; the person keeps the ones they pick, at the one commit the list was
+ * read from. Nothing changes until they look again and keep again.
+ */
+export interface SkillLibraryFile {
+  /** Inside the skill's folder: `scripts/fill.py`. */
+  readonly path: string
+  readonly bytes: number
+  /** A script or program: an extension that runs, or a file GitHub records as executable. */
+  readonly runs: boolean
+}
+
+export interface SkillLibrarySkill {
+  /** The folder's name, which is the skill's: a run calls it `library:<name>`. */
+  readonly name: string
+  /** Where it sits in the repository: `skills/pdf`. */
+  readonly folder: string
+  /** From the SKILL.md's `description:`, when it has one. */
+  readonly description?: string
+  readonly bytes: number
+  readonly files: readonly SkillLibraryFile[]
+  /** Why it cannot be kept, when it cannot: too large, or the name is kept from another repository. */
+  readonly held?: string
+  /** The commit this repository's copy of it was kept at, when one is kept. */
+  readonly keptAt?: string
+}
+
+export interface SkillLibraryPreview {
+  /** `owner/repo`. */
+  readonly source: string
+  /** The branch, tag or commit the link named, or the repository's default branch. */
+  readonly ref: string
+  /** The commit read: what keeping installs, whatever the branch does after. */
+  readonly sha: string
+  readonly skills: readonly SkillLibrarySkill[]
+  /** True when GitHub listed only part of a very large repository. */
+  readonly partial: boolean
+}
+
+export type SkillLibraryPreviewResponse =
+  | { readonly ok: true; readonly data: SkillLibraryPreview }
+  | { readonly ok: false; readonly error: { readonly code: 'SKILL_LIBRARY_REJECTED'; readonly message: string } }
+
+export interface SkillLibraryInstallRequest {
+  readonly source: string
+  readonly ref: string
+  readonly sha: string
+  readonly names: readonly string[]
+}
+
+export interface SkillLibraryKept {
+  readonly name: string
+  readonly files: number
+  readonly bytes: number
+  /** The files in it that run, by path inside the skill. */
+  readonly runs: readonly string[]
+}
+
+export interface SkillLibrarySource {
+  readonly source: string
+  readonly ref: string
+  readonly sha: string
+  readonly keptAt: string
+  readonly skills: readonly SkillLibraryKept[]
+}
+
+export type SkillLibraryListResponse =
+  | { readonly ok: true; readonly data: { readonly sources: readonly SkillLibrarySource[] } }
+  | { readonly ok: false; readonly error: { readonly code: 'SKILL_LIBRARY_REJECTED'; readonly message: string } }
+
 export const RUNTIME_SETUP_CHANNEL = 'runtime:setup'
 /** Every connector the person's Claude Code reports, and which each teammate may use. */
 export const CONNECTOR_LIST_CHANNEL = 'connectors:list'
@@ -3723,6 +3801,13 @@ export interface DesktopApi {
   clearMemories(request: MemoryClearRequest): Promise<MemoryListResponse>
   /** Put a recently forgotten memory back, as it was. */
   restoreMemory(memoryId: string): Promise<MemoryListResponse>
+  /** Skills from a GitHub repository (0.710): what a link holds, before anything is kept. */
+  previewSkillLibrary(link: string): Promise<SkillLibraryPreviewResponse>
+  /** Keep the named skills of a previewed repository, at the commit the preview read. */
+  installSkillLibrary(request: SkillLibraryInstallRequest): Promise<SkillLibraryListResponse>
+  listSkillLibrary(): Promise<SkillLibraryListResponse>
+  /** Remove every skill kept from one repository (`owner/repo`). */
+  removeSkillLibrary(source: string): Promise<SkillLibraryListResponse>
   writeWorkspaceSettings(settings: WorkspaceSettings): Promise<WorkspaceSettings>
   decideMissionApproval(answer: MissionApprovalAnswer): Promise<{ readonly ok: boolean }>
   /** Saved approval rules (0.521). */

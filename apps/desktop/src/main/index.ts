@@ -111,6 +111,7 @@ import type { AwaySummaryCounts } from '../shared/away.js'
 import { createRecentEdits } from './recent-edits.js'
 import { createCheckpoints, createTurnRecords } from './checkpoints.js'
 import { clearClaudeSkillCopies, prepareClaudeSkills } from './claude-skills.js'
+import { createSkillLibrary, SkillLibraryError } from './skill-library.js'
 import { createFolderCommits } from './folder-commit.js'
 import { createBackgroundRuns } from './claude-background-runs.js'
 import type { BackgroundRun, BackgroundRuns } from './claude-background-runs.js'
@@ -292,6 +293,10 @@ import {
   MEMORY_REMOVE_CHANNEL,
   MEMORY_CLEAR_CHANNEL,
   MEMORY_RESTORE_CHANNEL,
+  SKILL_LIBRARY_PREVIEW_CHANNEL,
+  SKILL_LIBRARY_INSTALL_CHANNEL,
+  SKILL_LIBRARY_LIST_CHANNEL,
+  SKILL_LIBRARY_REMOVE_CHANNEL,
   RUNTIME_SETUP_CHANNEL,
   WORKTREE_LIST_CHANNEL,
   WORKTREE_REMOVE_CHANNEL,
@@ -416,7 +421,8 @@ import type {
   MissionApprovalRequest,
   MissionApprovalAnswer,
   MissionHandoffRequest,
-  MissionResumeRequest
+  MissionResumeRequest,
+  SkillLibraryInstallRequest
 } from '../shared/ipc.js'
 import { ROUTINE_RECOVERY_CHANNEL } from '../shared/routine-recovery.js'
 import { decideRoutineRecovery } from './routine-recovery-ipc.js'
@@ -526,6 +532,8 @@ const checkpoints = createCheckpoints({ root: join(app.getPath('userData'), 'che
 const turnRecords = createTurnRecords(join(app.getPath('userData'), 'checkpoints', 'turns.json'))
 /** Skills copied for each Claude run outside Auto (0.679); what a crash left is cleared at launch. */
 const claudeSkillCopies = join(app.getPath('userData'), 'claude-skills')
+/** Skills the person kept from a GitHub repository (0.710), handed to every Claude run as the `library` plugin. */
+const skillLibrary = createSkillLibrary({ root: join(app.getPath('userData'), 'skill-library') })
 const runtimeFactsLoaded = runtimeFacts.load().catch(() => undefined)
 // What an ACP agent said it can do at its last run (W12), for Settings > AI agents.
 const acpCapabilities = createAcpCapabilitiesStore({ rootDirectory: app.getPath('userData') })
@@ -2272,9 +2280,16 @@ if (!ownsSingleInstanceLock) {
       // switch reaches the next mission without a restart.
       askConnectors: async () => (await teammates.readSettings()).askConnectors === true,
       keepATodoList: async () => (await teammates.readSettings()).keepATodoList === true,
-      // The folder's skills always; the person's own only when Settings says so, read at run start.
-      claudeSkills: async (workspace) =>
-        prepareClaudeSkills({ scratchRoot: claudeSkillCopies, workspacePath: workspace, ownSkills: (await teammates.readSettings()).claudeOwnSkills === true }),
+      // The folder's skills always; the person's own only when Settings says so, read at run start; the ones kept
+      // from GitHub always, Auto included.
+      claudeSkills: async (workspace, run) =>
+        prepareClaudeSkills({
+          scratchRoot: claudeSkillCopies,
+          workspacePath: workspace,
+          ownSkills: (await teammates.readSettings()).claudeOwnSkills === true,
+          libraryFolder: skillLibrary.skillsFolder,
+          auto: run.auto
+        }),
       readyConnectors: cursorReadyConnectors,
       // Each runtime's own slash commands (0.426, runtime-commands.ts).
       cursorDefaultModel,
@@ -6475,6 +6490,44 @@ if (!ownsSingleInstanceLock) {
         return await memoryList()
       } catch {
         return memoryRejected('The memory could not be removed.')
+      }
+    })
+    // Skills from a GitHub repository (0.710, skill-library.ts). Look, then keep what was looked at.
+    const skillLibraryRejected = (error: unknown, fallback: string) =>
+      ({ ok: false, error: { code: 'SKILL_LIBRARY_REJECTED', message: error instanceof SkillLibraryError ? error.message : fallback } }) as const
+    ipcMain.handle(SKILL_LIBRARY_PREVIEW_CHANNEL, async (event, link: unknown) => {
+      if (!fromOwnWindow(event)) return skillLibraryRejected(undefined, 'Locust could not look at that repository.')
+      try {
+        return { ok: true, data: await skillLibrary.preview(String(link ?? '')) } as const
+      } catch (error) {
+        note('skill-library', `preview failed: ${error instanceof Error ? error.message : String(error)}`)
+        return skillLibraryRejected(error, 'Locust could not look at that repository.')
+      }
+    })
+    ipcMain.handle(SKILL_LIBRARY_INSTALL_CHANNEL, async (event, request: unknown) => {
+      if (!fromOwnWindow(event)) return skillLibraryRejected(undefined, 'Nothing was kept.')
+      try {
+        const sources = await skillLibrary.install((typeof request === 'object' && request !== null ? request : {}) as SkillLibraryInstallRequest)
+        return { ok: true, data: { sources } } as const
+      } catch (error) {
+        note('skill-library', `keep failed: ${error instanceof Error ? error.message : String(error)}`)
+        return skillLibraryRejected(error, 'Nothing was kept. Try again.')
+      }
+    })
+    ipcMain.handle(SKILL_LIBRARY_LIST_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) return skillLibraryRejected(undefined, 'Locust could not read the kept skills.')
+      try {
+        return { ok: true, data: { sources: await skillLibrary.list() } } as const
+      } catch (error) {
+        return skillLibraryRejected(error, 'Locust could not read the kept skills.')
+      }
+    })
+    ipcMain.handle(SKILL_LIBRARY_REMOVE_CHANNEL, async (event, source: unknown) => {
+      if (!fromOwnWindow(event)) return skillLibraryRejected(undefined, 'Nothing was removed.')
+      try {
+        return { ok: true, data: { sources: await skillLibrary.remove(String(source ?? '')) } } as const
+      } catch (error) {
+        return skillLibraryRejected(error, 'Nothing was removed. Try again.')
       }
     })
     ipcMain.handle(MEMORY_RESTORE_CHANNEL, async (event, memoryId: unknown) => {

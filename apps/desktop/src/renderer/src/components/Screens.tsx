@@ -74,6 +74,7 @@ import { WorktreeRow } from './WorktreeRow.js'
 import type { WorktreeRemoval } from './WorktreeRow.js'
 import { ArmedButton } from './ArmedButton.js'
 import { OwnModels } from './OwnModels.js'
+import { SkillsFromGitHub } from './SkillsFromGitHub.js'
 import { routineAwaitsReview } from '../../../shared/routine-recovery.js'
 import { SavedApprovalRules } from './SavedApprovalRules.js'
 
@@ -2503,6 +2504,29 @@ export function SettingsScreen({
               teammate in Ask that uses a skill still changes nothing. In Auto a teammate runs as you and
               finds every skill you have, whichever way this is set.
             </p>
+          </More>
+        </section>
+        )}
+        {shownPage === 'teammates' && (
+        <section className="lc-settings__section" data-setting="skills-from-github">
+          <h2 className="lc-settings__heading">Skills from GitHub</h2>
+          <p className="lc-settings__lede">
+            Keep skills from a public repository. Claude Code teammates get them on every run, in every mode.
+          </p>
+          <SkillsFromGitHub />
+          <More>
+            <p>
+              Look lists every skill in the repository and every file each one carries, before anything is
+              downloaded. Files that run, such as scripts and programs, are named. Only the skills you tick are
+              kept, exactly as they are at the commit you looked at. Nothing changes when the repository does,
+              until you look for changes and keep again.
+            </p>
+            <p>
+              A skill is instructions a teammate follows, and its scripts run with the teammate's mode. In Ask
+              they cannot change anything; in Auto a teammate can run them without asking. Keep skills from
+              people you trust, as you would install a program.
+            </p>
+            <p>Only public repositories are read, and Locust sends GitHub nothing about you.</p>
           </More>
         </section>
         )}
