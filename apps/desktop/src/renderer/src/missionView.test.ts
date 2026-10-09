@@ -1083,6 +1083,8 @@ describe('signal rail', () => {
     expect(railToolName({ name: 'robinhood.get_quotes', command: 'NVDA' })).toBe('robinhood.get_quotes · NVDA')
     expect(railToolName({ name: 'shell', toolKind: 'command_execution' })).toBe('Ran a command')
     expect(railToolName({ name: 'WebSearch', command: 'oracle force majeure' })).toBe('Searched the web for oracle force majeure')
+    // Codex opens a page with the same tool, and its query is then the address.
+    expect(railToolName({ name: 'web_search', toolKind: 'web_search', command: 'https://releases.electronjs.org' })).toBe('Opened https://releases.electronjs.org')
   })
 })
 

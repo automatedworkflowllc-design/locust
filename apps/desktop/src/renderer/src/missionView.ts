@@ -4590,7 +4590,12 @@ export function railToolName(tool: { readonly name: string; readonly toolKind?: 
   const skill = skillCalled(tool.name, shown ?? '')
   if (skill !== undefined) return railLabel(skillWords(skill, false))
   if (tool.name === 'file_change' || editToolName(tool.name)) return railLabel(file === undefined ? 'Changed a file' : `Changed ${file}`)
-  if (words.includes('websearch') || (words.includes('web') && words.includes('search'))) return railLabel(shown === undefined ? 'Searched the web' : `Searched the web for ${shown}`)
+  // Codex's one web tool also opens pages, and then its query is the address
+  // (0.711, probe-codex-web-search): that is opening a page, not a search.
+  if (words.includes('websearch') || (words.includes('web') && words.includes('search'))) {
+    if (shown !== undefined && /^https?:\/\/\S+$/i.test(shown)) return railLabel(`Opened ${shown}`)
+    return railLabel(shown === undefined ? 'Searched the web' : `Searched the web for ${shown}`)
+  }
   if (words.some((word) => word === 'search' || word === 'grep' || word === 'find' || word === 'glob')) return railLabel(shown === undefined ? 'Searched' : `Searched for ${shown}`)
   if (words.some((word) => word === 'read' || word === 'view' || word === 'cat' || word === 'open')) return railLabel(file === undefined ? 'Read a file' : `Read ${file}`)
   if (words.some((word) => word === 'fetch' || word === 'browse')) return railLabel(shown === undefined ? 'Opened a page' : `Opened ${shown}`)

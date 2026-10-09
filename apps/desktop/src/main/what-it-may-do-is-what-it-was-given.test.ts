@@ -1,6 +1,8 @@
 import {
   codexAppServerPolicy,
   createClaudePrintCommand,
+  createCodexAppServerCommand,
+  createCodexExecCommand,
   createCopilotPromptCommand,
   createCursorPrintCommand,
   createMuseExecCommand,
@@ -125,11 +127,38 @@ describe('what the panel says a run may do', () => {
     expect(said('codex', 'full-access')).toContain('allow run any command your account can run, and reach any network')
   })
 
+  it('Codex: its own web search is left on in every mode, and Approve each says it does not ask', () => {
+    const appServer = createCodexAppServerCommand(launch('codex'), { workspacePath: 'C:\\work\\pebble', cliVersion: '0.162.0' })
+    expect(appServer.args.join(' ')).not.toMatch(/web_search/)
+    expect(createCodexExecCommand(launch('codex'), options('workspace-write')).args.join(' ')).not.toMatch(/web_search/)
+    for (const sandbox of SANDBOXES) {
+      expect(said('codex', sandbox)).toContain('allow search the web and open web pages')
+    }
+    expect(said('codex', 'workspace-write', 'approve-each')).toContain('allow search the web and open web pages, without asking')
+  })
+
   it('Cursor Agent: says nothing about commands it was not given a rule for', () => {
     expect(createCursorPrintCommand(launch('cursor'), options('workspace-write')).args).not.toContain('--force')
-    expect(said('cursor', 'workspace-write')).toEqual(['allow read the files in this folder', 'allow change files in this folder'])
+    expect(said('cursor', 'workspace-write')).toEqual([
+      'allow read the files in this folder',
+      'allow change files in this folder',
+      'deny searching the web or opening web pages, which Cursor Agent allows here only in Auto'
+    ])
     expect(createCursorPrintCommand(launch('cursor'), options('full-access')).args).toContain('--force')
-    expect(said('cursor', 'full-access')).toContain('allow run any command your account can run, and reach any network')
+    expect(said('cursor', 'full-access')).toEqual(expect.arrayContaining(['allow run any command your account can run, and reach any network', 'allow search the web and open web pages']))
+  })
+
+  it('the web, runtime by runtime, as measured on 2026-10-09 (probe-web-search-each-runtime)', () => {
+    // Copilot's web_fetch is one of --allow-all-tools, and read-only denies only write and shell.
+    expect(createCopilotPromptCommand(launch('copilot'), options('read-only')).args).toContain('--deny-tool=write,shell')
+    for (const sandbox of SANDBOXES) expect(said('copilot', sandbox)).toContain('allow search the web and open web pages')
+    // Cursor and Antigravity: their own web tools ask, so only Auto runs them.
+    for (const runtime of ['cursor', 'antigravity'] as const) {
+      expect(said(runtime, 'full-access')).toContain('allow search the web and open web pages')
+      for (const sandbox of ['read-only', 'workspace-write'] as const) {
+        expect(said(runtime, sandbox).some((row) => row.startsWith('deny searching the web'))).toBe(true)
+      }
+    }
   })
 
   it('leaves what it was not given to the runtime, by name', () => {

@@ -142,6 +142,10 @@ own models. A connector a teammate uses is called by its agent, at the service
 that connector names. A Claude Code teammate can also search the web and open
 web pages: in Auto on its own, and in every other mode only after you approve
 each one on its card, which shows the search words or the page's whole address.
+Codex CLI, Copilot CLI, OpenCode and Muse Code search the web and open pages
+with their own tools in every mode. Cursor Agent and Antigravity do only in
+Auto: outside it their own rules refuse those tools. Each teammate's Activity
+panel says which of these its run may do, and whether it asks you first.
 
 Locust does not sit between an agent and its service: it reads what the agent
 reports on this machine as it works, and nothing of its network traffic. It
