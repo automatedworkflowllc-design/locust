@@ -65,9 +65,13 @@ describe('the two a comparison starts on', () => {
     // Ling was tried (and failed) most recently; Muse is the one that answered.
     const picks = defaultComparePicks({ ...base, models, current, recent: ['opencode:opencode/ling-3.0-flash-fin-free'], answered: ['opencode/muse-spark-1.3-contributor-free'] })
     expect(picks.map((pick) => pick.model)).toEqual(['opencode/mimo-v2.6-flash-free', 'opencode/muse-spark-1.3-contributor-free'])
-    // Nothing answered yet: the next free one, as before.
+    // Nothing answered yet: the steadiest other free one (0.712, status.FREE_MODELS_BEST_FIRST names Muse, not
+    // Ling 3.0) -- it was the next one listed.
     const fresh = defaultComparePicks({ ...base, models, current, recent: [] })
-    expect(fresh.map((pick) => pick.model)).toEqual(['opencode/mimo-v2.6-flash-free', 'opencode/ling-3.0-flash-fin-free'])
+    expect(fresh.map((pick) => pick.model)).toEqual(['opencode/mimo-v2.6-flash-free', 'opencode/muse-spark-1.3-contributor-free'])
+    // And one that answered here still comes before that order.
+    const answeredLing = defaultComparePicks({ ...base, models, current, recent: [], answered: ['opencode/ling-3.0-flash-fin-free'] })
+    expect(answeredLing.map((pick) => pick.model)).toEqual(['opencode/mimo-v2.6-flash-free', 'opencode/ling-3.0-flash-fin-free'])
   })
 
   it('leave out older models and the person\'s own', () => {

@@ -34,6 +34,10 @@ const from = arg('--from')
  * after failed for the provider's reason, not Locust's. Each drive takes the
  * next of the free models the scorecard (_tools/free-model-scorecard.mjs)
  * found answering, so no one provider carries the sweep.
+ *
+ * The app takes its free models in an order kept from this list since 0.712
+ * (renderer status.ts FREE_MODELS_BEST_FIRST: a new person's first message
+ * goes to the first of them). A model dropped here comes out of that too.
  */
 const FREE_MODELS = [
   // Muse Spark left out 2026-10-06: rate-limited all day, each drive on it waited out OpenCode's retries.

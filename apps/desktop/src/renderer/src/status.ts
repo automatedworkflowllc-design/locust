@@ -1791,11 +1791,17 @@ export function keepWhatWasKnown(
  * on the welcome screen precisely because it needs no account; landing them
  * on an unnamed route afterwards gives that back.
  *
- * THE FIRST LISTED FREE MODEL, not a named one. Naming a specific OpenCode
- * model here would be the same bet `freeStartStillFree` exists to refuse --
- * somebody else's catalogue, changed on somebody else's clock, hardcoded into
- * our first-run path. Catalogue order is OpenCode's own answer to "what
- * first", and it stays right when the list changes.
+ * THE BEST FIRST OF THE LISTED FREE MODELS (0.712; it was the first listed).
+ * Catalogue order looked like OpenCode's own answer to "what first", but it
+ * is only the alphabet, and its first three free models were, in turn, one
+ * OpenCode had retired (Exo, 0.710), one its server no longer had (Fledge
+ * Alpha, "Model not found", the first message on a bare Mac, 0.712), and one
+ * down since 2026-10-05 (Ling 3.0, which OpenCode retries for two and a half
+ * minutes before it gives up). So the listed free models are taken in
+ * FREE_MODELS_BEST_FIRST's order, which names the ones the drive sweeps have
+ * found answering. It only orders what OpenCode lists -- it never adds a
+ * model, so a name gone stale costs nothing -- and a model not named keeps its
+ * catalogue place after them. Retired and down models are left out as before.
  *
  * BUT ONE THAT ANSWERED HERE FIRST (0.517). The first listed (Ling) said
  * "Endpoint is unavailable" all of 2026-09-30 while others answered, and
@@ -1816,7 +1822,7 @@ export function freeStartModel(
   down: ReadonlySet<string> = NONE_DOWN
 ): string | undefined {
   if (runtime !== FREE_START_RUNTIME) return undefined
-  const listed = models.filter((model) => model.runtime === FREE_START_RUNTIME && model.own !== true && model.id.endsWith('-free'))
+  const listed = freeModelsBestFirst(models)
   const up = listed.filter((model) => !down.has(model.id))
   return answered.find((id) => up.some((model) => model.id === id)) ?? up[0]?.id ?? listed[0]?.id
 }
@@ -1824,9 +1830,41 @@ export function freeStartModel(
 const NONE_DOWN: ReadonlySet<string> = new Set()
 
 /**
+ * OpenCode's free models that answered the drive sweeps, steadiest first
+ * (0.712): the 2026-10-05 scorecard (three tasks each, in Edit), the sweeps'
+ * own turn list since (_tools/sweep-drives.mjs FREE_MODELS), and one word asked
+ * of each on 2026-10-09. Kept with that list at each release's sweep. Muse
+ * Spark is last: rate-limited for whole days (2026-10-06). Not named: Ling 3.0
+ * (failing since 2026-10-05), and any model newer than the last sweep.
+ */
+export const FREE_MODELS_BEST_FIRST: readonly string[] = [
+  'opencode/space-bunny-free',
+  'opencode/longcat-2.5-preview-free',
+  'opencode/nemotron-3-ultra-free',
+  'opencode/nemotron-3.5-lightning-free',
+  'opencode/mimo-v2.6-flash-free',
+  'opencode/ling-3.1-flash-free',
+  'opencode/muse-spark-1.3-contributor-free'
+]
+
+/** The listed free models of the free-start runtime, FREE_MODELS_BEST_FIRST's first, then the rest as listed. */
+export function freeModelsBestFirst(models: readonly PublicModel[]): readonly PublicModel[] {
+  const rank = (id: string): number => {
+    const at = FREE_MODELS_BEST_FIRST.indexOf(id)
+    return at < 0 ? FREE_MODELS_BEST_FIRST.length : at
+  }
+  return models
+    .map((model, index) => ({ model, index }))
+    .filter(({ model }) => model.runtime === FREE_START_RUNTIME && model.own !== true && model.id.endsWith('-free'))
+    .sort((a, b) => rank(a.model.id) - rank(b.model.id) || a.index - b.index)
+    .map(({ model }) => model)
+}
+
+/**
  * The free model to offer when this one's provider is busy (C9): the next of
- * OpenCode's free models, in the catalogue's order, after the one the run is
- * on -- round to the first after the last. On 2026-09-26 two free models were
+ * OpenCode's free models, best first (freeModelsBestFirst, 0.712; it was the
+ * catalogue's order), after the one the run is on -- round to the first after
+ * the last. On 2026-09-26 two free models were
  * limited for hours while three others answered, and a new person starts on
  * the first of them. Undefined when the run is not on one of OpenCode's free
  * models, or there is no other: a paid route, or a model of the person's own,
@@ -1840,7 +1878,7 @@ export function nextFreeModel(
   /** Down right now (0.711): skipped, unless every other is down too. */
   down: ReadonlySet<string> = NONE_DOWN
 ): PublicModel | undefined {
-  const free = models.filter((entry) => entry.runtime === FREE_START_RUNTIME && entry.own !== true && entry.id.endsWith('-free'))
+  const free = freeModelsBestFirst(models)
   const at = free.findIndex((entry) => entry.id === model)
   if (runtime !== FREE_START_RUNTIME || at < 0 || free.length < 2) return undefined
   for (let step = 1; step < free.length; step += 1) {

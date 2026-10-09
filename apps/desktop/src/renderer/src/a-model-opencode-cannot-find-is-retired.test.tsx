@@ -42,8 +42,10 @@ describe('a model OpenCode cannot find is retired', () => {
   it('a new person never starts on Fledge Alpha: left out before anyone here has run it', () => {
     const retired = retiredFreeModels([])
     expect(retired.has('opencode/fledge-alpha-free')).toBe(true)
-    expect(freeStartModel('opencode', catalog, [])).toBe('opencode/exo-free')
-    expect(freeStartModel('opencode', shown(retired), [])).toBe('opencode/ling-3.0-flash-fin-free')
+    expect(shown(retired).map((entry) => entry.id)).not.toContain('opencode/fledge-alpha-free')
+    // The steadiest listed (status.FREE_MODELS_BEST_FIRST); and without it, still not Fledge Alpha.
+    expect(freeStartModel('opencode', shown(retired), [])).toBe('opencode/longcat-2.5-preview-free')
+    expect(freeStartModel('opencode', shown(retired).filter((entry) => !entry.id.startsWith('opencode/longcat')), [])).toBe('opencode/ling-3.0-flash-fin-free')
   })
 
   it('the next model OpenCode drops is learned from its first failure, and is back once it answers', () => {

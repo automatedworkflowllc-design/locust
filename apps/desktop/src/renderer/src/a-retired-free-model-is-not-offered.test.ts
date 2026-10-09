@@ -38,8 +38,9 @@ describe('a free model OpenCode retired is not offered', () => {
   it('Exo Free is left out before anyone here has run it: a new person starts on a free model that can answer', () => {
     const retired = retiredFreeModels([])
     expect([...retired]).toEqual(KNOWN_RETIRED_MODELS)
-    expect(freeStartModel('opencode', catalog, [])).toBe('opencode/exo-free')
-    expect(freeStartModel('opencode', shown(retired), [])).toBe('opencode/ling-3.0-flash-fin-free')
+    expect(shown(retired).map((entry) => entry.id)).not.toContain('opencode/exo-free')
+    // Best first since 0.712 (status.FREE_MODELS_BEST_FIRST): Muse is named; Ling 3.0 is not.
+    expect(freeStartModel('opencode', shown(retired), [])).toBe('opencode/muse-spark-1.3-contributor-free')
   })
 
   it('a model whose run ended "has been deprecated" is left out from then on', () => {

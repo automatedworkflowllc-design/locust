@@ -47,8 +47,8 @@ describe('a free model that is down is passed over', () => {
     const down = downFreeModels([run(LING, 'completed', '2026-10-08T10:00:00Z'), lingDown], NOW)
     expect(freeStartModel('opencode', catalog, [LING])).toBe(LING)
     expect(freeStartModel('opencode', catalog, [LING], down)).toBe(MIMO)
-    // Every free model down: still the catalogue's first, never nothing.
-    expect(freeStartModel('opencode', catalog, [], new Set([LING, MIMO, MUSE]))).toBe(LING)
+    // Every free model down: still the first of them, best first since 0.712 (Mimo), never nothing.
+    expect(freeStartModel('opencode', catalog, [], new Set([LING, MIMO, MUSE]))).toBe(MIMO)
   })
 
   it('the card after a failure offers the next one that is up', () => {
@@ -68,7 +68,8 @@ describe('a free model that is down is passed over', () => {
         refusal: () => undefined,
         label: (choice) => choice.model
       }).map((pick) => pick.model)
-    expect(picks()).toEqual([MUSE, LING])
-    expect(picks(new Set([LING]))).toEqual([MUSE, MIMO])
+    // Best first since 0.712: Mimo beside Muse, and Ling 3.0, which the order does not name, only when Mimo is down.
+    expect(picks()).toEqual([MUSE, MIMO])
+    expect(picks(new Set([MIMO]))).toEqual([MUSE, LING])
   })
 })

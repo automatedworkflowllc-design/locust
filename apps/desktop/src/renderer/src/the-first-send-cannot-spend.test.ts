@@ -26,13 +26,14 @@ const model = (id: string, runtime = 'opencode'): PublicModel =>
   ({ id, runtime, displayName: id, description: '', supportedEfforts: [] } as unknown as PublicModel)
 
 describe('the first send cannot spend', () => {
-  it('takes the first free model the catalogue lists', () => {
+  it('takes a free model, the steadiest listed first (0.712), and among the unnamed the first listed', () => {
     const listed = [
       model('opencode/paid-thing'),
       model('opencode/ling-3.0-flash-fin-free'),
       model('opencode/muse-spark-1.3-contributor-free')
     ]
-    expect(freeStartModel('opencode', listed)).toBe('opencode/ling-3.0-flash-fin-free')
+    expect(freeStartModel('opencode', listed)).toBe('opencode/muse-spark-1.3-contributor-free')
+    expect(freeStartModel('opencode', [model('opencode/paid-thing'), model('opencode/zz-one-free'), model('opencode/aa-two-free')])).toBe('opencode/zz-one-free')
   })
 
   it('leaves the route alone when nothing listed is free', () => {

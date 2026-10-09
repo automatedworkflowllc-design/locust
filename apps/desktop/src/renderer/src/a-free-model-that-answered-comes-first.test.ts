@@ -42,12 +42,13 @@ describe('a free model that answered here comes first', () => {
     expect(freeStartModel('opencode', listed, answered)).toBe('opencode/muse-spark-1.3-contributor-free')
   })
 
-  it('with nothing answered yet, the catalogue\'s first free model, as before', () => {
-    expect(freeStartModel('opencode', listed, [])).toBe('opencode/ling-3.0-flash-fin-free')
+  // Best first since 0.712 (status.FREE_MODELS_BEST_FIRST): Mimo, then Muse, then Ling 3.0, which it does not name.
+  it('with nothing answered yet, the steadiest listed free model (it was the catalogue\'s first)', () => {
+    expect(freeStartModel('opencode', listed, [])).toBe('opencode/mimo-v2.6-flash-free')
   })
 
   it('never a model of the person\'s own, even one named -free', () => {
     const own = [model('opencode/mine-free', { own: true } as Partial<PublicModel>), ...listed]
-    expect(freeStartModel('opencode', own, ['opencode/mine-free'])).toBe('opencode/ling-3.0-flash-fin-free')
+    expect(freeStartModel('opencode', own, ['opencode/mine-free'])).toBe('opencode/mimo-v2.6-flash-free')
   })
 })

@@ -1,5 +1,6 @@
 import type { PublicModel } from '../../shared/ipc.js'
 import type { ComparePick } from './components/RoutePicker.js'
+import { FREE_MODELS_BEST_FIRST } from './status.js'
 
 type Choice = { readonly runtime: ComparePick['runtime']; readonly model: string; readonly effort?: string }
 
@@ -55,7 +56,19 @@ export function defaultComparePicks(input: {
   const free = (one: Choice): boolean => one.runtime === 'opencode' && one.model.endsWith('-free')
   // And one that has answered here before one that has not: the first listed can be down for a day (0.517).
   // And never one that is down right now while another is up (0.711: Ling 3.0, a column that never answered).
-  const otherFree = candidates.filter((one) => one !== first && free(one))
+  // And, of the rest, the steadiest first (0.712, status.FREE_MODELS_BEST_FIRST): the alphabet put a retired, a
+  // missing and a down model at the top. One the person picked lately keeps its place ahead of them.
+  const recentlyPicked = new Set(input.recent)
+  const rank = (one: Choice): number => {
+    if (recentlyPicked.has(`${one.runtime}:${one.model}`)) return -1
+    const at = FREE_MODELS_BEST_FIRST.indexOf(one.model)
+    return at < 0 ? FREE_MODELS_BEST_FIRST.length : at
+  }
+  const otherFree = candidates
+    .filter((one) => one !== first && free(one))
+    .map((one, index) => ({ one, index }))
+    .sort((a, b) => rank(a.one) - rank(b.one) || a.index - b.index)
+    .map(({ one }) => one)
   const up = otherFree.filter((one) => input.down?.has(one.model) !== true)
   const second = (free(first) ? up.find((one) => input.answered?.includes(one.model) === true) ?? up[0] ?? otherFree[0] : undefined)
     ?? candidates.find((one) => one.runtime !== first.runtime)
