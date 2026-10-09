@@ -19,7 +19,7 @@ import { openTeammateScript, recordRoot, say, scratchRepository, sleep, startDri
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
-const MODEL = process.env.LOCUST_FREE_MODEL ?? 'opencode/fledge-alpha-free'
+const MODEL = process.env.LOCUST_FREE_MODEL ?? 'opencode/muse-spark-1.3-contributor-free'
 const tag = arg('--tag') ?? 'local'
 const workspace = await scratchRepository('locust-drive-stop-early-ws-')
 const drive = await startDrive({

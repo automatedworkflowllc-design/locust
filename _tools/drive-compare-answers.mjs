@@ -24,8 +24,8 @@ const tag = arg('--tag') ?? 'local'
 const MODEL = process.env.LOCUST_FREE_MODEL ?? 'opencode/nemotron-3-ultra-free'
 // Two models, each `search=>row pattern` (a regular expression over the picker's row label).
 // The first run's second free pick (Ling) had its provider down; OpenCode's free tier rate-limits too. Mimo was
-// rate-limited through 2026-10-06 and its column never finished; Fledge Alpha answered every drive asked of it that day.
-const PICKS = (process.env.LOCUST_COMPARE_PICKS ?? 'free=>nemotron-3-ultra|Nemotron 3 Ultra,free=>fledge-alpha|Fledge Alpha').split(',').map((spec) => {
+// rate-limited through 2026-10-06 and its column never finished; Fledge Alpha answered every drive asked of it that day, and left OpenCode's catalog 2026-10-08 (now Muse Spark).
+const PICKS = (process.env.LOCUST_COMPARE_PICKS ?? 'free=>nemotron-3-ultra|Nemotron 3 Ultra,free=>muse-spark|Muse Spark').split(',').map((spec) => {
   const [search, row] = spec.includes('=>') ? spec.split('=>') : ['free', spec]
   return { search, row }
 })

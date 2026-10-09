@@ -109,7 +109,7 @@ async function summarise() {
   await writeFile(join(out, 'summary.json'), JSON.stringify(results, null, 2), 'utf8')
 }
 
-const RETRY_FIRST = 'opencode/fledge-alpha-free'
+const RETRY_FIRST = 'opencode/muse-spark-1.3-contributor-free'
 const PAID_REFUSAL = /refusing to run "[^"]+": it spends a paid account/
 const PROVIDER_REFUSED = /Rate limit exceeded|rate[- ]limited|Endpoint is unavailable|provider answered "(?:Too Many Requests|Service Unavailable)/i
 async function runDrive(name, model) {

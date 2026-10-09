@@ -20,7 +20,7 @@ import { openTeammateScript, recordRoot, say, scratchRepository, sendAndWaitScri
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
 const tag = arg('--tag') ?? 'local'
-const MODEL = process.env.LOCUST_FREE_MODEL ?? 'opencode/fledge-alpha-free'
+const MODEL = process.env.LOCUST_FREE_MODEL ?? 'opencode/muse-spark-1.3-contributor-free'
 const workspace = await scratchRepository('locust-drive-office-ask-ws-')
 const report = fileURLToPath(new URL('../apps/desktop/test/documents/report-python-docx.docx', import.meta.url))
 await copyFile(report, join(workspace, 'report.docx'))

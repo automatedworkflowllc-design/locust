@@ -20,7 +20,7 @@ import { recordRoot, say, scratchRepository, sleep, startDrive } from './drive-l
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const packaged = arg('--packaged')
 const tag = arg('--tag') ?? 'local'
-const MODEL = process.env.LOCUST_FREE_MODEL ?? 'opencode/fledge-alpha-free'
+const MODEL = process.env.LOCUST_FREE_MODEL ?? 'opencode/muse-spark-1.3-contributor-free'
 const workspace = await scratchRepository('locust-drive-new-routine-ws-')
 await mkdir(join(workspace, 'inbox'), { recursive: true })
 const drive = await startDrive({
