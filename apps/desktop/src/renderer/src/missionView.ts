@@ -5371,6 +5371,19 @@ export function modelRetired(payload: { readonly message?: string }): boolean {
   return RETIRED_PATTERN.test(payload.message ?? '')
 }
 
+/**
+ * THE MODEL'S PROVIDER IS DOWN (0.711). OpenCode's free models go down for
+ * hours at a time: Ling 3.0 answered "Endpoint is unavailable" all of
+ * 2026-09-30, and "Upstream request failed: Model is unavailable" on
+ * 2026-10-09 while Ling 3.1 answered. Going on with the same model fails
+ * again; the card offers the next free model instead.
+ */
+const UNAVAILABLE_PATTERN = /\b(?:model|endpoint) is unavailable\b/i
+
+export function modelUnavailable(payload: { readonly message?: string }): boolean {
+  return UNAVAILABLE_PATTERN.test(payload.message ?? '')
+}
+
 /** Retired before anyone here ran it: a new person's first press must not find out the hard way. */
 export const KNOWN_RETIRED_MODELS: readonly string[] = ['opencode/exo-free']
 

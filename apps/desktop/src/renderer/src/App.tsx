@@ -170,6 +170,7 @@ import {
   failureMessage,
   failedOnItsLimit,
   modelRetired,
+  modelUnavailable,
   retiredFreeModels,
   failedOnProviderSide,
   recentlyUsedRoutes,
@@ -5208,7 +5209,8 @@ export default function App(): ReactElement {
     // A model OpenCode retired (0.710) is out of the list, so there is no "next after it": the free start instead,
     // one that has answered here first.
     const retired = modelRetired(failed.payload)
-    if (!retired && !failedOnItsLimit(failed.payload)) return undefined
+    // A free model whose provider is down (0.711) is a limit of its own: the same model fails again.
+    if (!retired && !modelUnavailable(failed.payload) && !failedOnItsLimit(failed.payload)) return undefined
     const start = retired ? freeStartModel(shown.data.runtime, models, freeAnswered) : undefined
     const next = retired ? models.find((model) => model.runtime === shown.data?.runtime && model.id === start) : nextFreeModel(shown.data.runtime, shown.data.model, models)
     if (next === undefined) return undefined
