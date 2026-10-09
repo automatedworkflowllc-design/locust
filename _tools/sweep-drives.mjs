@@ -111,6 +111,8 @@ async function summarise() {
 
 const RETRY_FIRST = 'opencode/muse-spark-1.3-contributor-free'
 const PAID_REFUSAL = /refusing to run "[^"]+": it spends a paid account/
+/** A drive that reaches a site outside GitHub only when told to (drive-pet-picks: LOCUST_NETWORK=1). */
+const NETWORK_REFUSAL = /Re-run with LOCUST_NETWORK=1 if you mean it/
 const PROVIDER_REFUSED = /Rate limit exceeded|rate[- ]limited|Endpoint is unavailable|provider answered "(?:Too Many Requests|Service Unavailable)/i
 async function runDrive(name, model, attempt = 0) {
   const child = spawn(process.execPath, [join(tools, name), '--packaged', packaged], {
@@ -182,7 +184,7 @@ for (const name of drives.slice(start)) {
     if (process.env.LOCUST_FREE_MODEL !== undefined) break
     // A drive that spends only on some routes (`spends: runtime !== 'opencode'`) passes the filter above and then
     // refuses, correctly, without LOCUST_SPEND: that is a skip, not a failure to run again.
-    if (PAID_REFUSAL.test(run.text)) break
+    if (PAID_REFUSAL.test(run.text) || NETWORK_REFUSAL.test(run.text)) break
     const refused = PROVIDER_REFUSED.test(run.text)
     if (!refused && failedOn.length > 0) break
     ;(refused ? refusedBy : failedOn).push(model.replace(/^opencode\//, ''))
@@ -193,6 +195,12 @@ for (const name of drives.slice(start)) {
     results.push({ name: name.replace(/\.mjs$/, ''), code: 0, timedOut: false, skipped: true, passes: 0, fails: 0, failedLines: [], ms: Date.now() - began, note: 'skipped: it spends a paid account on its default route' })
     await summarise()
     console.log(`${name}: skipped, it spends a paid account on its default route`)
+    continue
+  }
+  if (NETWORK_REFUSAL.test(run.text)) {
+    results.push({ name: name.replace(/\.mjs$/, ''), code: 0, timedOut: false, skipped: true, passes: 0, fails: 0, failedLines: [], ms: Date.now() - began, note: 'skipped: it reaches another site only with LOCUST_NETWORK=1' })
+    await summarise()
+    console.log(`${name}: skipped, it reaches another site only with LOCUST_NETWORK=1`)
     continue
   }
   const passedLater = fails === 0 && code === 0 && (refusedBy.length > 0 || failedOn.length > 0)
