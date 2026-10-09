@@ -11,6 +11,18 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.712.0 - 2026-10-09
+
+### Improved
+
+- **A new person's first message goes to a free model that answers.** "Use a free model" started on the first free model OpenCode lists, which is simply the alphabet: this week that was a model OpenCode had retired, then one its server no longer has, then one whose provider has been down for days, where OpenCode keeps retrying for minutes before it gives up. Locust now starts on the free model that has answered most reliably in its own tests, a failed run offers the next most reliable, and a comparison puts that one beside it. A free model that has answered for you still comes first.
+- **The offer under a failed free model says why.** It said "This model is at its limit" whatever the reason. It now says when OpenCode no longer offers the model, or when the model's provider is down for now.
+- **Mac copies update with every release again.** Releases 0.701 to 0.711 were published without their Mac disk images, so a Mac copy stayed on 0.700. Each release is now built on a Mac, launched there, run, stopped and updated before its images are added; 0.711 has them.
+
+### Fixed
+
+- **A free model OpenCode no longer has is left out.** A fresh install of OpenCode still lists Fledge Alpha, but OpenCode answers "Model not found" for it, and that is where a new person's first message went. Locust leaves it out, treats any model OpenCode cannot find the same way, and offers to switch to a free model that answers.
+
 ## 0.711.0 - 2026-10-09
 
 ### New
