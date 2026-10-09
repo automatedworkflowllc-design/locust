@@ -1811,12 +1811,17 @@ export function keepWhatWasKnown(
 export function freeStartModel(
   runtime: MissionRuntimeId,
   models: readonly PublicModel[],
-  answered: readonly string[] = []
+  answered: readonly string[] = [],
+  /** Down right now (missionView.downFreeModels, 0.711): passed over while another is listed. */
+  down: ReadonlySet<string> = NONE_DOWN
 ): string | undefined {
   if (runtime !== FREE_START_RUNTIME) return undefined
   const listed = models.filter((model) => model.runtime === FREE_START_RUNTIME && model.own !== true && model.id.endsWith('-free'))
-  return answered.find((id) => listed.some((model) => model.id === id)) ?? listed[0]?.id
+  const up = listed.filter((model) => !down.has(model.id))
+  return answered.find((id) => up.some((model) => model.id === id)) ?? up[0]?.id ?? listed[0]?.id
 }
+
+const NONE_DOWN: ReadonlySet<string> = new Set()
 
 /**
  * The free model to offer when this one's provider is busy (C9): the next of
@@ -1831,11 +1836,17 @@ export function freeStartModel(
 export function nextFreeModel(
   runtime: MissionRuntimeId,
   model: string | undefined,
-  models: readonly PublicModel[]
+  models: readonly PublicModel[],
+  /** Down right now (0.711): skipped, unless every other is down too. */
+  down: ReadonlySet<string> = NONE_DOWN
 ): PublicModel | undefined {
   const free = models.filter((entry) => entry.runtime === FREE_START_RUNTIME && entry.own !== true && entry.id.endsWith('-free'))
   const at = free.findIndex((entry) => entry.id === model)
   if (runtime !== FREE_START_RUNTIME || at < 0 || free.length < 2) return undefined
+  for (let step = 1; step < free.length; step += 1) {
+    const next = free[(at + step) % free.length]!
+    if (!down.has(next.id)) return next
+  }
   return free[(at + 1) % free.length]
 }
 

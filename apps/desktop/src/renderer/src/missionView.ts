@@ -5419,6 +5419,40 @@ export function retiredFreeModels(
 }
 
 /**
+ * FREE MODELS THAT ARE DOWN RIGHT NOW (0.711). Ling 3.0 answered "Model is
+ * unavailable" from 2026-10-08 into 2026-10-09 -- more than twelve hours --
+ * and, as the first free model listed, it was still what "Use a free model"
+ * started on, what Compare put beside a free model, and what a card offered
+ * after another free model failed. A free model whose latest run here ended on
+ * that is not suggested for six hours, unless a run on it has finished since.
+ * It stays in the list: anyone can still pick it, and after six hours it is
+ * suggested again, since down is not retired.
+ */
+export const DOWN_FOR_MS = 6 * 60 * 60 * 1000
+
+export function downFreeModels(
+  missions: readonly Pick<PublicRecoveredMission, 'runtime' | 'model' | 'phase' | 'lastUpdatedAt' | 'events'>[],
+  now: number
+): ReadonlySet<string> {
+  const downAt = new Map<string, number>()
+  const answeredAt = new Map<string, number>()
+  for (const mission of missions) {
+    if (mission.runtime !== 'opencode' || !mission.model.endsWith('-free')) continue
+    const at = Date.parse(mission.lastUpdatedAt)
+    if (!Number.isFinite(at)) continue
+    if (mission.phase === 'completed') {
+      answeredAt.set(mission.model, Math.max(answeredAt.get(mission.model) ?? -1, at))
+      continue
+    }
+    if (mission.phase !== 'failed') continue
+    const failed = [...mission.events].reverse().find((event) => event.type === 'run.failed')
+    if (failed === undefined || failed.type !== 'run.failed' || !modelUnavailable(failed.payload)) continue
+    downAt.set(mission.model, Math.max(downAt.get(mission.model) ?? -1, at))
+  }
+  return new Set([...downAt].filter(([model, at]) => now - at < DOWN_FOR_MS && (answeredAt.get(model) ?? -1) <= at).map(([model]) => model))
+}
+
+/**
  * The provider's servers were busy or dropped the turn -- not the person's
  * account, quota or folder (0.511).
  *

@@ -20,7 +20,7 @@ heading: the home screen then shows it once, as a splash.
 ### Improved
 
 - **What it may do says, for every agent, whether it can use the web.** Codex, Copilot, OpenCode and Muse Code search and open pages with their own tools in every mode. Cursor Agent and Antigravity do only in Auto, because outside it their own rules refuse those tools, and the panel now says so instead of saying nothing. When Codex opens a page, its step reads "Opened" and the address rather than "Searched the web for" it.
-- **When a free model's provider is down, Locust offers the next free model.** A run that failed because its free model was unavailable now offers to start again on a free model that answers.
+- **When a free model's provider is down, Locust moves on from it.** A run that failed because its free model was unavailable now offers to start again on a free model that answers. For the next six hours, or until that model answers again, Locust stops suggesting it: "Use a free model", the second model a comparison starts on, and the next model a failed run offers all pass it over. It stays in the model list if you want to pick it yourself.
 
 ### Fixed
 

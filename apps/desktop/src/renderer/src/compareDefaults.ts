@@ -24,6 +24,8 @@ export function defaultComparePicks(input: {
   readonly recent: readonly string[]
   /** OpenCode's free models that finished a run here, newest first (0.517). */
   readonly answered?: readonly string[]
+  /** OpenCode's free models that are down right now (missionView.downFreeModels, 0.711). */
+  readonly down?: ReadonlySet<string>
   readonly models: readonly PublicModel[]
   readonly ready: (runtime: string) => boolean
   readonly refusal: (choice: Choice) => string | undefined
@@ -52,8 +54,10 @@ export function defaultComparePicks(input: {
    */
   const free = (one: Choice): boolean => one.runtime === 'opencode' && one.model.endsWith('-free')
   // And one that has answered here before one that has not: the first listed can be down for a day (0.517).
+  // And never one that is down right now while another is up (0.711: Ling 3.0, a column that never answered).
   const otherFree = candidates.filter((one) => one !== first && free(one))
-  const second = (free(first) ? otherFree.find((one) => input.answered?.includes(one.model) === true) ?? otherFree[0] : undefined)
+  const up = otherFree.filter((one) => input.down?.has(one.model) !== true)
+  const second = (free(first) ? up.find((one) => input.answered?.includes(one.model) === true) ?? up[0] ?? otherFree[0] : undefined)
     ?? candidates.find((one) => one.runtime !== first.runtime)
     ?? candidates[1]
   if (second === undefined) return []

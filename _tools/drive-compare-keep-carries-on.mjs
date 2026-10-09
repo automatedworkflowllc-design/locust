@@ -56,18 +56,58 @@ try {
   check('Compare starts on two models', a !== undefined && b !== undefined, picked)
   check('both free, on a free teammate: no paid model nobody chose', /free/i.test(picked) && !/GPT|Claude|Opus|Sonnet|Fable|Grok|Codex/i.test(picked), picked)
   await drive.capture('asked both', () => drive.evaluate(sendAndWaitScript('Reply with one short sentence about the sea.')))
+  /*
+   * B's provider down (0.711): Ling 3.0 said "Model is unavailable" for over twelve hours over 2026-10-08/09, and as
+   * the first free model listed it is B in a fresh profile -- the 0.710 and 0.711 sweeps both failed here on a column
+   * that never answered, while Locust was fine. A person would do what the comparison offers under it: ASK ANOTHER
+   * MODEL, a third column asked the same question. So does this, on another free model, and keeps THAT column -- still
+   * a free model that is not Wren's own, which is what this drive is about. Locust itself passes over a free model it
+   * has seen down (missionView.downFreeModels); a fresh profile has seen nothing.
+   */
+  const bDown = JSON.parse(String(await drive.evaluate(`(async () => {
+    const settled = () => [...document.querySelectorAll('.lc-compare__head:not(.is-rail)')].every((el) => !/working|starting/i.test(el.innerText))
+    for (let i = 0; i < 480 && !settled(); i += 1) await new Promise((r) => setTimeout(r, 500))
+    const bFoot = [...document.querySelectorAll('.lc-compare__foot:not(.is-rail)')][1]?.innerText ?? ''
+    return JSON.stringify({ down: /(?:model|endpoint) is unavailable/i.test(document.querySelector('.lc-compare')?.innerText ?? '') && !/Keep this one/.test(bFoot), foot: bFoot.replace(/\s+/g, ' ').slice(0, 120) })
+  })()`)))
+  let keepAt = 1
+  if (bDown.down === true) {
+    say(`  B's provider is down (${bDown.foot}); asking another free model too, as the comparison offers`)
+    const added = JSON.parse(String(await drive.evaluate(`(async () => {
+      const pick = document.querySelector('.lc-compare__judgepick[aria-label="The model to ask too"]')
+      if (!pick) return JSON.stringify({ asked: false, why: 'no Ask another model' })
+      const names = [...document.querySelectorAll('.lc-compare__head:not(.is-rail) .lc-compare__name')].map((el) => el.innerText.split(' · ')[0].trim().toLowerCase())
+      // Another maker than any column's: Ling 3.1 was down with Ling 3.0 (0.711 drive), and a comparison holds three.
+      const maker = (text) => text.replace(/^OpenCode \\/ /i, '').split(/\\s+/)[0].toLowerCase()
+      const makers = names.map(maker)
+      const option = [...pick.options].find((one) => /free/i.test(one.text) && !/exo/i.test(one.text) && !makers.includes(maker(one.text)))
+      if (!option) return JSON.stringify({ asked: false, why: 'no other free model offered', options: [...pick.options].map((one) => one.text).slice(0, 12) })
+      const setSelect = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set
+      setSelect.call(pick, option.value)
+      pick.dispatchEvent(new Event('change', { bubbles: true }))
+      await new Promise((r) => setTimeout(r, 300))
+      const ask = [...pick.parentElement.querySelectorAll('button')].find((b) => b.innerText.trim() === 'Ask it too')
+      if (!ask || ask.disabled) return JSON.stringify({ asked: false, why: 'Ask it too not pressable', chose: option.text })
+      ask.click()
+      for (let i = 0; i < 40 && document.querySelectorAll('.lc-compare__head:not(.is-rail)').length < 3; i += 1) await new Promise((r) => setTimeout(r, 250))
+      return JSON.stringify({ asked: true, chose: option.text, columns: document.querySelectorAll('.lc-compare__head:not(.is-rail)').length })
+    })()`)))
+    say(`  asked too: ${JSON.stringify(added)}`)
+    if (added.asked !== true || added.columns < 3) throw new Error(`B's provider was down and no other model could be asked: ${JSON.stringify(added)}`)
+    keepAt = 2
+  }
   const kept = String(await drive.capture('kept B', () => drive.evaluate(`(async () => {
-    // Both columns settled, and B's Keep pressable: a column still working cannot be kept.
+    // Every column settled, and the kept one's Keep pressable (B's, or the model asked too when B was down): a column still working cannot be kept.
     const settled = () => {
       const heads = [...document.querySelectorAll('.lc-compare__head:not(.is-rail)')].map((el) => el.innerText)
       // B's OWN Keep, in B's foot (the second column): the last Keep on the page was A's whenever B had none
       // to offer, and A was kept while this drive thought B was (0.697, found with a debug build).
-      const keep = [...([...document.querySelectorAll('.lc-compare__foot:not(.is-rail)')][1]?.querySelectorAll('button') ?? [])].find((b) => b.innerText.trim() === 'Keep this one')
+      const keep = [...([...document.querySelectorAll('.lc-compare__foot:not(.is-rail)')][${keepAt}]?.querySelectorAll('button') ?? [])].find((b) => b.innerText.trim() === 'Keep this one')
       return heads.length >= 2 && !heads.some((text) => /working|starting/i.test(text)) && keep !== undefined && !keep.disabled
     }
     for (let i = 0; i < 480 && !settled(); i += 1) await new Promise((r) => setTimeout(r, 500))
-    const name = [...document.querySelectorAll('.lc-compare__head:not(.is-rail) .lc-compare__name')].map((el) => el.innerText.trim())[1] ?? ''
-    const bKeep = [...([...document.querySelectorAll('.lc-compare__foot:not(.is-rail)')][1]?.querySelectorAll('button') ?? [])].find((b) => b.innerText.trim() === 'Keep this one')
+    const name = [...document.querySelectorAll('.lc-compare__head:not(.is-rail) .lc-compare__name')].map((el) => el.innerText.trim())[${keepAt}] ?? ''
+    const bKeep = [...([...document.querySelectorAll('.lc-compare__foot:not(.is-rail)')][${keepAt}]?.querySelectorAll('button') ?? [])].find((b) => b.innerText.trim() === 'Keep this one')
     if (!bKeep || bKeep.disabled) return JSON.stringify({ name, chip: ${chip}, gone: false, noKeepForB: true })
     bKeep.click()
     for (let i = 0; i < 40 && document.querySelector('.lc-compare'); i += 1) await new Promise((r) => setTimeout(r, 250))

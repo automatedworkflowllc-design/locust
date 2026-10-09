@@ -172,6 +172,7 @@ import {
   modelRetired,
   modelUnavailable,
   retiredFreeModels,
+  downFreeModels,
   failedOnProviderSide,
   recentlyUsedRoutes,
   freeModelsThatAnswered,
@@ -2191,15 +2192,17 @@ export default function App(): ReactElement {
    */
   // The free models that finished a run here, newest first: preferred over the catalogue's first (0.517).
   const freeAnswered = useMemo(() => freeModelsThatAnswered(history), [history])
+  // And the free models that are down right now, passed over wherever Locust suggests one (0.711).
+  const freeDown = useMemo(() => downFreeModels(history, Date.now()), [history])
   useEffect(() => {
     if (runtimeState.phase !== 'ready' || routeChosen.current) return
     if (route.model !== ACCOUNT_DEFAULT_MODEL) return
-    const free = freeStartModel(route.runtime, models, freeAnswered)
+    const free = freeStartModel(route.runtime, models, freeAnswered, freeDown)
     if (free === undefined) return
     setRoute((current) =>
       current.model === ACCOUNT_DEFAULT_MODEL ? { ...current, model: free } : current
     )
-  }, [runtimeState.phase, route.runtime, route.model, models, freeAnswered])
+  }, [runtimeState.phase, route.runtime, route.model, models, freeAnswered, freeDown])
   // What the CLIs already have set up. Read once discovery has settled: the
   // list is gated on which runtimes are installed, so asking earlier would
   // report an empty machine.
@@ -4095,6 +4098,7 @@ export default function App(): ReactElement {
         : composerRoute,
       recent: recentRoutes,
       answered: freeAnswered,
+      down: freeDown,
       models,
       ready: (runtime) => runtimes.some((status) => status.id === runtime && status.ready),
       refusal: (choice) => compareChoiceRefusal(choice, changes),
@@ -5177,7 +5181,7 @@ export default function App(): ReactElement {
    */
   const busyOffer = ((): { readonly label: string; readonly onPress: () => void } | undefined => {
     const shown = liveRun
-    const next = shown?.data === undefined ? undefined : nextFreeModel(shown.data.runtime, shown.data.model, models)
+    const next = shown?.data === undefined ? undefined : nextFreeModel(shown.data.runtime, shown.data.model, models, freeDown)
     if (shown === undefined || next === undefined) return undefined
     return {
       // By the chip's own name for it: the catalogue's displayName for an
@@ -5211,8 +5215,8 @@ export default function App(): ReactElement {
     const retired = modelRetired(failed.payload)
     // A free model whose provider is down (0.711) is a limit of its own: the same model fails again.
     if (!retired && !modelUnavailable(failed.payload) && !failedOnItsLimit(failed.payload)) return undefined
-    const start = retired ? freeStartModel(shown.data.runtime, models, freeAnswered) : undefined
-    const next = retired ? models.find((model) => model.runtime === shown.data?.runtime && model.id === start) : nextFreeModel(shown.data.runtime, shown.data.model, models)
+    const start = retired ? freeStartModel(shown.data.runtime, models, freeAnswered, freeDown) : undefined
+    const next = retired ? models.find((model) => model.runtime === shown.data?.runtime && model.id === start) : nextFreeModel(shown.data.runtime, shown.data.model, models, freeDown)
     if (next === undefined) return undefined
     return {
       label: `Switch to ${modelDisplayName(next.runtime, next.id)}`,
@@ -7961,7 +7965,7 @@ export default function App(): ReactElement {
                 {...((() => {
                   // The free model that last answered here, else the catalogue's first free entry (0.514, 0.517).
                   if (route.runtime === 'opencode') return {}
-                  const free = freeStartModel('opencode', models, freeAnswered)
+                  const free = freeStartModel('opencode', models, freeAnswered, freeDown)
                   return free === undefined ? {} : { onUseFree: () => changeRoute({ runtime: 'opencode', model: free }) }
                 })())}
                 limitedRuntimes={limitedRuntimes}
