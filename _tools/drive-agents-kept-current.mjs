@@ -72,6 +72,19 @@ say(`scratch Codex: ${await scratchVersion()}`)
 const LATEST = (await cmd('npm view @openai/codex@latest version', process.env, 120_000)).out.split(/\r?\n/).pop()?.trim() ?? ''
 if (!/^\d+\.\d+\.\d+$/.test(LATEST)) throw new Error(`could not read npm's latest Codex: ${LATEST}`)
 say(`npm's latest Codex: ${LATEST}`)
+// A release under 12 hours old is not taken (runtime-updates.ts RELEASE_AGE_MS): on such a day the right answer is
+// to wait and download nothing, and that is what is checked (2026-10-08: Codex 0.162.0 was hours old; this read red).
+const published = await (async () => {
+  try {
+    return Date.parse(JSON.parse((await cmd('npm view @openai/codex time --json', process.env, 120_000)).out)[LATEST])
+  } catch {
+    return Number.NaN
+  }
+})()
+const TOO_NEW = Number.isFinite(published) && Date.now() - published < 12 * 60 * 60 * 1000
+if (TOO_NEW) say(`  ${LATEST} came out ${String(Math.round((Date.now() - published) / 3_600_000))} h ago: Locust should wait, and download nothing`)
+/** Ends the drive early, on purpose: a release held back leaves nothing after it to read. */
+const HELD_BACK = new Error('held back')
 
 const workspace = await scratchRepository('locust-kept-current-ws-')
 const drive = await startDrive({
@@ -120,8 +133,20 @@ try {
       if (settled.missing) break
       const codex = (settled.agents ?? []).find((agent) => agent.runtime === 'codex')
       if (codex !== undefined && (codex.status.kind === 'updated' || codex.status.kind === 'failed')) break
+      if (TOO_NEW && codex?.status.kind === 'waiting' && codex.status.why === 'too new') break
     }
     return settled
+  }
+  if (TOO_NEW) {
+    const held = await settle(180_000)
+    const codex = (held?.agents ?? []).find((agent) => agent.runtime === 'codex')
+    check(`it found ${LATEST}, too new to take, and is waiting`, codex?.status.kind === 'waiting' && codex.status.why === 'too new' && codex.status.version === LATEST, JSON.stringify(codex?.status ?? held))
+    const untouched = await scratchVersion()
+    check('and downloaded nothing', /0\.153\.0/.test(untouched), untouched)
+    const globalAfter = (await cmd(`"${GLOBAL_CODEX}" --version`)).out
+    check("the machine's own Codex was not touched", /^codex-cli \d/.test(globalBefore) && globalAfter === globalBefore, `${globalBefore} -> ${globalAfter}`)
+    say(failures === 0 ? '\nAGENTS KEPT CURRENT PASSED (held back: the release is under 12 hours old)' : `\nAGENTS KEPT CURRENT: ${String(failures)} FAILED`)
+    throw HELD_BACK
   }
   if (!ASK) {
     // It updates on its own: the first look is 45 s after launch.
@@ -241,7 +266,7 @@ try {
   check("the machine's own Codex was not touched", /^codex-cli \d/.test(globalBefore) && globalAfter === globalBefore, `${globalBefore} -> ${globalAfter}`)
   say(failures === 0 ? '\nAGENTS KEPT CURRENT PASSED' : `\nAGENTS KEPT CURRENT: ${String(failures)} FAILED`)
 } catch (error) {
-  say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
+  if (error !== HELD_BACK) say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
   await drive.finish({ intro: 'Codex CLI 0.153.0 in a scratch npm folder, the app left to keep it current on its own; then the Codex row, the CLI and the model picker read. Nothing sent, nothing spent.' })
 }
