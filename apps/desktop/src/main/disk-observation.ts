@@ -35,7 +35,17 @@ import { ownGitArgs } from './git-guard.js'
 export type WorkspaceSnapshot = ReadonlyMap<string, string> & {
   /** The look stopped at a bound, so a change past it is not known (0.365). */
   readonly partial?: true
+  /** When the look began, in ms (0.710). */
+  readonly takenAt?: number
+  /** Each file's modification time, as the look read it (0.710). */
+  readonly writtenAt?: ReadonlyMap<string, number>
 }
+
+/** When a file was last written or moved: a move keeps the modification time and changes the change time. */
+const lastTouched = (seen: { readonly mtimeMs: number; readonly ctimeMs?: number }): number => Math.max(seen.mtimeMs, seen.ctimeMs ?? 0)
+
+/** A file written this close before a look began may still be the run's: clocks and file times are coarse. */
+const WRITTEN_SLACK_MS = 2_000
 
 const GIT_TIMEOUT_MS = 5_000
 
@@ -45,9 +55,11 @@ export interface DiskObservationOptions {
   /** Test seam: read a file's text; undefined when it cannot be read as text. */
   readonly readText?: (absolutePath: string) => Promise<string | undefined>
   /** Test seam: a file's size and modification time; undefined when it cannot be read. */
-  readonly statOf?: (absolutePath: string) => Promise<{ readonly size: number; readonly mtimeMs: number } | undefined>
+  readonly statOf?: (absolutePath: string) => Promise<{ readonly size: number; readonly mtimeMs: number; readonly ctimeMs?: number } | undefined>
   /** Test seam: a folder's entries, for a folder git cannot answer for (0.365). */
   readonly listDirectory?: (directory: string) => Promise<readonly FolderEntry[]>
+  /** Test seam: the clock a plain-folder look is stamped with (0.710). */
+  readonly now?: () => number
   /**
    * A changed file's text from before the turn, when the snapshot did not
    * keep it (past MAX_OBSERVED_FILE_BYTES): the turn's Undo checkpoint
@@ -148,7 +160,12 @@ export async function snapshotWorkspace(
  * showed nothing (2026-09-05). Its text rides on the status, bounded -- and
  * past the bounds its size and time do, so the edit is still seen.
  */
-async function carryUntracked(snapshot: Map<string, string>, workspacePath: string, options: DiskObservationOptions): Promise<void> {
+async function carryUntracked(
+  snapshot: Map<string, string>,
+  workspacePath: string,
+  options: DiskObservationOptions,
+  writtenAt?: Map<string, number>
+): Promise<void> {
   const readText = options.readText ?? defaultReadText
   const statOf = options.statOf ?? defaultStatOf
   let lookedAt = 0
@@ -159,13 +176,17 @@ async function carryUntracked(snapshot: Map<string, string>, workspacePath: stri
     // Never read (holdsSecrets): its size and time say it changed.
     if (holdsSecrets(path)) {
       const seen = await statOf(join(workspacePath, path))
-      if (seen !== undefined) snapshot.set(path, UNTRACKED + STAMP_MARK + `${String(seen.size)}:${String(Math.round(seen.mtimeMs))}`)
+      if (seen !== undefined) {
+        snapshot.set(path, UNTRACKED + STAMP_MARK + `${String(seen.size)}:${String(Math.round(seen.mtimeMs))}`)
+        writtenAt?.set(path, lastTouched(seen))
+      }
       continue
     }
     if (lookedAt >= MAX_UNTRACKED_LOOKED_AT) break
     lookedAt += 1
     const absolute = join(workspacePath, path)
     const seen = await statOf(absolute)
+    if (seen !== undefined) writtenAt?.set(path, lastTouched(seen))
     const size = seen?.size ?? 0
     if (size <= MAX_OBSERVED_FILE_BYTES && texts < MAX_UNTRACKED_TEXTS && textBytes + size <= MAX_UNTRACKED_TEXT_BYTES) {
       const text = await readText(absolute)
@@ -227,6 +248,7 @@ async function defaultListDirectory(directory: string): Promise<readonly FolderE
  */
 export async function snapshotFolder(workspacePath: string, options: DiskObservationOptions = {}): Promise<WorkspaceSnapshot | undefined> {
   const listDirectory = options.listDirectory ?? defaultListDirectory
+  const takenAt = (options.now ?? Date.now)()
   const found: string[] = []
   let partial = false
   const queue: { readonly directory: string; readonly relative: string; readonly depth: number }[] = [{ directory: workspacePath, relative: '', depth: 0 }]
@@ -260,8 +282,9 @@ export async function snapshotFolder(workspacePath: string, options: DiskObserva
     }
   }
   const snapshot = new Map<string, string>(found.map((path) => [path, UNTRACKED]))
-  await carryUntracked(snapshot, workspacePath, options)
-  return partial ? Object.assign(snapshot, { partial: true as const }) : snapshot
+  const writtenAt = new Map<string, number>()
+  await carryUntracked(snapshot, workspacePath, options, writtenAt)
+  return Object.assign(snapshot, { takenAt, writtenAt }, partial ? { partial: true as const } : {})
 }
 
 /**
@@ -300,6 +323,11 @@ export function statusOf(entry: string | undefined): string | undefined {
   return entry === undefined ? undefined : entry.slice(0, 2)
 }
 
+/** How an entry was looked at: its text, its size and time, or its status alone. */
+function kindOf(entry: string): 'text' | 'stamp' | 'status' {
+  return entry.includes(TEXT_MARK) ? 'text' : entry.includes(STAMP_MARK) ? 'stamp' : 'status'
+}
+
 /** The text an untracked entry carried, or undefined. */
 export function textOf(entry: string | undefined): string | undefined {
   if (entry === undefined) return undefined
@@ -329,8 +357,26 @@ export function parsePorcelain(output: string): WorkspaceSnapshot {
 /** Paths whose status differs between the two snapshots, sorted. */
 export function changedPaths(before: WorkspaceSnapshot, after: WorkspaceSnapshot): readonly string[] {
   const paths = new Set<string>()
+  /*
+   * A LOOK THAT STOPPED AT A BOUND SHIFTS (0.710). The walk keeps the first
+   * 5,000 files, and the first 400 with their text. When one file early in
+   * the walk goes or comes, every later one moves a place: a file just past
+   * the bound is in the second look and not the first, and one at the text
+   * bound is a size-and-time in one look and its text in the other. Both read
+   * as changes nobody made -- Colin's Claude teammate, in his .claude (over
+   * 5,000 files), was shown file-history/...@v4 "ADDED, +133", written three
+   * weeks before. Where the two looks cannot be compared like for like, the
+   * file's own time decides: written since the first look began, or not.
+   */
+  const shifted = (path: string, was: string | undefined, now: string): boolean => {
+    // New to the second look: only a first look that stopped short can have missed it.
+    if (was === undefined ? before.partial !== true : (before.partial !== true && after.partial !== true) || kindOf(was) === kindOf(now)) return false
+    const written = after.writtenAt?.get(path)
+    return written !== undefined && before.takenAt !== undefined && written < before.takenAt - WRITTEN_SLACK_MS
+  }
   for (const [path, status] of after) {
-    if (before.get(path) !== status) paths.add(path)
+    const was = before.get(path)
+    if (was !== status && !shifted(path, was, status)) paths.add(path)
   }
   // A look that stopped at a bound can lose a file off its END when a new
   // one arrives earlier in the walk: gone from the second look, and not
@@ -388,10 +434,10 @@ export function unreportedPaths(
  * -- and `observed on disk` as the status so nobody reads them as the
  * runtime's own account.
  */
-async function defaultStatOf(absolutePath: string): Promise<{ readonly size: number; readonly mtimeMs: number } | undefined> {
+async function defaultStatOf(absolutePath: string): Promise<{ readonly size: number; readonly mtimeMs: number; readonly ctimeMs: number } | undefined> {
   try {
     const seen = await stat(absolutePath)
-    return seen.isFile() ? { size: seen.size, mtimeMs: seen.mtimeMs } : undefined
+    return seen.isFile() ? { size: seen.size, mtimeMs: seen.mtimeMs, ctimeMs: seen.ctimeMs } : undefined
   } catch {
     return undefined
   }
