@@ -617,6 +617,42 @@ describe("a stream-json run", () => {
     await run.completion;
   });
 
+  /*
+   * 2026-10-09, arena round 4: Sonnet's result came at 01:21, but a `python`
+   * it had started (the Windows Store stub, which waits forever) kept Claude
+   * Code alive, and the column read "working" until a person ended it.
+   */
+  it("ends a run that is still alive after its result, and says it ended after its result", async () => {
+    vi.useFakeTimers()
+    try {
+      const child = fakeChild({ onKill: (_signal, self) => self.close(1) });
+      const run = createNodeRuntimeProcessRunner({ lingerAfterResultMs: 5_000, spawnProcess: () => child.process }).start(streamSpec, prompt);
+      child.stdout.emit("data", '{"type":"result","subtype":"success","result":"done"}\n');
+      expect(child.stdin.ended).toBe(true);
+      await vi.advanceTimersByTimeAsync(4_999);
+      expect(child.signals).toEqual([]);
+      await vi.advanceTimersByTimeAsync(1);
+      await expect(run.completion).resolves.toMatchObject({ endedAfterResult: true, cancelled: false, exitCode: 1 });
+    } finally {
+      vi.useRealTimers()
+    }
+  });
+
+  it("leaves alone a run that exits on its own after its result", async () => {
+    vi.useFakeTimers()
+    try {
+      const child = fakeChild();
+      const run = createNodeRuntimeProcessRunner({ lingerAfterResultMs: 5_000, spawnProcess: () => child.process }).start(streamSpec, prompt);
+      child.stdout.emit("data", '{"type":"result","subtype":"success","result":"done"}\n');
+      child.close(0);
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(child.signals).toEqual([]);
+      await expect(run.completion).resolves.toMatchObject({ endedAfterResult: false, exitCode: 0 });
+    } finally {
+      vi.useRealTimers()
+    }
+  });
+
   it("does not take text that merely mentions a result for the result", async () => {
     const child = fakeChild();
     const run = createNodeRuntimeProcessRunner({ spawnProcess: () => child.process }).start(streamSpec, prompt);

@@ -225,11 +225,16 @@ try {
     const profileCompares = JSON.parse(await readFile(join(drive.profile, 'compares.json'), 'utf8'))
     await writeFile(join(OUT, 'compares.json'), JSON.stringify(profileCompares, null, 2))
     await writeFile(join(OUT, 'timing.json'), JSON.stringify({ sentAt: new Date(sentAt).toISOString(), doneAt, denied }, null, 2))
+    // The record first: a failure further down must not cost it (round 4's trio lost its final ledger that way).
+    await cp(join(drive.profile, 'mission-ledger'), join(OUT, 'mission-ledger'), { recursive: true }).catch((error) => note(`ledger not copied: ${String(error)}`))
     // Every column's folder, byte for byte, BEFORE Keep (which removes the others' copies) and before anything opens a page.
     const compare = (profileCompares.compares ?? profileCompares).at(-1)
     const files = {}
     for (const slot of compare.slots) {
-      const from = join(homedir(), '.locust', 'compare', `${compare.compareId}-${slot.slot}`)
+      // drive-lib points LOCUST_COMPARE_ROOT inside the profile (2026-10-05); round 4's trio looked in ~/.locust/compare,
+      // found nothing, and only a copy made by hand kept its three pages (2026-10-09).
+      const inProfile = join(drive.profile, 'compare', `${compare.compareId}-${slot.slot}`)
+      const from = (await stat(inProfile).then(() => true, () => false)) ? inProfile : join(homedir(), '.locust', 'compare', `${compare.compareId}-${slot.slot}`)
       const to = join(OUT, 'columns', slot.slot)
       await cp(from, to, { recursive: true, preserveTimestamps: true })
       const walk = async (dir, base = '') => (await Promise.all((await readdir(dir, { withFileTypes: true })).map(async (entry) => entry.isDirectory()
@@ -239,8 +244,8 @@ try {
     }
     await writeFile(join(OUT, 'columns.json'), JSON.stringify(files, null, 2))
     note(`copied out: ${JSON.stringify(Object.fromEntries(Object.entries(files).map(([slot, one]) => [slot, one.files.map((file) => file.name + ' ' + String(file.bytes))])))}`)
-    // Locust's own record of both runs, before finish() deletes the profile (round 2's first three were lost that way).
-    await cp(join(drive.profile, 'mission-ledger'), join(OUT, 'mission-ledger'), { recursive: true }).catch((error) => note(`ledger not copied: ${String(error)}`))
+    // Locust's own record again, now that every column is copied (round 2's first three were lost to finish()).
+    await cp(join(drive.profile, 'mission-ledger'), join(OUT, 'mission-ledger'), { recursive: true, force: true }).catch((error) => note(`ledger not copied: ${String(error)}`))
     // The reveal: Keep on the first column (not a choice -- the first), then the named view.
     const revealed = String(await drive.evaluate(`(async () => {
       document.querySelector('.lc-compare__foot .lc-primarybutton')?.click()

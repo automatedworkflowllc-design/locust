@@ -182,6 +182,16 @@ export interface RuntimeProcessCompletion {
   readonly forcedTerminationAttempted: boolean;
   /** True only when the final watchdog elapsed without a child `close` event. */
   readonly terminationUnconfirmed: boolean;
+  /**
+   * True when the run had already given its turn's result and was still
+   * alive `lingerAfterResultMs` later, so the runner ended its tree. Arena
+   * round 4, 2026-10-09: Sonnet's last message and result came at 01:21, but
+   * a `python` it had started at 01:14 -- the Windows Store stub, which waits
+   * forever -- kept Claude Code from exiting, and the column read "working"
+   * until a person ended that python by hand. The turn was over; the record is
+   * of a completed run.
+   */
+  readonly endedAfterResult?: boolean;
   readonly inputDeliveryFailed: boolean;
   readonly outputLimitExceeded: boolean;
   /**
@@ -227,6 +237,11 @@ export interface NodeRuntimeProcessRunnerOptions {
   readonly maxQueuedRecords?: number;
   readonly cancellationGraceMs?: number;
   readonly terminationConfirmationMs?: number;
+  /**
+   * How long a stream-json run may stay alive after its turn's result before
+   * the runner ends its tree (2026-10-09, see `endedAfterResult`).
+   */
+  readonly lingerAfterResultMs?: number;
   /** Source values are filtered through the documented allowlist below. */
   readonly environment?: Readonly<NodeJS.ProcessEnv>;
   /** Test seam; production callers should leave this undefined. */
@@ -556,6 +571,11 @@ export function createNodeRuntimeProcessRunner(
     2_000,
     "terminationConfirmationMs",
   );
+  const lingerAfterResultMs = positiveInteger(
+    options.lingerAfterResultMs,
+    60_000,
+    "lingerAfterResultMs",
+  );
   const environment = minimalEnvironment(options.environment ?? process.env);
   const spawnProcess = options.spawnProcess ?? defaultSpawn;
   const now = options.now ?? (() => new Date());
@@ -605,6 +625,8 @@ export function createNodeRuntimeProcessRunner(
       let skippingOversizedLine = false;
       let forceTimer: ReturnType<typeof setTimeout> | undefined;
       let confirmationTimer: ReturnType<typeof setTimeout> | undefined;
+      let lingerTimer: ReturnType<typeof setTimeout> | undefined;
+      let endedAfterResult = false;
       let removeAbortListener = (): void => {};
       let completionResolve!: (completion: RuntimeProcessCompletion) => void;
       let completionReject!: (error: Error) => void;
@@ -694,6 +716,20 @@ export function createNodeRuntimeProcessRunner(
           // Already gone with the process; nothing is left to close.
         }
       };
+      /*
+       * The turn's result is in: its input closes, and Claude Code exits --
+       * unless something it started is still running (`endedAfterResult`).
+       * Past `lingerAfterResultMs` the tree is ended, as a Stop would.
+       */
+      const closeInputAfterResult = (): void => {
+        if (!inputOpen) return;
+        closeInput();
+        lingerTimer = setTimeout(() => {
+          if (settled || terminationRequested) return;
+          endedAfterResult = true;
+          requestTermination(false);
+        }, lingerAfterResultMs);
+      };
       const writeInput = (line: string): boolean => {
         try {
           child.stdin.write(line, (error) => {
@@ -736,7 +772,7 @@ export function createNodeRuntimeProcessRunner(
           dropOversizedRecord();
           standInFor(raw, Buffer.byteLength(raw, "utf8"));
           // Even past its own cap, a result still ends the turn.
-          if (inputOpen && startsAsTurnResult(raw)) closeInput();
+          if (inputOpen && startsAsTurnResult(raw)) closeInputAfterResult();
           return;
         }
         const nextSequence = recordCount + 1;
@@ -745,7 +781,7 @@ export function createNodeRuntimeProcessRunner(
           return;
         }
         recordCount = nextSequence;
-        if (inputOpen && isTurnResult(raw)) closeInput();
+        if (inputOpen && isTurnResult(raw)) closeInputAfterResult();
       };
 
       const acceptStdout = (text: string): void => {
@@ -785,7 +821,7 @@ export function createNodeRuntimeProcessRunner(
             dropOversizedRecord();
             // Its size is not known yet: at least what was held.
             standInFor(held, Buffer.byteLength(held, "utf8"));
-            if (inputOpen && endsTheTurn) closeInput();
+            if (inputOpen && endsTheTurn) closeInputAfterResult();
           }
         }
       };
@@ -793,6 +829,7 @@ export function createNodeRuntimeProcessRunner(
       const cleanup = (): void => {
         if (forceTimer !== undefined) clearTimeout(forceTimer);
         if (confirmationTimer !== undefined) clearTimeout(confirmationTimer);
+        if (lingerTimer !== undefined) clearTimeout(lingerTimer);
         removeAbortListener();
         // Both `finish` and `fail` come through here, so the prompt file is
         // removed on a clean exit, a crash, and a cancellation alike.
@@ -821,6 +858,7 @@ export function createNodeRuntimeProcessRunner(
           cancelled,
           forcedTerminationAttempted,
           terminationUnconfirmed,
+          endedAfterResult,
           inputDeliveryFailed,
           outputLimitExceeded,
           oversizedRecordsDropped,

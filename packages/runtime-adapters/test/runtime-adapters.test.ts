@@ -89,7 +89,7 @@ describe("runtime command specifications", () => {
     // The connectors ride along -- `--restricted` never kept them out, which
     // was measured on 2026-09-09 -- but nothing that writes to this machine
     // does.
-    expect(claude.args.join(" ")).toContain("--tools Read,Glob,Grep,Task,Skill,mcp__*");
+    expect(claude.args.join(" ")).toContain("--tools Read,Glob,Grep,Task,Skill,WebSearch,WebFetch,mcp__*");
     expect(claude.args.join(" ")).not.toContain("Edit");
     expect(claude.args.join(" ")).not.toContain("Bash");
   });
@@ -112,7 +112,7 @@ describe("runtime command specifications", () => {
     // And it keeps the person's connectors, which `--restricted` was never
     // keeping out: only `--strict-mcp-config` would, and nothing sends that.
     expect(claude.args.join(" ")).not.toContain("--disallowedTools");
-    expect(claude.args.join(" ")).toContain("Bash,Task,Skill,mcp__*");
+    expect(claude.args.join(" ")).toContain("Bash,Task,Skill,WebSearch,WebFetch,mcp__*");
   });
 
   it("rejects permission bypass arguments", () => {
@@ -154,7 +154,7 @@ describe("the Auto mode a person switches on", () => {
     // else, which the app saw as a run that ended without a result. Auto is
     // the one mode that drops it; every other mode keeps it.
     expect(claude.args).not.toContain("--restricted");
-    expect(claude.args.join(" ")).toContain("Bash,Task,Skill,mcp__*");
+    expect(claude.args.join(" ")).toContain("Bash,Task,Skill,WebSearch,WebFetch,mcp__*");
     expect(claude.args).not.toContain("--dangerously-skip-permissions");
     /*
      * EVERY MODE GETS THE PERSON'S CONNECTORS.
@@ -187,7 +187,7 @@ describe("the Auto mode a person switches on", () => {
       const other = createClaudePrintCommand({ ...nativeExecutable, commandName: "claude" }, { workspacePath, sandbox });
       expect(other.args).toContain("--restricted");
       expect(other.args.join(" ")).not.toContain("--disallowedTools");
-      expect(other.args.join(" ")).toContain("Task,Skill,mcp__*");
+      expect(other.args.join(" ")).toContain("Task,Skill,WebSearch,WebFetch,mcp__*");
       // Never `--strict-mcp-config`: that IS the flag that would keep the
       // person's servers out, and nothing here wants that.
       expect(other.args).not.toContain("--strict-mcp-config");

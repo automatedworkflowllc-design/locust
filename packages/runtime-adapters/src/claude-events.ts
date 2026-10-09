@@ -1390,7 +1390,9 @@ export function createClaudeEventNormalizer(
       // A clean exit that never produced a `result` record is not a success:
       // the provider never said it finished, so the run is reported as failed
       // with that stated, rather than completed on the strength of exit 0.
-      if (!sawResult || completion.exitCode !== 0) {
+      // Ended by the runner AFTER its result, for something it left running (endedAfterResult, 2026-10-09):
+      // the turn finished, and the record says so.
+      if (!sawResult || (completion.exitCode !== 0 && completion.endedAfterResult !== true)) {
         return [
           emit("run.failed", {
             kind: "process-failed",
