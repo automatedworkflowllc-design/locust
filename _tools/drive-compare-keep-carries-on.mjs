@@ -68,7 +68,7 @@ try {
     const settled = () => [...document.querySelectorAll('.lc-compare__head:not(.is-rail)')].every((el) => !/working|starting/i.test(el.innerText))
     for (let i = 0; i < 480 && !settled(); i += 1) await new Promise((r) => setTimeout(r, 500))
     const bFoot = [...document.querySelectorAll('.lc-compare__foot:not(.is-rail)')][1]?.innerText ?? ''
-    return JSON.stringify({ down: /(?:model|endpoint) is unavailable/i.test(document.querySelector('.lc-compare')?.innerText ?? '') && !/Keep this one/.test(bFoot), foot: bFoot.replace(/\s+/g, ' ').slice(0, 120) })
+    return JSON.stringify({ down: /(?:model|endpoint) is unavailable/i.test(document.querySelector('.lc-compare')?.innerText ?? '') && !/Keep this one/.test(bFoot), foot: bFoot.replace(/\\s+/g, ' ').slice(0, 120) })
   })()`)))
   let keepAt = 1
   if (bDown.down === true) {
