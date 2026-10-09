@@ -112,7 +112,7 @@ async function summarise() {
 const RETRY_FIRST = 'opencode/muse-spark-1.3-contributor-free'
 const PAID_REFUSAL = /refusing to run "[^"]+": it spends a paid account/
 const PROVIDER_REFUSED = /Rate limit exceeded|rate[- ]limited|Endpoint is unavailable|provider answered "(?:Too Many Requests|Service Unavailable)/i
-async function runDrive(name, model) {
+async function runDrive(name, model, attempt = 0) {
   const child = spawn(process.execPath, [join(tools, name), '--packaged', packaged], {
     cwd: new URL('../', import.meta.url).pathname.slice(1),
     // The free model is the drives' own (drive-lib FREE_ROUTE) unless LOCUST_FREE_MODEL says otherwise. This forced
@@ -131,7 +131,9 @@ async function runDrive(name, model) {
   }, LIMIT_MS)
   const code = await new Promise((resolve) => child.on('close', (value) => resolve(value ?? -1)))
   clearTimeout(timer)
-  await writeFile(join(out, 'logs', name.replace(/\.mjs$/, '.log')), text, 'utf8')
+  // Each run its own log: a retry wrote over the first, and the 0.709 sweep's first failures were lost behind
+  // retries on a model that was no longer there.
+  await writeFile(join(out, 'logs', name.replace(/\.mjs$/, attempt === 0 ? '.log' : `.again-${String(attempt)}.log`)), text, 'utf8')
   const lines = text.split(/\r?\n/)
   return {
     text,
@@ -170,11 +172,12 @@ for (const name of drives.slice(start)) {
   let run
   for (let attempt = 0; attempt < 3; attempt += 1) {
     // A first run takes the rotation; a run again takes the steadiest free model first (Fledge Alpha answered every
-    // drive asked again on it, 2026-10-06), so a retry tests Locust rather than another model's bad hour.
+    // drive asked again on it, 2026-10-06; it left OpenCode 2026-10-08, so Muse Spark), so a retry tests Locust rather
+    // than another model's bad hour.
     const tried = [...refusedBy, ...failedOn].map((slug) => `opencode/${slug}`)
     const model = process.env.LOCUST_FREE_MODEL
       ?? (attempt > 0 && !tried.includes(RETRY_FIRST) ? RETRY_FIRST : nextFreeModel())
-    run = await runDrive(name, model)
+    run = await runDrive(name, model, attempt)
     if (run.fails === 0 && run.code === 0) break
     if (process.env.LOCUST_FREE_MODEL !== undefined) break
     // A drive that spends only on some routes (`spends: runtime !== 'opencode'`) passes the filter above and then

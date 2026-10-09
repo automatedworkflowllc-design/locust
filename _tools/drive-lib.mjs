@@ -598,10 +598,8 @@ export async function startDrive({ name, port, workspace, seed, files = {}, env 
           // Its own name first; "free" on alternate tries, for a model the picker names otherwise.
           const said = await evaluate(pickRouteScript({ group: '/opencode/i', search: attempt % 2 === 0 ? FREE_SEARCH : 'free', row: FREE_ROW }))
           route = await routeText()
-          if (!isFree(route) && attempt < 3) {
-            say(`the free route is not there yet (${String(said).slice(0, 140)}); trying again`)
-            await sleep(5000)
-          }
+          if (!isFree(route)) say(`the free route is not there yet (${String(said).slice(0, 1500)})${attempt < 3 ? '; trying again' : ''}`)
+          if (!isFree(route) && attempt < 3) await sleep(5000)
         }
         if (!isFree(route)) {
           say(`could not put a non-spending drive on a free route; it is on "${String(route)}".`)
@@ -871,7 +869,19 @@ export function pickRouteScript({ group, search, row }) {
       }
       if (!target) await new Promise(r => setTimeout(r, 500))
     }
-    if (!target) return 'no matching route; rows: ' + [...document.querySelectorAll('.lc-picker__row')].map(r => r.innerText.replace(/\\s+/g, ' ')).slice(0, 6).join(' | ')
+    // The whole list as it stood, headers and disabled rows marked: six rows did not say why a pick found nothing.
+    if (!target) {
+      const entries = [...(document.querySelector('.lc-picker__list')?.children ?? [])].map((node) => {
+        const header = node.querySelector('.lc-picker__group')
+        const r = node.querySelector('.lc-picker__row')
+        return [
+          header ? '[' + header.innerText.replace(/\\s+/g, ' ').trim() + ']' : '',
+          r ? (r.disabled ? '(disabled) ' : '') + r.innerText.replace(/\\s+/g, ' ').trim().slice(0, 50) : ''
+        ].filter(Boolean).join(' ')
+      }).filter(Boolean)
+      const typed = document.querySelector('.lc-picker__input')?.value
+      return 'no matching route; typed ' + JSON.stringify(typed ?? null) + (notice ? '; notice: ' + notice : '') + '; ' + String(entries.length) + ' entries: ' + entries.join(' | ')
+    }
     target.click()
     await new Promise(r => setTimeout(r, 500))
     return (notice ? 'picker said: ' + notice + ' || ' : '') + [...document.querySelectorAll('.lc-control')].map(c => c.innerText.replace(/\\s+/g, ' ').trim()).filter(Boolean).join(' · ')
