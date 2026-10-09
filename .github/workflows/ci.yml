@@ -69,6 +69,35 @@ jobs:
       # Stop and check nothing it started is left (0.496); then install it in
       # /Applications, offer it its own disk image as a newer version, press
       # Restart and install, and check it comes back as the new copy (0.516).
+      # The first hour on a Mac with nothing on it (0.712): the runner's node,
+      # npm and opencode are moved out of every folder Locust searches, so the
+      # npm Locust carries installs the free runtime from the first screen and
+      # a first answer is timed (the smoke refuses to measure a machine that is
+      # not bare). Reported, not yet required: a free provider can be down for
+      # hours, and that is not Locust's to fix. Runs before anything below
+      # installs OpenCode.
+      - name: First hour on a bare Mac
+        if: runner.os == 'macOS'
+        continue-on-error: true
+        run: |
+          NODE="$(command -v node)"
+          hidden=""
+          trap 'for f in $hidden; do sudo mv "$f.locust-hidden" "$f"; done' EXIT
+          for d in /opt/homebrew/bin /usr/local/bin; do
+            for n in node npm npx corepack opencode; do
+              if [ -e "$d/$n" ] || [ -L "$d/$n" ]; then sudo mv "$d/$n" "$d/$n.locust-hidden"; hidden="$hidden $d/$n"; fi
+            done
+          done
+          echo "moved aside for the smoke:${hidden:- nothing}"
+          "$NODE" _smoke/mac-first-hour-smoke.mjs "apps/desktop/release/mac-arm64/Locust.app/Contents/MacOS/Locust"
+      - name: Keep the first hour's frames
+        if: runner.os == 'macOS' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-first-hour-frames
+          path: mac-first-hour-*.png
+          if-no-files-found: ignore
+          retention-days: 7
       # npm runs OpenCode's install script, which fetches its program, only when asked.
       - name: Install OpenCode for the Mac launch check
         if: runner.os == 'macOS'

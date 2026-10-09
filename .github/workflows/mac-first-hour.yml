@@ -1,0 +1,57 @@
+# The first hour on a bare Mac (_smoke/mac-first-hour-smoke.mjs), run against
+# the Mac images an earlier ci.yml run built, so the smoke can be worked on in
+# minutes instead of a full build each time. ci.yml runs the same smoke on
+# every Mac build. Started by hand with that run's id. No secrets are used.
+
+name: mac-first-hour
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: The ci.yml run whose locust-macos-14 images to use
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  first-hour:
+    runs-on: macos-14
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: locust-macos-14
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+          path: images
+      - name: Take the app out of the arm64 image
+        run: |
+          dmg="$(ls images/*-mac-arm64.dmg | head -1)"
+          echo "image: $dmg"
+          hdiutil attach -nobrowse -readonly -mountpoint /tmp/locust-image "$dmg"
+          cp -R /tmp/locust-image/Locust.app "$RUNNER_TEMP/Locust.app"
+          hdiutil detach /tmp/locust-image
+      - name: First hour on a bare Mac
+        run: |
+          NODE="$(command -v node)"
+          hidden=""
+          trap 'for f in $hidden; do sudo mv "$f.locust-hidden" "$f"; done' EXIT
+          for d in /opt/homebrew/bin /usr/local/bin; do
+            for n in node npm npx corepack opencode; do
+              if [ -e "$d/$n" ] || [ -L "$d/$n" ]; then sudo mv "$d/$n" "$d/$n.locust-hidden"; hidden="$hidden $d/$n"; fi
+            done
+          done
+          echo "moved aside for the smoke:${hidden:- nothing}"
+          "$NODE" _smoke/mac-first-hour-smoke.mjs "$RUNNER_TEMP/Locust.app/Contents/MacOS/Locust"
+      - name: Keep the frames
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-first-hour-frames
+          path: mac-first-hour-*.png
+          if-no-files-found: ignore
+          retention-days: 7
