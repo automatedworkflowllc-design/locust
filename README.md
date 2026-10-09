@@ -8,9 +8,14 @@ on runtimes and models you choose, with a durable record of everything they did.
 
 **Download the latest build** at [locust.lol](https://locust.lol) or from the
 [releases page](https://github.com/automatedworkflowllc-design/locust-releases/releases/latest)
-(Windows and Mac). The installer is not code-signed yet, so Windows warns that
-it comes from an unknown publisher: choose **More info**, then **Run anyway**
-([why, and the signing policy](docs/CODE-SIGNING.md)).
+(Windows and Mac). Neither build is signed by a publisher yet
+([why, and the signing policy](docs/CODE-SIGNING.md)), so each asks once:
+
+- **Windows** warns that the installer comes from an unknown publisher: choose
+  **More info**, then **Run anyway**.
+- **Mac** refuses the first open, since Apple has not checked the app. Close
+  that message, open **System Settings › Privacy & Security**, and press
+  **Open Anyway** beside Locust.
 
 Locust is developed in this repository, and each release is cut from `main`.
 Issues are welcome here; code changes are by invitation (see CONTRIBUTING.md).

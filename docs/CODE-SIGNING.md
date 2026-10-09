@@ -23,7 +23,11 @@ that nobody changed it on the way.
 Inside the Windows build, three files carry a signature: the application
 executable (`Locust.exe`), its uninstaller, and the installer itself
 (`Locust-<version>-setup.exe`). The macOS build is not covered by this
-policy; it is unsigned until a Mac developer account exists.
+policy. Until a Mac developer account exists it is signed ad hoc, which names
+no publisher, and it is not notarized, so macOS refuses the first open, since
+Apple has not checked the app. Close that message, open **System Settings ›
+Privacy & Security** (on macOS 12, **System Preferences › Security &
+Privacy**), and press **Open Anyway** beside Locust.
 
 ## The certificate
 
