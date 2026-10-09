@@ -170,17 +170,30 @@ export function gitBlobId(bytes: Uint8Array): string {
   return createHash('sha1').update(`blob ${String(bytes.length)}\0`).update(bytes).digest('hex')
 }
 
+/*
+ * A failure stops new work and is reported only once the work already started
+ * has ended. It used to reject at once, so install's cleanup removed the
+ * staging folder while other lanes were still writing into it, and a late
+ * write made it again: a refused install left a `.staging-*` folder behind
+ * (the 0.711 ship's unit run, skills-kept-from-github).
+ */
 async function atMostAtOnce<T, R>(items: readonly T[], work: (item: T) => Promise<R>): Promise<R[]> {
   const results: R[] = new Array<R>(items.length)
   let next = 0
+  let failed: { readonly error: unknown } | undefined
   const lane = async (): Promise<void> => {
-    while (next < items.length) {
+    while (next < items.length && failed === undefined) {
       const at = next
       next += 1
-      results[at] = await work(items[at] as T)
+      try {
+        results[at] = await work(items[at] as T)
+      } catch (error) {
+        failed ??= { error }
+      }
     }
   }
   await Promise.all(Array.from({ length: Math.min(AT_ONCE, items.length) }, () => lane()))
+  if (failed !== undefined) throw failed.error
   return results
 }
 

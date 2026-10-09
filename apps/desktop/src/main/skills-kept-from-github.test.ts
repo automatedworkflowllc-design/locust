@@ -208,6 +208,23 @@ describe('skills from a GitHub repository', () => {
     expect((await readdir(root).catch(() => [])).filter((name) => name.startsWith('.staging-'))).toEqual([])
   })
 
+  it('and leaves no staging folder when the other files are still arriving as it refuses', async () => {
+    // The 0.711 ship's unit run: the tampered file failed first, cleanup ran,
+    // and a file still downloading wrote its folder back.
+    const root = await scratch()
+    const repos = { 'acme/kit': { commits: { [SHA_A]: repoAtA } } }
+    const looked = await createSkillLibrary({ root, fetch: fakeGitHub(repos).fetch }).preview('acme/kit')
+    const tampered = fakeGitHub(repos, { tamper: 'skills/pdf/scripts/fill.py' }).fetch
+    const late: Fetcher = async (url, init) => {
+      if (!url.endsWith('skills/pdf/scripts/fill.py')) await new Promise((resolve) => setTimeout(resolve, 40))
+      return tampered(url, init)
+    }
+    const library = createSkillLibrary({ root, fetch: late })
+    await expect(library.install({ source: looked.source, ref: looked.ref, sha: looked.sha, names: ['brand', 'pdf'] })).rejects.toThrow(/did not arrive as GitHub lists it/)
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    expect((await readdir(root).catch(() => [])).filter((name) => name.startsWith('.staging-'))).toEqual([])
+  })
+
   it('a name kept from one repository is held in another, and refused if asked anyway', async () => {
     const root = await scratch()
     const repos = {

@@ -25,6 +25,7 @@ heading: the home screen then shows it once, as a splash.
 ### Fixed
 
 - **A Claude Code teammate no longer stays "working" after it has answered.** If a command it started kept running after its final answer, the run stayed open until that command ended, which could be never. Locust now ends such a run a minute after the answer and counts it as completed.
+- **A Skills from GitHub keep that is refused leaves nothing behind.** When a file did not arrive as GitHub lists it, nothing was kept, as intended, but a hidden half-downloaded folder could stay in Locust's skill library. It is now removed every time.
 
 ## 0.710.0 - 2026-10-09
 
