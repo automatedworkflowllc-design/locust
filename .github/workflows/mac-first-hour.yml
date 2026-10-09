@@ -37,7 +37,7 @@ jobs:
           hdiutil detach /tmp/locust-image
       - name: First hour on a bare Mac
         run: |
-          NODE="$(command -v node)"
+          NODE="$(realpath "$(command -v node)")"
           hidden=""
           trap 'for f in $hidden; do sudo mv "$f.locust-hidden" "$f"; done' EXIT
           for d in /opt/homebrew/bin /usr/local/bin; do
