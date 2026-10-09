@@ -11,6 +11,17 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.710.0 - 2026-10-09
+
+### New
+
+- **Skills from GitHub.** Settings > Teammates > Skills from GitHub keeps skills from a public repository: paste `owner/repo` or its github.com link and press Look. Locust lists every skill in it with what it is for and every file it carries, and names the files that run, such as scripts, before anything is downloaded. Tick the ones you want and press Keep. They are kept exactly as they were at the commit you looked at, and Claude Code teammates use them on every run, Auto included. Nothing changes when the repository does until you press Look for changes and keep again. Kept skills are part of a profile backup.
+
+### Fixed
+
+- **A free model OpenCode has retired is no longer offered.** OpenCode retired Exo Free while still listing it, so "Use a free model" could start a new person on it and their first message failed, and Compare could put it beside your model as a column that never answered. Locust now leaves out a free model OpenCode says is retired, and a run that hits one offers to switch to a free model that answers.
+- **A large folder no longer shows files that did not change.** In a folder with more than 5,000 files that is not a Git repository, a file one run never touched could be listed under "changed in the folder while it ran", as added or edited. Locust now counts a file only if it was written while the run went.
+
 ## 0.709.0 - 2026-10-08
 
 ### Fixed
