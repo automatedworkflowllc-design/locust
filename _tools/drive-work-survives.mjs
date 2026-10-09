@@ -31,14 +31,13 @@ const drive = await startDrive({
 /** Everything on screen that represents work, counted the same way twice. */
 const census = `(() => {
   const count = (selector) => document.querySelectorAll(selector).length
-  const head = document.querySelector('.lc-workroom__head, header')?.textContent?.replace(/\\s+/g, ' ').trim() ?? ''
+  const running = Boolean(document.querySelector('button[aria-label^="Stop the running"]'))
   return {
-    phase: /running|starting/i.test(head) ? 'running' : 'finished',
+    phase: running ? 'running' : 'finished',
     liveStep: count('.lc-livestep, [class*="livestep"]'),
     activityCards: count('.lc-activity'),
     fileRows: count('.lc-filerow'),
     shellRows: count('.lc-filerow.is-shell'),
-    traceLine: document.querySelector('.lc-activity__trace, [class*="trace"]')?.textContent?.replace(/\\s+/g, ' ').trim(),
     agentMessages: count('.lc-agentline'),
     bodyMentionsThinking: /thought|thinking/i.test(document.body.innerText)
   }

@@ -127,33 +127,22 @@ try {
      * in a 6px well without moving the row, which is a thing only a real
      * render can show.
      */
+    // The row's orb became Claude Code's spinner glyph in 0.392 (WorkingSpark, .lc-spark): CSS, no canvas, in the
+    // finished dot's 6px box so a row never moves when a run starts or stops. The 20px morph checks went with it.
     const seen = await drive.evaluate(`(() => {
-      const row = document.querySelector('.lc-row__orb canvas')
+      const row = document.querySelector('.lc-sidebar .lc-spark') ?? document.querySelector('.lc-spark')
       const plan = document.querySelector('.lc-plan__orb canvas')
-      const rowBox = row ? row.closest('.lc-row__orb').getBoundingClientRect() : null
       return JSON.stringify({
-        sidebar: row ? row.width + 'x' + row.height : 'none',
-        sidebarWell: rowBox ? Math.round(rowBox.width) : null,
-        // What the eye gets, not what the canvas holds. The library's
-        // smallest orb is 20px and resolvePreset throws on anything else, so
-        // the row's is scaled down in CSS -- which the canvas's own width
-        // property cannot see, because that is device pixels at full
-        // resolution. Only the painted box knows. (No backticks in here: a
-        // backtick in a page script's comment closes this template literal,
-        // and the repo has a guard for exactly that.)
-        sidebarDrawn: row ? Math.round(row.getBoundingClientRect().width) : null,
+        sidebar: row ? 'spark' : 'none',
+        sidebarWell: row ? Math.round(row.getBoundingClientRect().width) : null,
+        glyph: row ? getComputedStyle(row, '::before').content : null,
         planStep: plan ? plan.width + 'x' + plan.height : 'none'
       })
     })()`)
     const read = JSON.parse(String(seen))
-    check('the running conversation row carries an orb', read.sidebar !== 'none', seen)
+    check('the running conversation row carries the working spark', read.sidebar !== 'none', seen)
     check('and it does not widen the row', read.sidebarWell === 6, `well ${String(read.sidebarWell)}px`)
-    // At the library's own 20px, never shrunk: Colin, 2026-09-21, found the
-    // scaled-down morph orb dense and smudged, and shell.css (.lc-row__orb)
-    // records the measurement that keeps it at full size. This asserted
-    // "under 16px" -- the design before that -- and failed on every run
-    // since (0.271 design recheck, 9g).
-    check('it is drawn at its own size, where the morph stays a clean circle', read.sidebarDrawn === 20, `drawn ${String(read.sidebarDrawn)}px`)
+    check('and it draws its glyph', typeof read.glyph === 'string' && !/^(none|normal)$/.test(read.glyph), String(read.glyph))
     return seen
   })
 

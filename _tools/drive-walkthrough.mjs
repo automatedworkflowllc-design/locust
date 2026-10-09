@@ -119,12 +119,13 @@ const reading = `(() => {
   const text = (el) => (el === null ? null : (el.innerText ?? '').replace(/\\s+/g, ' ').trim())
   return JSON.stringify({
     title: document.title,
-    version: text(document.querySelector('.lc-sidebar__version, .lc-settings__version')),
+    // The version is said in Settings' header now ("Locust 0.711.0 · local only"), when Settings is open.
+    version: text([...document.querySelectorAll('.lc-screen__meta')].find((el) => /^Locust /.test(el.innerText ?? '')) ?? null),
     teammates: [...document.querySelectorAll('.lc-teammate-name')].map((el) => text(el)),
     composerPlaceholder: document.querySelector('textarea[aria-label="Message"]')?.placeholder ?? null,
     controls: [...document.querySelectorAll('button.lc-control')].map((el) => text(el)),
     suggestions: [...document.querySelectorAll('.lc-idlepad__prompt, .lc-teammate__title')].map((el) => text(el)).slice(0, 4),
-    bottomLine: text(document.querySelector('.lc-sidebar__foot, .lc-statusline'))
+    bottomLine: text(document.querySelector('.lc-sidebar__footer'))
   })
 })()`
 

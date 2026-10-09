@@ -54,7 +54,7 @@ function send(prompt) {
 }
 try {
   await drive.capture('Ash on Claude Code Haiku 4.5 in Auto', async () => { await drive.ready(); return drive.evaluate(openTeammateScript('Ash')) })
-  const shownRoute = await drive.evaluate(`document.querySelector('.lc-route')?.innerText ?? document.querySelector('form.command-dock')?.innerText`)
+  const shownRoute = await drive.evaluate(`document.querySelector('form.command-dock')?.innerText`)
   say(`route shown: ${shownRoute}`)
   await drive.capture('Read chart.png and describe the chart', () => drive.evaluate(send('Read chart.png and tell me in one sentence what it shows.')))
   const read = await drive.evaluate(`(() => {

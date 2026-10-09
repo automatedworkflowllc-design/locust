@@ -158,7 +158,10 @@ try {
         if (across > 1 && down > 1) overlap = 'cards ' + i + ' and ' + j + ' overlap by ' + Math.round(across) + 'x' + Math.round(down) + 'px'
       }
     }
-    const scroller = document.querySelector('.lc-roomthread') ?? document.scrollingElement
+    // The cards' own scrolling box, found from the cards: the room's thread has no class of its own any more.
+    let scroller = cards[0]?.parentElement ?? null
+    while (scroller && scroller !== document.body && !(/auto|scroll/.test(getComputedStyle(scroller).overflowY))) scroller = scroller.parentElement
+    if (!scroller || scroller === document.body) scroller = document.scrollingElement
     return 'cards: ' + cards.length + ' · overlap: ' + overlap +
       ' · widest: ' + Math.max(...boxes.map(b => Math.round(b.width))) + 'px' +
       ' · column height: ' + Math.round(boxes[boxes.length - 1].bottom - boxes[0].top) + 'px' +

@@ -45,23 +45,12 @@ const measure = `(() => {
     scrollWidth: row.scrollWidth,
     overflowBy: Math.max(0, row.scrollWidth - Math.round(box.width)),
     pastTheEdge: past,
+    // The effort control at the row's right end. The swarm pill that sat beside it left the row (swarm is a
+    // Settings switch, said by a chip in the title bar), so there is no neighbour to overlap any more.
     rightEnd: (() => {
-      const effort = row.querySelector('.lc-effortbar, .lc-effortchip, [class*="effort"]')
-      const swarm = row.querySelector('.lc-swarm')
-      const b = node => node ? { l: Math.round(node.getBoundingClientRect().left), r: Math.round(node.getBoundingClientRect().right) } : null
-      const e = b(effort), w = b(swarm)
-      return {
-        effort: e, swarm: w,
-        gap: e && w ? w.l - e.r : null,
-        moth: (() => {
-          const img = row.querySelector('.lc-swarm img')
-          if (!img) return null
-          const i = img.getBoundingClientRect()
-          const btn = row.querySelector('.lc-swarm').getBoundingClientRect()
-          return { imgWidth: Math.round(i.width), buttonWidth: Math.round(btn.width), spillsLeftBy: Math.round(btn.left - i.left) }
-        })(),
-        overlapping: e && w ? w.l < e.r : null
-      }
+      const effort = row.querySelector('[aria-label="Reasoning effort"]')
+      const box = effort ? effort.getBoundingClientRect() : null
+      return { effort: box ? { l: Math.round(box.left), r: Math.round(box.right) } : null, insideTheRow: box ? box.right <= row.getBoundingClientRect().right + 0.5 : null }
     })(),
     children: [...row.children].map(group => ({
       group: Math.round(group.getBoundingClientRect().width),

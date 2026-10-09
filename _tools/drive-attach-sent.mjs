@@ -89,13 +89,13 @@ try {
     // button is on the composer and outlives the run's own state.
     for (let i = 0; i < 150; i += 1) {
       await new Promise(r => setTimeout(r, 2000))
-      const head = document.querySelector('.lc-workroom__head, header')?.textContent ?? ''
-      if (!/running|starting/i.test(head)) break
+      // Running is the Stop button now (the head no longer says it).
+      if (!document.querySelector('button[aria-label^="Stop the running"]')) break
     }
     const text = document.body.innerText
     return text.includes('ORCHID-4417')
       ? 'the file was read: ORCHID-4417 came back'
-      : 'NO PASSPHRASE -- ' + (document.querySelector('.lc-workroom__head, header')?.textContent?.replace(/\\s+/g, ' ').trim() ?? 'no header')
+      : 'NO PASSPHRASE -- ' + (document.querySelector('.lc-workroom__header')?.textContent?.replace(/\\s+/g, ' ').trim() ?? 'no header')
   })()`))
 
 } finally {

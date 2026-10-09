@@ -54,7 +54,6 @@ try {
   await sleep(4000)
   const home = JSON.parse(String(await drive.capture('Home: Build and compare, under the agents', () => drive.evaluate(`(async () => {
     for (let i = 0; i < 40 && !document.querySelector('.lc-buildhead'); i += 1) await new Promise((r) => setTimeout(r, 500))
-    const scroller = document.querySelector('.lc-home, .lc-firstlaunch, main') ?? document.scrollingElement
     return JSON.stringify({
       // One row of chips since 0.609 (cards before 0.607, a line of links in 0.607 and 0.608).
       starters: [...document.querySelectorAll('.lc-buildchip .lc-buildchip__name')].map((b) => b.textContent.trim()),

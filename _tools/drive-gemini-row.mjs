@@ -31,7 +31,7 @@ try {
   await drive.capture('launch', () => drive.ready())
 
   await drive.capture('every runtime, as the footer counts them', () => drive.evaluate(`
-    document.querySelector('.lc-shell__foot, .lc-runtimecount, footer')?.textContent?.trim()
+    document.querySelector('.lc-connected')?.getAttribute('title')
       ?? [...document.querySelectorAll('*')].map(n => n.childElementCount === 0 ? n.textContent : '').find(t => /runtime/i.test(t ?? '')) ?? 'no count found'
   `))
 

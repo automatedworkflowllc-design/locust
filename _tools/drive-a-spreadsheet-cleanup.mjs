@@ -92,7 +92,7 @@ try {
     const row = [...document.querySelectorAll('.lc-thread *')].find((el) => el.children.length === 0 && /sales-clean\\.csv/.test(el.textContent ?? ''))
     row?.scrollIntoView({ block: 'center' })
     await new Promise((r) => setTimeout(r, 600))
-    return JSON.stringify({ sheet: !!document.querySelector('.lc-sheetview, [class*="sheet"]'), near: row?.closest('.lc-filerow, .lc-activity, .lc-card')?.innerText.replace(/\\s+/g, ' ').slice(0, 300) ?? '' })
+    return JSON.stringify({ sheet: !!document.querySelector('.lc-sheet'), near: row?.closest('.lc-filerow, .lc-activity, .lc-card')?.innerText.replace(/\\s+/g, ' ').slice(0, 300) ?? '' })
   })()`)))
   say(`  file card: ${card}`)
 } catch (error) {

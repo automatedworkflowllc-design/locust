@@ -48,7 +48,7 @@ const open = `(async () => {
   if (row === undefined) return 'no row for that mission'
   row.click()
   await new Promise(r => setTimeout(r, 1800))
-  const header = document.querySelector('.lc-thread__header, header')
+  const header = document.querySelector('.lc-workroom__header')
   const more = document.querySelector('[aria-label="More actions"]')
   if (more === null) return 'no more-actions control'
   more.click()

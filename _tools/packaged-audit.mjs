@@ -103,7 +103,7 @@ try {
     open.click()
     for (let i = 0; i < 40; i += 1) {
       await new Promise(r => setTimeout(r, 250))
-      if (document.querySelector('.lc-settings__group')) break
+      if (document.querySelector('.lc-settings__section')) break
     }
     const text = document.body.innerText || ''
     const version = (text.match(/Locust\\s+(\\d+\\.\\d+\\.\\d+)/) || [])[1] || ''

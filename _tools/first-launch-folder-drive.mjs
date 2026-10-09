@@ -180,52 +180,11 @@ try {
   check('the invented folder is announced on screen, not only on hover', saidOnScreen === true, said.body.slice(0, 200))
   say(`   OPEN: the chip's tooltip says: ${JSON.stringify(tooltip)}`)
 
-  /*
-   * AND THE CHANGELOG, WHICH IS READ HERE OR NOWHERE.
-   *
-   * A first launch is the one moment the "what changed" banner is on
-   * screen, so this is where its rendering gets looked at. Every entry in
-   * `CHANGELOG.md` is a bullet whose sentence wraps with two-space
-   * continuations, and the parser used to end the list at the first wrapped
-   * line: the bullet kept one line and the rest of the sentence became a
-   * paragraph beneath it, at the left margin. Colin, with a screenshot of
-   * the banner open (2026-09-19): "this format is slightly off".
-   */
-  say('2. the what-changed banner, opened')
-  const changelog = JSON.parse(await cdp.eval(`(async () => {
-    const readIt = [...document.querySelectorAll('button')].find(b => /^Read it$/.test((b.innerText || '').trim()))
-    if (!readIt) return JSON.stringify({ banner: false })
-    readIt.click()
-    await new Promise(r => setTimeout(r, 700))
-    const panel = document.querySelector('.lc-whatchanged')
-    if (!panel) return JSON.stringify({ banner: true, panel: false })
-    const clean = (s) => (s || '').replace(new RegExp('[' + String.fromCharCode(32, 9, 13, 10) + ']+', 'g'), ' ').trim()
-    const items = [...panel.querySelectorAll('li')].map(li => clean(li.innerText))
-    // Anything drawn as prose BESIDE the list is the defect: an entry is a
-    // list of bullets and nothing else.
-    const loose = [...panel.children].filter(el => el.tagName !== 'UL' && el.tagName !== 'OL' && clean(el.innerText).length > 0)
-    return JSON.stringify({
-      banner: true,
-      panel: true,
-      items: items.map(t => t.slice(0, 80)),
-      longest: items.reduce((most, t) => Math.max(most, t.length), 0),
-      loose: loose.map(el => el.tagName + ': ' + clean(el.innerText).slice(0, 60))
-    })
-  })()`))
-  say(`   ${JSON.stringify(changelog).slice(0, 400)}`)
-  if (changelog.panel === true) {
-    check('the entry is drawn as bullets', changelog.items.length > 0, JSON.stringify(changelog.items))
-    check('a wrapped bullet stays inside its bullet', changelog.loose.length === 0, JSON.stringify(changelog.loose))
-    check('and the whole sentence is in the item', changelog.longest > 80, String(changelog.longest))
-    const read = await cdp.send('Page.captureScreenshot', { format: 'png' })
-    await writeFile(new URL('../docs/chain-measure/first-launch-changelog-2026-09-19.png', import.meta.url), Buffer.from(read.result.data, 'base64'))
-    // Put it back the way it was for the frame below.
-    await cdp.eval(`(async () => {
-      const hide = [...document.querySelectorAll('button')].find(b => /^Hide$/.test((b.innerText || '').trim()))
-      if (hide) { hide.click(); await new Promise(r => setTimeout(r, 500)) }
-      return true
-    })()`)
-  }
+  // The what-changed banner left Home on 2026-09-23 (Colin: "it adds a needless scrollbar"); the changelog is
+  // Settings > What's new now, and drive-whats-new reads its bullets. Its checks here had not run since.
+  say('2. no what-changed banner on a first launch')
+  const banner = await cdp.eval(`[...document.querySelectorAll('button')].some((b) => /^Read it$/.test((b.innerText || '').trim()))`)
+  check('no what-changed banner on Home', banner === false, String(banner))
 
   const shot = await cdp.send('Page.captureScreenshot', { format: 'png' })
   const out = new URL('../docs/chain-measure/first-launch-folder-2026-09-19.png', import.meta.url)

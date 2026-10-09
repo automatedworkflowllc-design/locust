@@ -253,7 +253,7 @@ try {
   let answered
   for (let i = 0; sent === 'sent' && i < 300; i += 1) {
     await sleep(1000)
-    const now = JSON.parse(String(await cdp.eval(`JSON.stringify({ text: [...document.querySelectorAll('.lc-agentline__body')].map((e) => e.innerText.trim()).join(' ').length, running: Boolean(document.querySelector('button[aria-label^="Stop the running"]')), failed: document.querySelector('.lc-notice--error, .lc-failcard')?.innerText?.slice(0, 200) ?? null })`)))
+    const now = JSON.parse(String(await cdp.eval(`JSON.stringify({ text: [...document.querySelectorAll('.lc-agentline__body')].map((e) => e.innerText.trim()).join(' ').length, running: Boolean(document.querySelector('button[aria-label^="Stop the running"]')), failed: document.querySelector('.lc-diagnostic.lc-tone-red, .lc-card.is-terminal.is-red')?.innerText?.slice(0, 200) ?? null })`)))
     if (firstWords === undefined && now.text > 0) firstWords = Math.round((Date.now() - sentAt) / 1000)
     if (now.failed !== null) { say(`   failed: ${now.failed}`); break }
     if (now.text > 0 && !now.running) { answered = Math.round((Date.now() - sentAt) / 1000); break }

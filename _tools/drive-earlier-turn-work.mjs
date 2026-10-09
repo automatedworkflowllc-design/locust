@@ -39,8 +39,8 @@ const send = (text) => `(async () => {
   box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
   for (let i = 0; i < 150; i += 1) {
     await new Promise(r => setTimeout(r, 2000))
-    const head = document.querySelector('.lc-workroom__head, header')?.textContent ?? ''
-    if (!/running|starting/i.test(head)) return 'done'
+    // Running is the Stop button now (the head no longer says it).
+    if (!document.querySelector('button[aria-label^="Stop the running"]')) return 'done'
   }
   return 'still running'
 })()`

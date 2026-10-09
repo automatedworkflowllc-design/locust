@@ -70,12 +70,13 @@ const REPORT = `(async () => {
     }
   }
   const chips = picker.querySelectorAll('.lc-effortpanel__notch')
-  const swarmPill = picker.querySelector('.lc-swarm')
+  // Swarm is a Settings switch and a /swarm command now; the title bar's chip says while it is on.
+  const swarmPill = document.querySelector('.lc-swarmchip')
   return [
     'chip: ' + chip.slice(0, 46),
     'ACTIVE rows: ' + activeRows.length + (activeRows.length ? ' >> ' + activeRows.join(' ;; ') : ''),
     'effort chips: ' + chips.length + (chips.length ? ' >> ' + [...chips].map(flat).join(' ') : ''),
-    'swarm pill: ' + (swarmPill ? 'yes' : 'NO')
+    'swarm chip in the title bar: ' + (swarmPill ? 'yes' : 'no (swarm off)')
   ].join('  ||  ')
 })()`
 

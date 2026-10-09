@@ -53,6 +53,26 @@ const ABSENCE_ASSERTIONS: readonly { readonly file: string; readonly selector: s
     file: 'avatar-smoke.mjs',
     selector: 'progress, [role="progressbar"], .lc-progress',
     why: 'asserts "no progress bar exists anywhere" — matching nothing is the pass'
+  },
+  {
+    file: 'drive-context-menu.mjs',
+    selector: '.lc-context__title',
+    why: 'the menu lost its title bar on purpose (a-context-menu-stays-in-the-window.test.tsx); "no title bar" is the pass'
+  },
+  {
+    file: 'drive-teammate-model.mjs',
+    selector: '.lc-sidebar__addmenu',
+    why: 'the + opens the right-click menu instead of the old add menu; oldMenu === false is checked'
+  },
+  {
+    file: 'drive-newline-hint.mjs',
+    selector: '.lc-composer__newline',
+    why: 'the Shift+Enter hint was removed on Colin\'s word (Composer.tsx); the drive reads it as ABSENT'
+  },
+  {
+    file: 'probe-composer-row.mjs',
+    selector: '.lc-workroom__context',
+    why: 'the context ring left the conversation header for the chat box; ringStillInHeader false is the pass'
   }
 ]
 
@@ -128,7 +148,15 @@ function labelIsReachable(label: string, exact: boolean): boolean {
   return appLabelPrefixes.some((prefix) => prefix.startsWith(label) || label.startsWith(prefix))
 }
 
-const CALL = /querySelectorAll?\(\s*(['"`])(.*?)\1/gs
+/*
+ * querySelector AND querySelectorAll (0.712). This read `querySelectorAll?\(`,
+ * which matches "querySelectorAll(" and "querySelectorAl(" -- never
+ * "querySelector(". Every single-element lookup in every harness went
+ * unchecked: 46 dead selectors in 34 files when it was fixed, among them the
+ * first-hour drive's failure detector (`.lc-notice--error, .lc-failcard`,
+ * neither drawn), so a failed first answer read as one still coming.
+ */
+const CALL = /querySelector(?:All)?\(\s*(['"`])(.*?)\1/gs
 
 function deadSelectors(text: string, file: string): string[] {
   const dead: string[] = []
@@ -173,6 +201,12 @@ describe('no harness selects something the app cannot draw', () => {
     // wrong first time.
     expect(appLabels.has('Save as routine')).toBe(true)
     expect(appLabels.size).toBeGreaterThan(40)
+  })
+
+  it('reads querySelector as well as querySelectorAll (0.712: it read only the second)', () => {
+    expect(deadSelectors("document.querySelector('.lc-not-drawn-anywhere')", 'probe.mjs')).toEqual(['.lc-not-drawn-anywhere'])
+    expect(deadSelectors("document.querySelectorAll('.lc-not-drawn-anywhere')", 'probe.mjs')).toEqual(['.lc-not-drawn-anywhere'])
+    expect(deadSelectors("document.querySelector('.lc-bubble, .lc-not-drawn-anywhere')", 'probe.mjs')).toEqual([])
   })
 
   it.each(harnesses.map((entry) => entry.name))('%s', (name: string) => {

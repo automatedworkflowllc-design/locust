@@ -83,7 +83,7 @@ const ask = (text, answer) => `(async () => {
     const approval = document.querySelector('[role=group][aria-label="Approval required"]')
     if (approval) {
       await new Promise((r) => setTimeout(r, 300))
-      cards.push((approval.querySelector('code, pre, .lc-approval__exact')?.innerText ?? approval.innerText).split(/\\s+/).join(' ').slice(0, 90))
+      cards.push((approval.querySelector('.lc-approval__detail')?.innerText ?? approval.innerText).split(/\\s+/).join(' ').slice(0, 90))
       const button = ANSWER(approval)
       if (!button) break
       button.click()

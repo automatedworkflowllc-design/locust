@@ -102,7 +102,7 @@ try {
     const before = await drive.evaluate(`JSON.stringify({
       stopButton: document.querySelector('button[aria-label^="Stop the running"]') !== null,
       stopDisabled: document.querySelector('button[aria-label^="Stop the running"]')?.disabled ?? null,
-      header: (document.querySelector('.lc-workroom__line')?.innerText ?? '').replace(/\\s+/g, ' ').trim().slice(0, 120)
+      header: (document.querySelector('.lc-workroom__header')?.innerText ?? '').replace(/\\s+/g, ' ').trim().slice(0, 120)
     })`)
     const pressed = await drive.evaluate(`(() => {
       const stop = document.querySelector('button[aria-label^="Stop the running"]')

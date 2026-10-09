@@ -70,7 +70,7 @@ const READ_PICKER = `(async () => {
     rowCount: rows.length,
     rows: rows.slice(0, 30),
     emptyMessage: empty === null ? null : (empty.textContent ?? '').trim(),
-    statusLine: (document.querySelector('.lc-sidebar__foot')?.textContent ?? '').trim()
+    statusLine: (document.querySelector('.lc-sidebar__footer')?.textContent ?? '').trim()
   })
 })()`
 

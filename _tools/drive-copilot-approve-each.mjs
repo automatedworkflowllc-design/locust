@@ -123,7 +123,7 @@ const answerUntilEnd = (answer) => `(async () => {
         ? `[...card.querySelectorAll('button')].find((b) => /^Approve once/.test(b.innerText.trim()))`
         : `card.querySelector('button.lc-denybutton')`}
       if (button) {
-        cards.push((card.querySelector('code, pre, .lc-approval__exact')?.innerText ?? card.innerText).split(/\\s+/).join(' ').slice(0, 90))
+        cards.push((card.querySelector('.lc-approval__detail')?.innerText ?? card.innerText).split(/\\s+/).join(' ').slice(0, 90))
         button.click()
         await new Promise((r) => setTimeout(r, 900))
         continue

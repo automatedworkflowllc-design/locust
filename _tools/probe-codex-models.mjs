@@ -65,7 +65,7 @@ const search = (term) => `(async () => {
   box.dispatchEvent(new Event('input', { bubbles: true }))
   await new Promise(r => setTimeout(r, 600))
   const rows = [...document.querySelectorAll('.lc-picker__row')].map(r => r.innerText.replace(/\\s+/g, ' ').trim().slice(0, 70))
-  const empty = document.querySelector('.lc-picker__empty')?.innerText.trim()
+  const empty = document.querySelector('.lc-picker__notice')?.innerText.trim()
   return JSON.stringify({ term: ${JSON.stringify(term)}, matched: rows.length, rows, empty }, null, 1)
 })()`
 

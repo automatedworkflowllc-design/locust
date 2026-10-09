@@ -70,12 +70,13 @@ const OPEN_PICKER = `(async () => {
   if (!picker) return 'picker did not open'
   const flat = (el) => el.innerText.split(/\\s+/).join(' ').trim()
   const head = picker.querySelector('.lc-picker__head')
-  const swarm = picker.querySelector('.lc-swarm')
+  // Swarm left the picker and the composer: a Settings switch, said by the title bar's chip while it is on.
+  const swarm = document.querySelector('.lc-swarmchip')
   const efforts = picker.querySelectorAll('.lc-effortpanel__notch')
   const held = picker.querySelector('.lc-effortpanel__now')
   return [
     'head: ' + (head ? flat(head).slice(0, 70) : 'none'),
-    'swarm pill in head: ' + (swarm ? 'YES -- ' + flat(swarm) : 'NO'),
+    'swarm chip in the title bar: ' + (swarm ? 'YES -- ' + flat(swarm) : 'NO (swarm off)'),
     'effort chips: ' + efforts.length + (efforts.length ? ' >> ' + [...efforts].map(flat).join(' ') : ''),
     'held line: ' + (held ? flat(held) : 'none')
   ].join('  ||  ')
@@ -88,19 +89,7 @@ try {
   })
 
   await drive.capture('the picker, as built', () => drive.evaluate(OPEN_PICKER))
-
-  await drive.capture('swarm on: the effort chips should grey and say who holds them', () =>
-    drive.evaluate(`(async () => {
-      const pill = document.querySelector('.lc-swarm')
-      if (!pill) return 'no swarm pill to press'
-      pill.click()
-      await new Promise((r) => setTimeout(r, 900))
-      const flat = (el) => el.innerText.split(/\\s+/).join(' ').trim()
-      const held = document.querySelector('.lc-effortpanel__now')
-      const on = document.querySelector('.lc-swarm.is-on')
-      return 'swarm pressed: ' + (on ? 'on' : 'NOT on') + '  ||  held line: ' + (held ? flat(held) : 'none')
-    })()`)
-  )
+  // The "swarm on" frame pressed a pill in the composer; swarm is a Settings switch now, so there is none to press.
 } catch (error) {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {

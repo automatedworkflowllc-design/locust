@@ -85,7 +85,7 @@ const settle = `(async () => {
   const bodies = [...document.querySelectorAll('.lc-agentline__body')]
   return JSON.stringify({
     reply: (bodies.at(-1)?.innerText ?? '').trim().slice(0, 120),
-    header: (document.querySelector('.lc-workroom__meta')?.innerText ?? '').replace(/\\s+/g, ' ').trim().slice(0, 200)
+    header: (document.querySelector('.lc-workroom__header')?.innerText ?? '').replace(/\\s+/g, ' ').trim().slice(0, 200)
   }, null, 1)
 })()`
 

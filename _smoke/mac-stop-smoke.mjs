@@ -160,7 +160,7 @@ try {
     const start = document.querySelector('button[aria-label="Send"]')
     return 'never ran: pressed ' + window.__presses + ' times, box held "' + String(window.__box).slice(0, 40) + '" | start ' + (start === null ? 'missing' : start.disabled ? 'disabled (' + (start.getAttribute('title') ?? '') + ')' : 'enabled')
       + ' | notice: ' + ([...document.querySelectorAll('.lc-notice')].map((el) => el.innerText).join(' / ') || 'none')
-      + ' | runtimes: ' + (document.querySelector('.lc-sidebar__status, .lc-status')?.innerText ?? '?')
+      + ' | runtimes: ' + (document.querySelector('.lc-connected')?.getAttribute('title') ?? '?')
       + ' | thread: ' + (document.querySelector('.lc-thread')?.innerText ?? '').replace(/\\s+/g, ' ').slice(-400)
   })()`)
   const running = String(sent).startsWith('running')

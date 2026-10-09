@@ -55,7 +55,7 @@ try {
     const box = plus.getBoundingClientRect()
     return 'present, ' + Math.round(box.width) + 'x' + Math.round(box.height)
       + ', disabled: ' + plus.disabled
-      + ' || chip drawn before choosing anything: ' + (document.querySelector('.lc-attachchip') !== null)
+      + ' || chip drawn before choosing anything: ' + (document.querySelector('.lc-attached') !== null)
   })()`))
 
   await drive.capture('the host refuses a path outside the workspace', () => drive.evaluate(`(async () => {

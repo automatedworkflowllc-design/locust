@@ -87,8 +87,8 @@ const states = `(async () => {
   chips[0]?.click()
   await new Promise(r => setTimeout(r, 300))
   look('named, one ticked')
-  const count = document.querySelector('.lc-roomform__count')?.innerText.trim() ?? '(no count)'
-  return seen.join(' || ') + ' || count reads: ' + count
+  // The form's member count went with its old layout; what is ticked is in the looks above.
+  return seen.join(' || ')
 })()`
 
 try {
