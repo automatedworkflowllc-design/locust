@@ -206,8 +206,8 @@ try {
   const reading = `JSON.stringify({
     text: [...document.querySelectorAll('.lc-agentline__body')].map((e) => e.innerText.trim()).join(' ').length,
     running: Boolean(document.querySelector('button[aria-label^="Stop the running"]')),
-    failures: document.querySelectorAll('.lc-card.is-terminal.is-red').length,
-    failed: [...document.querySelectorAll('.lc-card.is-terminal.is-red')].pop()?.innerText.replace(/\\s+/g, ' ').slice(0, 240) ?? null,
+    failures: document.querySelectorAll('.lc-diagnostic.lc-tone-red, .lc-card.is-terminal.is-red').length,
+    failed: [...document.querySelectorAll('.lc-diagnostic.lc-tone-red, .lc-card.is-terminal.is-red')].pop()?.innerText.replace(/\\s+/g, ' ').slice(0, 240) ?? null,
     offer: [...document.querySelectorAll('button')].map((b) => b.innerText.trim()).find((t) => /^Switch to /.test(t)) ?? null
   })`
   let before = JSON.parse(String(await evaluate(reading)))

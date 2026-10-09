@@ -809,8 +809,12 @@ export interface ThreadProps {
   readonly runAgainNote?: string
   /** A stopped run's message, sent again; drawn only when no tool had run. */
   readonly onSendAgain?: () => void
-  /** A free model that gave up on its limit: the next one, with the message handed back. */
-  readonly limitModel?: { readonly label: string; readonly onPress: () => void }
+  /**
+   * A free model that gave up on its limit, whose provider is down, or that
+   * OpenCode retired: another one, with the message handed back. `why` picks
+   * the sentence over the button; absent, it is the limit's.
+   */
+  readonly limitModel?: { readonly label: string; readonly onPress: () => void; readonly why?: 'retired' | 'down' | 'limit' }
   /** The provider's servers were busy (0.511): carry the same conversation on. */
   readonly onContinueAfterBusy?: () => void
   /** A run that failed because its runtime is signed out: that runtime's sign-in. */
@@ -1757,7 +1761,14 @@ onResume,
           */}
         {limitModel !== undefined && error !== undefined && (
           <div className="lc-rerun">
-            <span>This model is at its limit. Switching puts your message back in the chat box, to send there.</span>
+            <span>
+              {limitModel.why === 'retired'
+                ? 'OpenCode no longer offers this model.'
+                : limitModel.why === 'down'
+                  ? 'This model’s provider is down for now.'
+                  : 'This model is at its limit.'}{' '}
+              Switching puts your message back in the chat box, to send there.
+            </span>
             <button type="button" className="lc-button" onClick={limitModel.onPress}>
               {limitModel.label}
             </button>

@@ -5369,8 +5369,16 @@ export function failedOnItsLimit(payload: {
  * beside a free model: a first run that fails, and a column that never
  * answers. Such a model is left out of the window's model list from then on
  * (retiredFreeModels), and the failed run's card offers the next free one.
+ *
+ * AND "MODEL NOT FOUND" (0.712). A fresh OpenCode 1.18.35 lists the models its
+ * binary was built with until it next reads models.dev, and Fledge Alpha was
+ * still among them -- first of the free ones once Exo was left out -- while
+ * OpenCode's server answered "Model not found: opencode/fledge-alpha-free. Did
+ * you mean: ...". It was the first message a new person sent, on a bare Mac
+ * (_smoke/mac-first-hour-smoke.mjs, 2026-10-09), and the line said why with
+ * nothing to press. Retired, the same way.
  */
-const RETIRED_PATTERN = /\bmodel \S+ has been deprecated\b/i
+const RETIRED_PATTERN = /\bmodel \S+ has been deprecated\b|\bmodel not found: \S+/i
 
 export function modelRetired(payload: { readonly message?: string }): boolean {
   return RETIRED_PATTERN.test(payload.message ?? '')
@@ -5390,7 +5398,7 @@ export function modelUnavailable(payload: { readonly message?: string }): boolea
 }
 
 /** Retired before anyone here ran it: a new person's first press must not find out the hard way. */
-export const KNOWN_RETIRED_MODELS: readonly string[] = ['opencode/exo-free']
+export const KNOWN_RETIRED_MODELS: readonly string[] = ['opencode/exo-free', 'opencode/fledge-alpha-free']
 
 /**
  * The models to leave out of the window's list: the known ones, and any whose

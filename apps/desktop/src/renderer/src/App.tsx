@@ -5205,7 +5205,7 @@ export default function App(): ReactElement {
    * sent for the person, as above. Only for the free models, where the next
    * one is known to cost nothing; a paid runtime's limit is the person's call.
    */
-  const limitOffer = ((): { readonly label: string; readonly onPress: () => void } | undefined => {
+  const limitOffer = ((): { readonly label: string; readonly onPress: () => void; readonly why: 'retired' | 'down' | 'limit' } | undefined => {
     const shown = liveRun
     if (shown === undefined || shown.phase !== 'failed' || shown.data === undefined) return undefined
     const failed = [...shown.events].reverse().find((event) => event.type === 'run.failed')
@@ -5214,11 +5214,16 @@ export default function App(): ReactElement {
     // one that has answered here first.
     const retired = modelRetired(failed.payload)
     // A free model whose provider is down (0.711) is a limit of its own: the same model fails again.
-    if (!retired && !modelUnavailable(failed.payload) && !failedOnItsLimit(failed.payload)) return undefined
-    const start = retired ? freeStartModel(shown.data.runtime, models, freeAnswered, freeDown) : undefined
-    const next = retired ? models.find((model) => model.runtime === shown.data?.runtime && model.id === start) : nextFreeModel(shown.data.runtime, shown.data.model, models, freeDown)
+    const down = !retired && modelUnavailable(failed.payload)
+    if (!retired && !down && !failedOnItsLimit(failed.payload)) return undefined
+    // Never the model that just failed, which stays in the list until the record of this run reaches it.
+    const others = models.filter((model) => model.id !== shown.data?.model)
+    const start = retired ? freeStartModel(shown.data.runtime, others, freeAnswered, freeDown) : undefined
+    const next = retired ? others.find((model) => model.runtime === shown.data?.runtime && model.id === start) : nextFreeModel(shown.data.runtime, shown.data.model, models, freeDown)
     if (next === undefined) return undefined
     return {
+      // What the sentence over the button says: a retired model is not "at its limit" (0.712).
+      why: retired ? 'retired' : down ? 'down' : 'limit',
       label: `Switch to ${modelDisplayName(next.runtime, next.id)}`,
       onPress: () => {
         const split = splitAttachments(shown.prompt)
