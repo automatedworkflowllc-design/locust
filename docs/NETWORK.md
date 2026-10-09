@@ -139,7 +139,9 @@ Code to Anthropic, Copilot CLI to GitHub, Cursor Agent to Cursor, Antigravity
 to Google, Muse Code to Meta, and OpenCode to the provider of the model you
 pick -- for one of your own models, the address you gave it in Settings > Your
 own models. A connector a teammate uses is called by its agent, at the service
-that connector names.
+that connector names. A Claude Code teammate can also search the web and open
+web pages: in Auto on its own, and in every other mode only after you approve
+each one on its card, which shows the search words or the page's whole address.
 
 Locust does not sit between an agent and its service: it reads what the agent
 reports on this machine as it works, and nothing of its network traffic. It

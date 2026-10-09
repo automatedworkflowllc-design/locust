@@ -69,14 +69,16 @@ describe('what the panel says a run may do', () => {
     expect(rows).toContain('allow open files outside this folder, once you approve it')
   })
 
-  it('Claude Code: commands only when its tool list has Bash, and never the web tools', () => {
+  it('Claude Code: commands only when its tool list has Bash; the web in every mode, asked about outside Auto', () => {
     for (const sandbox of ['read-only', 'workspace-write'] as const) {
       const spec = createClaudePrintCommand(launch('claude'), options(sandbox))
       const tools = spec.args[spec.args.indexOf('--tools') + 1]!.split(',')
       const rows = said('claude', sandbox)
-      expect(tools).not.toContain('WebFetch')
-      expect(tools).not.toContain('WebSearch')
-      expect(rows).toContain('deny searching the web or opening web pages: it is given no tool for either')
+      // 0.711: given, and asked about -- no allow rule names them, so each goes to the bridge's card.
+      expect(tools).toContain('WebFetch')
+      expect(tools).toContain('WebSearch')
+      expect(spec.args.some((arg) => /^Web(?:Search|Fetch)/.test(arg) && arg !== tools.join(','))).toBe(false)
+      expect(rows).toContain('allow search the web and open web pages, once you approve each one')
       expect(rows).toContain(tools.includes('Bash') ? 'allow run commands, which can reach anything your account can' : 'deny running commands')
       // Skills (0.679): the tool, and the skills it is handed as plugins.
       expect(tools).toContain('Skill')

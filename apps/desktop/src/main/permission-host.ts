@@ -139,9 +139,47 @@ export function builtInOrConnector(
   toolName: string,
   input: unknown,
   cwd: string
-): { readonly kind: 'command' | 'file-change' | 'connector'; readonly summary: string; readonly detail: string; readonly reversibleSays?: string } {
+): {
+  readonly kind: 'command' | 'file-change' | 'connector'
+  readonly summary: string
+  readonly detail: string
+  readonly reversibleSays?: string
+  readonly dataSentSays?: string
+} {
   const fields = typeof input === 'object' && input !== null ? (input as Record<string, unknown>) : {}
   const text = (value: unknown): string => (typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, 600) : '')
+  /*
+   * THE WEB (0.711). Claude Code's own search and fetch, asked about outside
+   * Auto. Drawn as what leaves this machine -- a connector's kind -- in words
+   * of their own: the search's words go to the search, and a page's whole
+   * address goes to that page's server, which is where a folder's hidden
+   * instruction would put what it wanted out.
+   */
+  if (toolName === 'WebSearch') {
+    return {
+      kind: 'connector',
+      summary: 'Search the web',
+      detail: text(fields.query),
+      dataSentSays: 'The search words above, to Claude Code\'s web search.',
+      reversibleSays: 'Nothing is changed by a search.'
+    }
+  }
+  if (toolName === 'WebFetch') {
+    const url = text(fields.url)
+    let host = ''
+    try {
+      host = new URL(url).host
+    } catch {
+      host = ''
+    }
+    return {
+      kind: 'connector',
+      summary: host.length > 0 ? `Open a page on ${host}` : 'Open a web page',
+      detail: [url, text(fields.prompt)].filter((line) => line.length > 0).join('\n'),
+      dataSentSays: 'The whole address above, to that site. Read it: anything written into an address is sent with it.',
+      reversibleSays: 'Opening a page changes nothing here. A site can act on an address it is sent.'
+    }
+  }
   if (toolName === 'Bash') {
     // Whole, line breaks kept: a heredoc or a long command is read as written (R14).
     const command = typeof fields.command === 'string' ? wholeDetail(fields.command) : ''

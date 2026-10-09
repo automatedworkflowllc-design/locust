@@ -894,7 +894,12 @@ export function createClaudePrintCommand(
     // (0.679). Without it, "use the review skill" went to the nearest
     // connector with "skill" in its name, and stopped there for a permission
     // a printed run cannot give (measured 2026-10-04).
-    editing ? "Read,Glob,Grep,Edit,Write,NotebookEdit,Bash,Task,Skill,mcp__*" : "Read,Glob,Grep,Task,Skill,mcp__*",
+    // WebSearch and WebFetch (0.711, Colin: "build your suggestion"), in every
+    // mode. Auto runs them unasked, as the person. Everywhere else Claude Code
+    // asks before each, and the asking goes through Locust's bridge below to a
+    // card -- so a folder that tells a teammate to fetch a URL carrying what
+    // it read is stopped by a person reading that URL.
+    editing ? "Read,Glob,Grep,Edit,Write,NotebookEdit,Bash,Task,Skill,WebSearch,WebFetch,mcp__*" : "Read,Glob,Grep,Task,Skill,WebSearch,WebFetch,mcp__*",
     /*
      * The connectors this teammate was given, one allow rule each.
      *

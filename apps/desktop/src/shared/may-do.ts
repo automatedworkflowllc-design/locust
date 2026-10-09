@@ -75,15 +75,16 @@ export function whatItMayDo(runtime: MissionRuntimeId, sandbox: MissionSandbox, 
         text: sandbox === 'read-only' ? "run commands in Codex's sandbox, which lets them read and change nothing" : "run commands in Codex's sandbox, which keeps their changes in this folder"
       })
     case 'claude':
-      // `--tools` is the whole list: Bash only when the mode may edit, and
-      // never WebFetch or WebSearch, in any mode (createClaudePrintCommand).
+      // `--tools` is the whole list: Bash only when the mode may edit;
+      // WebSearch and WebFetch in every mode (0.711), asked about through the
+      // card outside Auto (createClaudePrintCommand, permission-host.ts).
       // Skill, with the folder's skills (and the person's own, when Settings
       // lends them) handed over as plugins (0.679, claude-skills.ts). A skill
       // is instructions: it uses only the tools named above.
-      if (sandbox === 'full-access') return rows(ANY_COMMAND)
+      if (sandbox === 'full-access') return rows(ANY_COMMAND, THE_WEB)
       return rows(
         sandbox === 'read-only' ? NO_COMMANDS : OPEN_COMMANDS,
-        { verdict: 'deny', text: 'searching the web or opening web pages: it is given no tool for either' },
+        { verdict: 'allow', wide: true, text: 'search the web and open web pages, once you approve each one' },
         CLAUDE_SKILLS
       )
     case 'opencode':
