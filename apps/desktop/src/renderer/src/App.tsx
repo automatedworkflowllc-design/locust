@@ -169,6 +169,8 @@ import {
   conversationTurns,
   failureMessage,
   failedOnItsLimit,
+  modelRetired,
+  retiredFreeModels,
   failedOnProviderSide,
   recentlyUsedRoutes,
   freeModelsThatAnswered,
@@ -2169,7 +2171,11 @@ export default function App(): ReactElement {
     setApprovals((current) => approvalsOfLiveRuns(current, runs))
   }, [runs])
   const [decidingIds, setDecidingIds] = useState<readonly string[]>([])
-  const [models, setModels] = useState<readonly PublicModel[]>([])
+  const [listedModels, setModels] = useState<readonly PublicModel[]>([])
+  // Less any model OpenCode has retired (0.710, missionView.retiredFreeModels): the picker, Home's free start and
+  // Compare's defaults all read this one list, so none of them offers a model that can only fail.
+  const retiredModels = useMemo(() => retiredFreeModels(history), [history])
+  const models = useMemo(() => listedModels.filter((model) => !retiredModels.has(model.id)), [listedModels, retiredModels])
   /*
    * An unchosen route lands on a NAMED FREE model once the catalogue says
    * there is one. Sol's beta finding 1, the only one of the nine that can
@@ -5198,8 +5204,13 @@ export default function App(): ReactElement {
     const shown = liveRun
     if (shown === undefined || shown.phase !== 'failed' || shown.data === undefined) return undefined
     const failed = [...shown.events].reverse().find((event) => event.type === 'run.failed')
-    if (failed === undefined || failed.type !== 'run.failed' || !failedOnItsLimit(failed.payload)) return undefined
-    const next = nextFreeModel(shown.data.runtime, shown.data.model, models)
+    if (failed === undefined || failed.type !== 'run.failed') return undefined
+    // A model OpenCode retired (0.710) is out of the list, so there is no "next after it": the free start instead,
+    // one that has answered here first.
+    const retired = modelRetired(failed.payload)
+    if (!retired && !failedOnItsLimit(failed.payload)) return undefined
+    const start = retired ? freeStartModel(shown.data.runtime, models, freeAnswered) : undefined
+    const next = retired ? models.find((model) => model.runtime === shown.data?.runtime && model.id === start) : nextFreeModel(shown.data.runtime, shown.data.model, models)
     if (next === undefined) return undefined
     return {
       label: `Switch to ${modelDisplayName(next.runtime, next.id)}`,

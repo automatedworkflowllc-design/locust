@@ -5355,6 +5355,52 @@ export function failedOnItsLimit(payload: {
 }
 
 /**
+ * OPENCODE RETIRED THE MODEL (0.710).
+ *
+ * On 2026-10-08 every run on Exo Free ended "OpenCode stopped: Model exo-free
+ * has been deprecated." while `opencode models` -- and models.dev, refreshed --
+ * still listed it as active. Being first of the free models alphabetically, it
+ * was what Home's "Use a free model" gave a new person and what Compare put
+ * beside a free model: a first run that fails, and a column that never
+ * answers. Such a model is left out of the window's model list from then on
+ * (retiredFreeModels), and the failed run's card offers the next free one.
+ */
+const RETIRED_PATTERN = /\bmodel \S+ has been deprecated\b/i
+
+export function modelRetired(payload: { readonly message?: string }): boolean {
+  return RETIRED_PATTERN.test(payload.message ?? '')
+}
+
+/** Retired before anyone here ran it: a new person's first press must not find out the hard way. */
+export const KNOWN_RETIRED_MODELS: readonly string[] = ['opencode/exo-free']
+
+/**
+ * The models to leave out of the window's list: the known ones, and any whose
+ * latest run here ended on OpenCode's "has been deprecated" -- unless a run on
+ * it finished after that, which says it is back.
+ */
+export function retiredFreeModels(
+  missions: readonly Pick<PublicRecoveredMission, 'runtime' | 'model' | 'phase' | 'lastUpdatedAt' | 'events'>[]
+): ReadonlySet<string> {
+  const retiredAt = new Map<string, number>(KNOWN_RETIRED_MODELS.map((model) => [model, 0]))
+  const answeredAt = new Map<string, number>()
+  for (const mission of missions) {
+    if (mission.runtime !== 'opencode') continue
+    const at = Date.parse(mission.lastUpdatedAt)
+    const stamp = Number.isFinite(at) ? at : 0
+    if (mission.phase === 'completed') {
+      answeredAt.set(mission.model, Math.max(answeredAt.get(mission.model) ?? -1, stamp))
+      continue
+    }
+    if (mission.phase !== 'failed') continue
+    const failed = [...mission.events].reverse().find((event) => event.type === 'run.failed')
+    if (failed === undefined || failed.type !== 'run.failed' || !modelRetired(failed.payload)) continue
+    retiredAt.set(mission.model, Math.max(retiredAt.get(mission.model) ?? -1, stamp))
+  }
+  return new Set([...retiredAt].filter(([model, at]) => (answeredAt.get(model) ?? -1) <= at).map(([model]) => model))
+}
+
+/**
  * The provider's servers were busy or dropped the turn -- not the person's
  * account, quota or folder (0.511).
  *
