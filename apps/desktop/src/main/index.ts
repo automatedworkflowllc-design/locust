@@ -125,7 +125,8 @@ import { readWorkspaceImage } from './workspace-image.js'
 import { readPdfPages } from './pdf-pages.js'
 import { addConnector, removeConnector } from './connector-add.js'
 import { createGithubAccount } from './github-account.js'
-import { FOLDER_PULL_REQUEST_CHANNEL } from '../shared/pull-request.js'
+import { FOLDER_PULL_REQUEST_CHANNEL, PULL_REQUEST_NEWS_CHANNEL, PULL_REQUEST_WATCH_CHANNEL } from '../shared/pull-request.js'
+import { createPullRequestWatch } from './pull-request-watch.js'
 import { GITHUB_ACCOUNT_CHANNEL, GITHUB_CLI_VERSIONS_CHANNEL, GITHUB_INSTALL_CHANNEL, GITHUB_UPDATE_CHANNEL, GITHUB_SIGN_IN_CANCEL_CHANNEL, GITHUB_SIGN_IN_CHANNEL, GITHUB_SIGN_IN_CODE_CHANNEL } from '../shared/github-account.js'
 import type { AgentLaunch } from './connector-add.js'
 import { CONNECTOR_ADD_CHANNEL, CONNECTOR_REMOVE_CHANNEL, isConnectorAgent } from '../shared/connector-add.js'
@@ -2686,6 +2687,25 @@ if (!ownsSingleInstanceLock) {
     ipcMain.handle(FOLDER_PULL_REQUEST_CHANNEL, (event) =>
       fromOwnWindow(event) ? folderCommits.pullRequest(workspacePath).catch(() => undefined) : undefined
     )
+    /*
+     * Watching the folder's pull request (0.731, pull-request-watch.ts): news goes to every window, and as a
+     * notification while Locust is in the background -- a click brings it forward. It never starts a run.
+     */
+    const pullRequestWatch = createPullRequestWatch({
+      read: () => folderCommits.pullRequest(workspacePath),
+      onNews: (news) => {
+        for (const window of BrowserWindow.getAllWindows()) {
+          if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send(PULL_REQUEST_NEWS_CHANNEL, news)
+        }
+        attention.runFinished({ title: `Pull request #${String(news.number)}`, body: `${news.said}.`, missionId: undefined })
+      }
+    })
+    app.once('will-quit', () => pullRequestWatch.stop())
+    ipcMain.handle(PULL_REQUEST_WATCH_CHANNEL, (event, url: unknown, on: unknown) => {
+      if (!fromOwnWindow(event) || typeof url !== 'string' || !/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d+$/.test(url)) return false
+      pullRequestWatch.watch(url, on === true)
+      return pullRequestWatch.watching(url)
+    })
     ipcMain.handle(FOLDER_COMMIT_CHANNEL, (event, message: unknown, then: unknown, shown: unknown) =>
       fromOwnWindow(event) && typeof message === 'string' && message.length <= 20_000 && (then === 'commit' || then === 'push' || then === 'pull-request')
         && Array.isArray(shown) && shown.length <= 100_000 && shown.every((path) => typeof path === 'string' && path.length <= 4_096)

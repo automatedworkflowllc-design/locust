@@ -84,19 +84,23 @@ function gh(calls: string[][], signedIn = true) {
       if (signedIn) return 'Logged in'
       throw new Error('not logged in')
     }
-    if (args[0] === 'pr' && args[1] === 'view' && args[2] === 'locust/fix-the-cart-total') return OPEN([run('SUCCESS')])
-    if (args[0] === 'pr' && args[1] === 'view') throw new Error(`no pull requests found for branch "${String(args[2])}"`)
+    // Asked from the branch checked out in the folder, as gh is (0.731).
+    if (args[0] === 'pr' && args[1] === 'view') {
+      const branch = (await git(['symbolic-ref', '--short', 'HEAD'], cwd)).trim()
+      if (branch === 'locust/fix-the-cart-total') return OPEN([run('SUCCESS')])
+      throw new Error(`no pull requests found for branch "${branch}"`)
+    }
     throw new Error('unexpected gh call')
   }
 }
 
 describe('the folder’s pull request', () => {
-  it('is the one for the branch the folder is on, asked of gh by that branch', { timeout: TIMEOUT }, async () => {
+  it('is the one for the branch the folder is on, asked of gh from that branch (0.731: a fork’s too)', { timeout: TIMEOUT }, async () => {
     const folder = await repository()
     await git(['checkout', '-q', '-b', 'locust/fix-the-cart-total'], folder)
     const calls: string[][] = []
     expect(await createFolderCommits({ runNetwork: gh(calls) }).pullRequest(folder)).toMatchObject({ number: 17, state: 'open', checks: 'passing' })
-    expect(calls.find((call) => call[1] === 'pr')).toEqual(['gh', 'pr', 'view', 'locust/fix-the-cart-total', '--json', 'number,title,url,state,isDraft,statusCheckRollup,reviewDecision'])
+    expect(calls.find((call) => call[1] === 'pr')).toEqual(['gh', 'pr', 'view', '--json', 'number,title,url,state,isDraft,statusCheckRollup,reviewDecision,mergeable'])
   })
 
   it('is nothing on the default branch, on a branch with none, or when gh is signed out -- and gh is not asked on main', { timeout: TIMEOUT }, async () => {

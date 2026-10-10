@@ -7191,6 +7191,33 @@ textarea {
   flex: none;
 }
 
+/* The watched pull request's news, above the box (0.731, PullRequestNewsBanner.tsx). */
+.lc-prnews {
+  flex-wrap: wrap;
+  max-width: var(--lc-thread-max-width);
+  margin-left: auto;
+  margin-right: auto;
+}
+.lc-prnews.is-work {
+  border-color: var(--lc-amber-border);
+  background: var(--lc-amber-tint);
+  color: var(--lc-amber-text);
+}
+.lc-prnews__said {
+  flex: 1;
+  min-width: 0;
+}
+.lc-prnews__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lc-space-2);
+}
+/* Watch beside the pull request chip (0.731). */
+.lc-prwatch.is-on {
+  color: var(--lc-green-text);
+  border-color: var(--lc-green-border);
+}
+
 /* A table's Status column, as chips in their tone (0.728, statusChips.ts). */
 .lc-status {
   display: inline-block;

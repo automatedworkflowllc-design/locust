@@ -19,7 +19,7 @@ import type { Spend } from './spend.js'
 import type { UsageRange, UsageSummary } from './usage.js'
 import type { ConnectorAddRequest, ConnectorAddResponse, ConnectorAgent } from './connector-add.js'
 import type { GithubAccount, GithubCliVersions, GithubInstallResult, GithubSignInCode, GithubSignInResult } from './github-account.js'
-import type { FolderPullRequest } from './pull-request.js'
+import type { FolderPullRequest, PullRequestNews } from './pull-request.js'
 import type { OfficeDocument } from './office-document.js'
 import type { Workbook } from './sheet.js'
 import type { AboutYouSuggestion } from './about-you.js'
@@ -3673,6 +3673,10 @@ export interface DesktopApi {
   folderChanges(): Promise<FolderChanges>
   /** The pull request for the branch the open folder is on, read with the person's own gh (0.720). */
   folderPullRequest(): Promise<FolderPullRequest | undefined>
+  /** Watch the folder's pull request, or stop (0.731); answers whether it is watched now. */
+  watchPullRequest(url: string, on: boolean): Promise<boolean>
+  /** What changed about the watched pull request (0.731). */
+  onPullRequestNews(listener: (news: PullRequestNews) => void): () => void
   /** Commit it all as the person, then push or open a pull request when asked. */
   commitFolder(message: string, then: CommitThen, shown: readonly string[]): Promise<CommitResult>
   /** Background turns (W10): Claude Code runs them, Locust watches. */

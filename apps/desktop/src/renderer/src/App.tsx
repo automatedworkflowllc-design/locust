@@ -210,6 +210,8 @@ import { splitAttachments, withAttachments } from '../../shared/attachments.js'
 // different question from who owns a recorded mission.
 import { conversationKeys, heldFor, routineOf } from './conversationList.js'
 import { snoozeChoices } from './settled.js'
+import { PullRequestNewsBanner } from './components/PullRequestNewsBanner.js'
+import type { PullRequestNews } from '../../shared/pull-request.js'
 import type { SettledEntry } from './settled.js'
 import { collapseConversations, staleChecking, defaultEffort, defaultRoute, effortAfterRouteChange, routeAfterKeep, effortIsInModelId, modelFamily, listedAsMission, modeFacts, modeRunsOn, modesFor, modeUnavailableReason, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, runtimeReach, teammateStatusView, startRoute, freeStartStillFree, freeStartModel, nextFreeModel, integrationOf, ACCOUNT_DEFAULT_MODEL} from './status.js'
 import { homeRouteOf, isOwnRoute, modelDisplayName, rememberOwnModels, routeChrome, routeModelName } from './routeName.js'
@@ -2066,6 +2068,9 @@ export default function App(): ReactElement {
   const [route, setRoute] = useState<RouteChoice>({ runtime: 'codex', model: 'account-default' })
   /** Words going back into the chat box (C9): a busy model's message, to send on another. */
   const [handBack, setHandBack] = useState<{ readonly text: string; readonly attachments: readonly string[] }>()
+  // What changed about the watched pull request (0.731), shown above the box until dismissed.
+  const [pullRequestNewsShown, setPullRequestNewsShown] = useState<PullRequestNews>()
+  useEffect(() => window.desktop?.onPullRequestNews((news) => setPullRequestNewsShown(news)), [])
   // A part of a reply the person asked about (SelectionAsk): quoted into the box.
   const [quoteIn, setQuoteIn] = useState<{ readonly quote: string; readonly attachments?: readonly string[] }>()
   // Intent belongs to the addressed teammate, not to discovery or the last
@@ -8693,6 +8698,18 @@ export default function App(): ReactElement {
           {screen === 'workroom' && !running && <UpdateBanner update={update} onInstall={installUpdate} />}
           {screen === 'workroom' && !running && (
             <MacUpdateBanner release={macRelease} onDownload={(url) => void window.desktop?.openLink(url).catch(() => undefined)} />
+          )}
+          {screen === 'workroom' && pullRequestNewsShown !== undefined && (
+            <PullRequestNewsBanner
+              news={pullRequestNewsShown}
+              teammateName={pickedTeammate?.name}
+              onAsk={(text) => {
+                setHandBack({ text, attachments: [] })
+                setPullRequestNewsShown(undefined)
+              }}
+              onOpen={(url) => void window.desktop?.openLink(url).catch(() => undefined)}
+              onDismiss={() => setPullRequestNewsShown(undefined)}
+            />
           )}
           {screen === 'workroom' && (
           <Composer

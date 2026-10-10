@@ -257,8 +257,10 @@ export function createFolderCommits(options: FolderCommitOptions = {}) {
     const remote = await remoteOf(folder, branch)
     let found: FolderPullRequest | undefined
     if (remote?.pullRequests === true && branch !== remote.defaultBranch) {
-      // No pull request for the branch is an error from gh; it is an answer here.
-      found = await runNetwork('gh', ['pr', 'view', branch, '--json', PULL_REQUEST_FIELDS], folder).then(pullRequestOf, () => undefined)
+      // No pull request for the branch is an error from gh; it is an answer here. Asked of the checked-out branch, not
+      // by its name (0.731): MEASURED 2026-10-10, `gh pr view my-first-change` found nothing for a pull request from
+      // a fork checked out with `gh pr checkout`, and plain `gh pr view` there found it by the branch's tracking.
+      found = await runNetwork('gh', ['pr', 'view', '--json', PULL_REQUEST_FIELDS], folder).then(pullRequestOf, () => undefined)
     }
     pullRequests.set(folder, { at: Date.now(), branch, found })
     return found

@@ -16,7 +16,7 @@
 export const FOLDER_PULL_REQUEST_CHANNEL = 'folder:pull-request'
 
 /** The fields asked of gh, in its own names. */
-export const PULL_REQUEST_FIELDS = 'number,title,url,state,isDraft,statusCheckRollup,reviewDecision'
+export const PULL_REQUEST_FIELDS = 'number,title,url,state,isDraft,statusCheckRollup,reviewDecision,mergeable'
 
 export type PullRequestState = 'open' | 'draft' | 'merged' | 'closed'
 export type PullRequestChecks = 'passing' | 'failing' | 'pending' | 'none'
@@ -31,6 +31,8 @@ export interface FolderPullRequest {
   readonly checkCount: number
   readonly notPassed: number
   readonly review?: 'approved' | 'changes-requested' | 'review-required'
+  /** GitHub says it cannot merge into its base as it stands (`mergeable: CONFLICTING`, 0.731). */
+  readonly conflicts?: true
 }
 
 const FAILED = new Set(['FAILURE', 'TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED', 'STARTUP_FAILURE', 'ERROR'])
@@ -78,7 +80,8 @@ export function pullRequestOf(json: string): FolderPullRequest | undefined {
     checks: read.length === 0 ? 'none' : failed > 0 ? 'failing' : pending > 0 ? 'pending' : 'passing',
     checkCount: read.length,
     notPassed: failed + pending,
-    ...(review === undefined ? {} : { review })
+    ...(review === undefined ? {} : { review }),
+    ...(pr.mergeable === 'CONFLICTING' ? { conflicts: true as const } : {})
   }
 }
 
@@ -96,4 +99,54 @@ export function pullRequestLine(pr: FolderPullRequest): string {
     else if (pr.review === 'changes-requested') parts.push('changes requested')
   }
   return parts.join(' · ')
+}
+
+/**
+ * A WATCHED PULL REQUEST, AND WHAT IS NEWS ABOUT IT (0.731). The plan's "a teammate that watches a PR": it checks
+ * the PR every few minutes and wakes when a check fails, someone reviews, or the branch conflicts. Locust watches
+ * the folder's pull request while the person has asked it to, and says what changed -- in the conversation, with
+ * a press that hands it to the teammate, and as a notification while the window is elsewhere. It never starts a
+ * run on its own: what a fix costs stays the person's call.
+ */
+export const PULL_REQUEST_WATCH_CHANNEL = 'folder:pull-request-watch'
+/** main -> renderer: news about the watched pull request. */
+export const PULL_REQUEST_NEWS_CHANNEL = 'folder:pull-request-news'
+
+export interface PullRequestNews {
+  readonly number: number
+  readonly url: string
+  /** "2 of 9 checks failed", "changes were requested", joined. */
+  readonly said: string
+  /** Something a teammate could fix: a failed check, requested changes, a conflict. */
+  readonly needsWork: boolean
+}
+
+/** What changed between two looks at one pull request that a person would want to hear; undefined for nothing. */
+export function pullRequestNews(before: FolderPullRequest, now: FolderPullRequest): PullRequestNews | undefined {
+  if (before.number !== now.number) return undefined
+  const said: string[] = []
+  let needsWork = false
+  if (before.state !== now.state && (now.state === 'merged' || now.state === 'closed')) {
+    said.push(now.state === 'merged' ? 'it was merged' : 'it was closed')
+  } else {
+    if (now.checks === 'failing' && before.checks !== 'failing') {
+      said.push(`${String(now.notPassed)} of ${String(now.checkCount)} checks did not pass`)
+      needsWork = true
+    } else if (now.checks === 'passing' && before.checks !== 'passing' && before.checks !== 'none') {
+      said.push(now.checkCount === 1 ? 'its check passed' : `all ${String(now.checkCount)} checks passed`)
+    }
+    if (now.review !== before.review && now.review === 'changes-requested') {
+      said.push('changes were requested')
+      needsWork = true
+    } else if (now.review !== before.review && now.review === 'approved') {
+      said.push('it was approved')
+    }
+    if (now.conflicts === true && before.conflicts !== true) {
+      said.push('it conflicts with its base branch')
+      needsWork = true
+    }
+  }
+  if (said.length === 0) return undefined
+  const sentence = said.join(', and ')
+  return { number: now.number, url: now.url, said: sentence.charAt(0).toUpperCase() + sentence.slice(1), needsWork }
 }
