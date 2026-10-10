@@ -1275,6 +1275,28 @@ describe('runtime selection', () => {
     expect(spec?.args.slice(at, at + 2)).toEqual(['--effort', 'high'])
   })
 
+  it('gives every Copilot run Locust’s command guard as a plugin, and no other runtime that plugin (0.721)', async () => {
+    const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({ records: records([]), completion: Promise.resolve(completion()) })) satisfies RuntimeProcessRunner['start']
+    const guard = vi.fn(async () => 'C:\\Users\\Jane\\AppData\\Roaming\\Locust\\copilot-command-guard')
+    const service = createCodexMissionService({
+      workspacePath: WORKSPACE,
+      discover: async () => [{ ...codexRuntime(), id: 'copilot', displayName: 'Copilot CLI', optional: true }, { ...codexRuntime(), id: 'cursor', displayName: 'Cursor Agent', optional: true }],
+      runner: { start },
+      ledger: fakeLedger(),
+      createId: (() => { let n = 0; return () => String(++n) })(),
+      now: () => new Date(NOW),
+      schedule: () => undefined,
+      copilotCommandGuard: guard
+    })
+    await service.start('Say hi.', 'copilot', 'ask', {}, () => undefined)
+    const copilot = start.mock.calls[0]?.[0]
+    const at = copilot?.args.indexOf('--plugin-dir') ?? -1
+    expect(copilot?.args.slice(at, at + 2)).toEqual(['--plugin-dir', 'C:\\Users\\Jane\\AppData\\Roaming\\Locust\\copilot-command-guard'])
+    await service.start('Say hi.', 'cursor', 'ask', {}, () => undefined)
+    expect(start.mock.calls[1]?.[0]?.args).not.toContain('C:\\Users\\Jane\\AppData\\Roaming\\Locust\\copilot-command-guard')
+    expect(guard).toHaveBeenCalledTimes(1)
+  })
+
   it('lets a Cursor mission edit when asked, and never forces its commands', async () => {
     const { service, start } = serviceWith([{ ...codexRuntime(), id: 'cursor', displayName: 'Cursor Agent', optional: true }])
     await service.start('Do work.', 'cursor', 'accept-edits', {}, () => undefined)

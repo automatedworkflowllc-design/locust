@@ -127,6 +127,12 @@ const IGNORED_TYPES = new Set([
   "assistant.idle",
   "model.messages_snapshot",
   "session.skills_loaded",
+  // Copilot CLI 1.0.95 (drive-a-copilot-command-is-guarded, 2026-10-10): a
+  // command's output as it runs, shown under every answer as "Unhandled
+  // Copilot record". Every byte arrives again in `tool.execution_complete`,
+  // which this adapter reads, and no runtime's output is drawn live yet.
+  "tool.shell_output",
+  "tool.execution_partial_result",
   "user.message",
 ]);
 
@@ -365,7 +371,13 @@ export function createCopilotEventNormalizer(
      * shape and shipping a follow-up on it is the mistake this file's
      * history is mostly made of.
      */
+    /*
+     * Copilot CLI 1.0.95 sends it with `data: {}` -- 28 of them for one
+     * `echo` that never went to the background (2026-10-10). An empty one
+     * says nothing about any task, so it leaves nothing to build from.
+     */
     if (type === "session.background_tasks_changed") {
+      if (isObject(parsed.data) && Object.keys(parsed.data).length === 0) return [];
       return [
         diagnostic(
           "info",
@@ -445,6 +457,9 @@ export function createCopilotEventNormalizer(
     ) {
       return [];
     }
+    // 1.0.95: each model call's outcome. A success says nothing the answer
+    // does not; any other outcome is still reported, below, as unknown.
+    if (type === "model.call_final_result" && data.result === "success") return [];
 
     if (type === "assistant.message_delta") {
       const text = stringValue(data.deltaContent);

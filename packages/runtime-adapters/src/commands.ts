@@ -463,6 +463,12 @@ export interface RuntimeCommandOptions {
    */
   readonly commandGuard?: { readonly settingsPath: string };
   /**
+   * The same guard for Copilot (0.721): a plugin folder, in Claude Code's
+   * plugin format, whose PreToolUse hook is that guard -- one `--plugin-dir`,
+   * on the print route and the ACP route alike. Copilot only.
+   */
+  readonly guardPlugin?: string;
+  /**
    * One of the runtime's own slash commands, typed by the person (0.427):
    * `opencode run --command <name>`, its arguments being what arrives on
    * stdin. MEASURED 2026-09-28 on 1.18.27 with the free Nemotron: `--command
@@ -1850,6 +1856,10 @@ export function createCopilotPromptCommand(
   } else if (options.sessionId !== undefined) {
     args.push("--session-id", requireText(options.sessionId, "Session id"));
   }
+  // No teammate ends the person's browser (0.721, main/command-guard.ts).
+  if (options.guardPlugin !== undefined) {
+    args.push("--plugin-dir", requireText(options.guardPlugin, "Command guard plugin"));
+  }
   return baseSpec("copilot", executable, options.workspacePath, args, { stdin: "none", sandbox: sandboxArgument(options.sandbox) });
 }
 
@@ -1875,6 +1885,10 @@ export function createCopilotAcpCommand(
   // MEASURED on 1.0.95: `--effort` is still taken beside `--reasoning-effort`, and a value it does not know stops it.
   if (options.effort !== undefined) {
     args.push("--effort", requireEffort(options.effort));
+  }
+  // The hook refuses before anyone is asked (MEASURED over --acp, 1.0.95).
+  if (options.guardPlugin !== undefined) {
+    args.push("--plugin-dir", requireText(options.guardPlugin, "Command guard plugin"));
   }
   return baseSpec("copilot", executable, options.workspacePath, args, { stdin: "protocol", sandbox: "workspace-write" });
 }

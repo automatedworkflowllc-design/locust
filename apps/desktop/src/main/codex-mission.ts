@@ -616,6 +616,12 @@ interface CodexMissionServiceOptions {
    */
   readonly commandGuard?: () => Promise<string | undefined>
   /**
+   * The same guard for every Copilot run (0.721, `writeCopilotCommandGuard`):
+   * the plugin folder naming it, given on the print and ACP routes alike;
+   * undefined when it could not be written, and runs go without it.
+   */
+  readonly copilotCommandGuard?: () => Promise<string | undefined>
+  /**
    * The same guard for a Codex run (0.720, `codexCommandGuardConfig`): the
    * config its thread is started, resumed or forked with, for this folder;
    * undefined when Codex would load some other hook too (`otherCodexHooks`),
@@ -1936,6 +1942,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         const askEveryConnector =
           globalThis.process.env.LOCUST_ASK_CONNECTORS === '1' || (await options.askConnectors?.()) === true
         const commandGuardPath = runtime === 'claude' ? await options.commandGuard?.() : undefined
+        const copilotGuardPlugin = runtime === 'copilot' ? await options.copilotCommandGuard?.().catch(() => undefined) : undefined
         const codexGuardConfig = runtime === 'codex' ? await options.codexCommandGuard?.(runCwd).catch(() => undefined) : undefined
         const permissionBridge =
           runtime === 'claude' && effectiveSandbox !== 'full-access' && options.permissionHost !== undefined
@@ -2041,7 +2048,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             return createCopilotAcpCommand(executable, {
               workspacePath: runCwd,
               ...(chosenModel === undefined || chosenModel === 'auto' ? {} : { model: chosenModel }),
-              ...(chosenEffort === undefined ? {} : { effort: chosenEffort })
+              ...(chosenEffort === undefined ? {} : { effort: chosenEffort }),
+              ...(copilotGuardPlugin === undefined ? {} : { guardPlugin: copilotGuardPlugin })
             })
           }
           if (runtime === 'copilot') {
@@ -2051,7 +2059,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               prompt: promptText,
               ...(chosenModel === undefined || chosenModel === 'auto' ? {} : { model: chosenModel }),
               ...(chosenEffort === undefined ? {} : { effort: chosenEffort }),
-              ...(resumeThreadId === undefined ? { sessionId: copilotSessionId } : { resumeThreadId })
+              ...(resumeThreadId === undefined ? { sessionId: copilotSessionId } : { resumeThreadId }),
+              ...(copilotGuardPlugin === undefined ? {} : { guardPlugin: copilotGuardPlugin })
             })
           }
           return runtime === 'claude'

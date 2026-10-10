@@ -63,15 +63,80 @@ export function codexCommandGuardConfig(options: {
   readonly parent: number
   readonly platform?: NodeJS.Platform
 }): { readonly bypass_hook_trust: true; readonly hooks: { readonly PreToolUse: readonly unknown[] } } {
-  const parent = Number.isInteger(options.parent) && options.parent > 0 ? options.parent : 0
-  const forward = (path: string): string => path.replace(/\\/g, '/')
-  const command =
-    (options.platform ?? process.platform) === 'win32'
-      ? `$env:ELECTRON_RUN_AS_NODE='1'; $env:LOCUST_GUARD_PARENT='${String(parent)}'; & ${[options.node, options.guardPath].map((path) => `'${forward(path).replace(/'/g, "''")}'`).join(' ')}`
-      : `ELECTRON_RUN_AS_NODE=1 LOCUST_GUARD_PARENT=${String(parent)} ${[options.node, options.guardPath].map((path) => `"${forward(path).replace(/(["$`])/g, '\\$1')}"`).join(' ')}`
   return {
     bypass_hook_trust: true,
-    hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command, timeout: 15 }] }] }
+    hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: guardCommand(options), timeout: 15 }] }] }
+  }
+}
+
+/**
+ * The guard's command line: PowerShell's form on Windows, a POSIX shell's
+ * elsewhere. `log` is a drive's LOCUST_GUARD_LOG, named in the command because
+ * a runtime the process runner starts inherits only its allowlist.
+ */
+function guardCommand(options: { readonly node: string; readonly guardPath: string; readonly parent: number; readonly platform?: NodeJS.Platform; readonly log?: string }): string {
+  const parent = Number.isInteger(options.parent) && options.parent > 0 ? options.parent : 0
+  const forward = (path: string): string => path.replace(/\\/g, '/')
+  const log = options.log === undefined || options.log.length === 0 ? undefined : forward(options.log)
+  return (options.platform ?? process.platform) === 'win32'
+    ? `$env:ELECTRON_RUN_AS_NODE='1'; $env:LOCUST_GUARD_PARENT='${String(parent)}'; ${log === undefined ? '' : `$env:LOCUST_GUARD_LOG='${log.replace(/'/g, "''")}'; `}& ${[options.node, options.guardPath].map((path) => `'${forward(path).replace(/'/g, "''")}'`).join(' ')}`
+    : `ELECTRON_RUN_AS_NODE=1 LOCUST_GUARD_PARENT=${String(parent)} ${log === undefined ? '' : `LOCUST_GUARD_LOG="${log.replace(/(["$`])/g, '\\$1')}" `}${[options.node, options.guardPath].map((path) => `"${forward(path).replace(/(["$`])/g, '\\$1')}"`).join(' ')}`
+}
+
+/**
+ * THE SAME GUARD FOR COPILOT (0.721): a plugin folder every Copilot run is
+ * given (`--plugin-dir`), in Claude Code's plugin format, naming the same
+ * script as a PreToolUse hook.
+ *
+ * MEASURED 2026-10-10 on Copilot CLI 1.0.95 (Auto, which ran gpt-6-luna):
+ * - A `.claude-plugin/plugin.json` with `hooks/hooks.json` beside it loads
+ *   from `--plugin-dir` in a folder never trusted, in `-p` and in `--acp`
+ *   alike. Copilot hands the hook Claude Code's own event (`tool_name:
+ *   "Bash"` for its PowerShell tool, `tool_input.command`), and the matcher
+ *   `Bash|PowerShell` takes it. A `permissionDecision: "deny"` stops the
+ *   command ("Denied by preToolUse hook: <reason>"); over ACP it is refused
+ *   before anyone is asked to approve it.
+ * - On Windows it runs the hook as `powershell.exe -nop -nol -c`, as Codex
+ *   does, so the command is Codex's.
+ * - UNLIKE Claude Code and Codex, Copilot refuses the command when a hook
+ *   fails: a hook that exited 1, or whose program was not there, denied
+ *   `echo` ("hook errored"). A guard Locust could not start would stop every
+ *   command a Copilot teammate runs. So the command cannot fail: PowerShell's
+ *   `try {} catch {}; exit 0`, measured letting `echo` run with the program
+ *   missing; `|| true` elsewhere (not measured on a Mac). The guard itself
+ *   always exits 0, and refuses only by what it prints.
+ * - Copilot keeps an empty folder per plugin path in ~/.copilot/plugin-data;
+ *   nothing else of the person's is written.
+ */
+export function copilotCommandGuardHooks(options: { readonly node: string; readonly guardPath: string; readonly parent: number; readonly platform?: NodeJS.Platform; readonly log?: string }): string {
+  const command = guardCommand(options)
+  return JSON.stringify(
+    {
+      hooks: {
+        PreToolUse: [
+          {
+            matcher: 'Bash|PowerShell',
+            hooks: [{ type: 'command', command: (options.platform ?? process.platform) === 'win32' ? `try { ${command} } catch {}; exit 0` : `${command} || true`, timeout: 15 }]
+          }
+        ]
+      }
+    },
+    null,
+    2
+  )
+}
+
+/** Copilot's plugin folder, written once at start in the profile; undefined if it could not be, and runs go without it. */
+export async function writeCopilotCommandGuard(folder: string, options: { readonly node: string; readonly guardPath: string; readonly parent: number; readonly log?: string }): Promise<string | undefined> {
+  try {
+    const plugin = join(folder, 'copilot-command-guard')
+    await mkdir(join(plugin, '.claude-plugin'), { recursive: true })
+    await mkdir(join(plugin, 'hooks'), { recursive: true })
+    await writeFile(join(plugin, '.claude-plugin', 'plugin.json'), `${JSON.stringify({ name: 'locust-command-guard', version: '1.0.0', description: 'Locust refuses a command that would end a program the person runs.' }, null, 2)}\n`, 'utf8')
+    await writeFile(join(plugin, 'hooks', 'hooks.json'), copilotCommandGuardHooks(options), 'utf8')
+    return plugin
+  } catch {
+    return undefined
   }
 }
 
