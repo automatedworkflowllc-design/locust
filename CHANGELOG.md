@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.720.0 - 2026-10-10
+
+### Improved
+
+- **Codex teammates can't close your browser either.** Since 0.717 a Claude Code teammate is stopped before it ends a program you are running, such as your browser, by name or by id. Codex teammates now get the same check before every command, in every mode. Nothing is added to your Codex settings. If Codex would also run hooks of its own for that folder, such as yours, a project's or a plugin's, Locust leaves its check out of that run, so a hook you never reviewed doesn't run alongside it.
+
 ## 0.719.0 - 2026-10-10
 
 ### New
