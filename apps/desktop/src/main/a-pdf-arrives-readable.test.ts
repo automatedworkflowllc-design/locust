@@ -5,7 +5,6 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { readablePdfNote, splitAttachments, withAttachments } from '../shared/attachments.js'
-import { pageText } from '../renderer/src/pdfText.js'
 import { attachmentsForRun } from './attachments-for-run.js'
 import { createPdfReadings, readablePdf } from './pdf-reading.js'
 import type { PdfReading, ReadPdf } from './pdf-reading.js'
@@ -18,7 +17,8 @@ import type { PdfReading, ReadPdf } from './pdf-reading.js'
  * 33 s in Codex's own app. Locust now opens the PDF itself, the same way for
  * every runtime: its text and a picture of each page, beside the attachment
  * in Locust's own folder, named in the message. The drive is
- * _tools/drive-a-pdf-arrives-readable.mjs; this holds the pieces.
+ * _tools/drive-a-pdf-arrives-readable.mjs; this holds the pieces, and
+ * renderer/src/a-pdf-page-reads-in-order.test.ts the text's order.
  */
 
 const roots: string[] = []
@@ -39,34 +39,10 @@ function fakeReader(reading: PdfReading = { pages: 2, text: ['Page one words', '
   const read = (async () => {
     read.calls += 1
     return reading
-  }) as ReadPdf & { calls: number }
+  }) as unknown as ReadPdf & { calls: number }
   read.calls = 0
   return read
 }
-
-describe('a page’s text, in reading order', () => {
-  const run = (str: string, x: number, y: number, size = 10, width = str.length * size * 0.5) => ({ str, transform: [size, 0, 0, size, x, y], width, height: size })
-
-  it('puts runs on their lines, top first, and keeps a matrix’s entries apart', () => {
-    const runs = [
-      run('47', 150, 588, 12), run('2', 120, 588, 12), run('5', 90, 588, 12),
-      run('Practice sheet', 72, 720, 18),
-      run('3', 90, 610, 12), run('8', 120, 610, 12), run('1', 150, 610, 12)
-    ]
-    expect(pageText(runs)).toBe('Practice sheet\n3  8  1\n5  2  47')
-  })
-
-  it('a subscript joins its line, and the next line of a paragraph does not', () => {
-    // "x" with a subscript "1" a little below it, then the next line 12 points down.
-    const runs = [run('x', 72, 700, 10, 5), run('1', 77.5, 697, 7, 3.5), run(' = 4', 81, 700, 10, 18), run('next line', 72, 688, 10)]
-    expect(pageText(runs)).toBe('x1 = 4\nnext line')
-  })
-
-  it('an empty page is no text, not an error', () => {
-    expect(pageText([])).toBe('')
-    expect(pageText([run('', 72, 700)])).toBe('')
-  })
-})
 
 describe('what the agent is told', () => {
   it('names the text and the pictures, and says no tool is needed', () => {
