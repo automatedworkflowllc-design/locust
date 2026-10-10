@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { BOT_SIZE } from '../botSizes.js'
 import { boardSectionOf, teamBoard } from '../teamBoard.js'
-import { durationText, runSpanMs, usagePercent, usageWindowSentence } from '../missionView.js'
+import { durationText, runSpanMs } from '../missionView.js'
 import { WhatsNew } from './WhatsNew.js'
 import { RemoteControlSetting } from './RemoteControlSetting.js'
 import { VoiceSettings } from './VoiceSettings.js'
@@ -44,6 +44,7 @@ import {
   formatBytes,
   integrationOf,
   missionPhaseView,
+  listTone,
   modeLabel,
   prunePreviewSummary,
   routeRowStatus,
@@ -55,6 +56,7 @@ import type { EyeGlyphs } from './Bot.js'
 import { TeammateBot } from './TeammateBot.js'
 import { FaceLegend } from './FaceLegend.js'
 import { RuntimeMark } from './RuntimeMark.js'
+import { UsageMeters } from './UsageMeters.js'
 import { WhatLocustCanStop } from './WhatLocustCanStop.js'
 import { WHAT_LOCUST_CAN_STOP_LEDE } from '../../../shared/what-locust-can-stop.js'
 import { NETWORK_DOC_LINK } from '../../../shared/outbound-links.js'
@@ -501,7 +503,7 @@ export function MissionsScreen({
                   className="lc-missionrow"
                   onClick={() => onOpen(mission.missionId)}
                 >
-                  <span className={`lc-rail__dot lc-tone-${view.tone}`} />
+                  <span className={`lc-rail__dot lc-tone-${listTone(view)}`} />
                   {/*
                     * Title, and under it the live word.
                     *
@@ -539,7 +541,7 @@ export function MissionsScreen({
                   <span className="lc-missionrow__cost lc-mono" title="What the runtime reported this run cost">
                     {costCell(sumCosts(entry.members.map((turn) => missionCost(turn))), mission.model)}
                   </span>
-                  <span className={`lc-missionrow__tag lc-mono lc-tone-${view.tone}`}>{view.tag}</span>
+                  <span className={`lc-missionrow__tag lc-mono lc-tone-${listTone(view)}`}>{view.tag}</span>
                 </button>
                 </div>
               )
@@ -715,11 +717,11 @@ export function TeammatesScreen({
         <dl className="lc-rostercard__stats">
           <div className="lc-rostercard__stat">
             <dt>Runs</dt>
-            <dd className={`lc-mono${owned === 0 ? ' is-unreported' : ''}`}>{owned}</dd>
+            <dd className={owned === 0 ? 'is-unreported' : undefined}>{owned}</dd>
           </div>
           <div className="lc-rostercard__stat">
             <dt>Last run</dt>
-            <dd className={`lc-mono${work.lastRunAt === undefined ? ' is-unreported' : ''}`}>
+            <dd className={work.lastRunAt === undefined ? 'is-unreported' : undefined}>
               {work.lastRunAt === undefined ? 'never' : agoLabel(work.lastRunAt) ?? 'unknown'}
             </dd>
           </div>
@@ -762,7 +764,7 @@ export function TeammatesScreen({
                 className="lc-rostercard__mission"
                 onClick={() => onOpenMission(entry.missionId)}
               >
-                <span className={`lc-dot lc-tone-${runningMissionIds?.has(entry.missionId) === true ? missionPhaseView('running', false).tone : missionPhaseView(entry.phase, entry.hasIntegrityIssues).tone}`} />
+                <span className={`lc-dot lc-tone-${runningMissionIds?.has(entry.missionId) === true ? missionPhaseView('running', false).tone : listTone(missionPhaseView(entry.phase, entry.hasIntegrityIssues))}`} />
                 <span className="lc-rostercard__missiontitle">{entry.title}</span>
                 <span className="lc-rostercard__missionage lc-mono">{agoLabel(entry.at) ?? ''}</span>
               </button>
@@ -2123,8 +2125,9 @@ export function SettingsScreen({
                       </div>
                     )}
                     {usageWindows?.get(runtime.id) !== undefined && (
-                      <div className={`lc-runtimerow__detail lc-runtimerow__usage${(usagePercent(usageWindows.get(runtime.id)!) ?? 0) >= 80 ? ' lc-tone-amber' : ''}`}>
-                        {usageWindowSentence(usageWindows.get(runtime.id)!)}
+                      // A meter a window, toned only where it is pressing (design pass, 0.715).
+                      <div className="lc-runtimerow__detail lc-runtimerow__usage">
+                        <UsageMeters said={usageWindows.get(runtime.id)!} />
                       </div>
                     )}
                     {/*

@@ -9137,9 +9137,8 @@ export default function App(): ReactElement {
                     .catch(() => setSwarm(!next))
                 }
               },
+              // In the order of their shortcuts (design pass, 0.715): listed 1, 4, 5, 2, 3, they read as unsorted.
               { id: 'go-missions', group: 'Go to', label: 'Conversations', hint: 'Ctrl 1', run: () => setScreen('missions') },
-              { id: 'go-rooms', group: 'Go to', label: 'Rooms', hint: 'Ctrl 4', run: () => setScreen('rooms') },
-              { id: 'go-memory', group: 'Go to', label: 'Memory', hint: 'Ctrl 5', run: () => setScreen('memory') },
               {
                 id: 'go-teammates',
                 group: 'Go to',
@@ -9159,6 +9158,10 @@ export default function App(): ReactElement {
                   setScreen('settings')
                 }
               },
+              { id: 'go-rooms', group: 'Go to', label: 'Rooms', hint: 'Ctrl 4', run: () => setScreen('rooms') },
+              { id: 'go-memory', group: 'Go to', label: 'Memory', hint: 'Ctrl 5', run: () => setScreen('memory') },
+              // Claude Code's /usage, for every agent (0.714's dialog), from anywhere.
+              { id: 'go-usage', group: 'Go to', label: 'Usage', hint: 'every agent and model', run: () => setUsageOpen(true) },
               {
                 id: 'new-teammate',
                 group: 'Teammates',

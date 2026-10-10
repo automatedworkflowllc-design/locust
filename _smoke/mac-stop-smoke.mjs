@@ -121,7 +121,9 @@ try {
   check("Ash's conversation opens", opened === 'opened', String(opened))
 
   const sent = await evaluate(`(async () => {
-    const WORDS = 'Using the shell, run a command that prints the numbers 1 to 300, one per second, then tell me the last number.'
+    // The exact command (0.715): asked for 'a command that prints 1 to 300', the steadiest free model answered
+    // without running one, its OpenCode exited within seconds, and there was no run left to stop (0.714's Mac run).
+    const WORDS = 'Run this exact shell command and wait for it to finish, then tell me the last number it printed: for i in $(seq 1 300); do echo $i; sleep 1; done'
     const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
     // The box is found again every time: the window can draw a new one as the
     // conversation opens, and a held reference then reads the old, detached box
@@ -189,9 +191,12 @@ try {
     await sleep(1_000)
     during = opencodes().filter((pid) => !before.has(pid))
   }
-  if (during.length > 0) await sleep(6_000)
-  during = opencodes().filter((pid) => !before.has(pid))
-  console.log(`  opencode processes during the run: ${String(during.length)} (first seen after ${String(Math.round((Date.now() - waitedFrom) / 1000))} s)`)
+  // Every process seen is kept (0.715): read again after the wait, a run that had already ended
+  // wiped what was seen, and the check below reported nothing ran when something had.
+  if (during.length > 0) await sleep(3_000)
+  during = [...new Set([...during, ...opencodes().filter((pid) => !before.has(pid))])]
+  const aliveAtStop = opencodes().filter((pid) => during.includes(pid))
+  console.log(`  opencode processes during the run: ${String(during.length)}, still running when Stop is pressed: ${String(aliveAtStop.length)} (${String(Math.round((Date.now() - waitedFrom) / 1000))} s after the turn started)`)
   if (during.length === 0) console.log(`  every process now: ${execFileSync('ps', ['-axo', 'pid,command'], { encoding: 'utf8' }).split('\n').filter((line) => /opencode|Locust/i.test(line)).join(' | ').slice(0, 1200)}`)
 
   const stopped = await evaluate(`(async () => {
@@ -206,7 +211,11 @@ try {
   await sleep(5_000)
   const left = opencodes().filter((pid) => !before.has(pid) && during.includes(pid))
   // With nothing running there was nothing to stop, and that proves nothing.
-  check('Stop ends the whole process group: nothing the run started is left', during.length > 0 && left.length === 0, JSON.stringify({ during, left }))
+  check(
+    'Stop ends the whole process group: nothing the run started is left',
+    aliveAtStop.length > 0 && left.length === 0,
+    aliveAtStop.length === 0 ? `the run had ended on its own before Stop -- nothing to prove: ${JSON.stringify({ during })}` : JSON.stringify({ during, aliveAtStop, left })
+  )
 } catch (error) {
   failures += 1
   console.log(`smoke failed: ${error instanceof Error ? error.message : String(error)}`)

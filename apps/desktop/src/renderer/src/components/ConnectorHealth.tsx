@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ReactElement } from 'react'
 
 import type { PublicConnector } from '../../../shared/ipc.js'
-import { connectorReport, connectorStateWords, connectorWhere, lastWorked } from '../connectorHealth.js'
+import { connectorDetail, connectorReport, connectorStateWords, connectorWhere } from '../connectorHealth.js'
 
 /**
  * THE CONNECTORS THIS MACHINE HAS, AND HOW EACH IS (W8, 0.567), in Settings >
@@ -56,10 +56,7 @@ export function ConnectorHealth({ now = () => new Date() }: { readonly now?: () 
                 <span className={`lc-connectorhealth__state lc-connectorhealth__state--${words.tone}`}>{words.state}</span>
                 <span className="lc-connectorhealth__name">{connector.name}</span>
                 <span className="lc-connectorhealth__where lc-mono">{connectorWhere(connector.location)}</span>
-                <span className="lc-connectorhealth__detail">
-                  {words.todo === undefined ? '' : `${words.todo} `}
-                  {lastWorked(connector, now())}
-                </span>
+                {connectorDetail(connector, now()) !== undefined && <span className="lc-connectorhealth__detail">{connectorDetail(connector, now())}</span>}
               </li>
             )
           })}

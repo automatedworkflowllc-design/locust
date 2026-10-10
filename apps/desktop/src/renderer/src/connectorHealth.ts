@@ -30,6 +30,21 @@ export function lastWorked(connector: PublicConnector, now: Date = new Date()): 
 }
 
 /**
+ * The line under a connector's name, or nothing (design pass, 0.715): a row
+ * that is connected and was checked a moment ago has nothing to add to its
+ * own CONNECTED -- "Connected just now." under every working connector made
+ * the list twice as tall and said the state twice. A connector to act on
+ * keeps what to do, and an old reading keeps its age; the report still says
+ * it all.
+ */
+export function connectorDetail(connector: PublicConnector, now: Date = new Date()): string | undefined {
+  const words = connectorStateWords(connector)
+  const when = lastWorked(connector, now)
+  if (connector.status === 'connected' && when === 'Connected just now.') return undefined
+  return words.todo === undefined ? when : `${words.todo} ${when}`
+}
+
+/**
  * Where it lives, as much as a report may say: a remote connector's host,
  * never its path or query; a local one is "a program on this computer", never
  * its command, arguments or environment.

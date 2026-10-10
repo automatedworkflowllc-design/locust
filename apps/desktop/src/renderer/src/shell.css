@@ -3242,6 +3242,13 @@ textarea {
 }
 .lc-segmented > .lc-button:first-child { border-left: 0; }
 
+/* The divider beside the chosen segment stays a divider (design pass, 0.715):
+   the button's own active border lit only its LEFT edge -- one bright stroke
+   on one side of the choice. The tint and the text say which is chosen. */
+.lc-segmented > .lc-button.is-active {
+  border-left-color: var(--lc-border-control);
+}
+
 /*
  * MONO IS FOR THE NUMBERS ONLY, and that limit is deliberate.
  *
@@ -14060,13 +14067,47 @@ textarea {
   gap: 14px;
 }
 
+/*
+ * THE ROLE RUNS UNDER THE BUTTONS (design pass, 0.715). Beside three icon
+ * buttons the role had ~110px at 1209 wide, and "Code & Migrations" wrapped
+ * to two lines -- that card stood taller than the two beside it, its tiles
+ * a line lower (the 0.712 Team frame). The face spans both lines; the name
+ * keeps the buttons' line; the role takes the card's whole width under them.
+ */
 .lc-rostercard__head {
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--lc-space-5);
+  row-gap: 1px;
+}
+
+.lc-rostercard__head > :first-child {
+  grid-row: 1 / span 2;
 }
 
 .lc-rostercard__id {
-  flex: 1;
+  display: contents;
+}
+
+.lc-rostercard__head .lc-rostercard__name {
+  grid-column: 2;
+  grid-row: 1;
   min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.lc-rostercard__head .lc-rostercard__role {
+  grid-column: 2 / -1;
+  grid-row: 2;
+  min-width: 0;
+}
+
+.lc-rostercard__head .lc-rostercard__actions {
+  grid-column: 3;
+  grid-row: 1;
 }
 
 .lc-rostercard__actions {
@@ -14145,12 +14186,17 @@ textarea {
   color: var(--lc-text-muted);
 }
 
+/* The value in the app's own face, on one line (design pass, 0.715): in mono,
+   "5 minutes ago" broke as "5 minutes / ago" in a 120px tile, and the tiles of
+   one row stood at three heights. */
 .lc-rostercard__stat dd {
   margin: var(--lc-space-1) 0 0;
-  font-family: var(--lc-font-mono);
+  overflow: hidden;
   font-size: var(--lc-text-control);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   color: var(--lc-text-primary);
-  overflow-wrap: anywhere;
 }
 
 /* Cost on its own full-width row, label and value inline. Costs are long
@@ -20838,5 +20884,84 @@ textarea {
   margin: 0;
   text-align: center;
   font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+}
+
+/*
+ * AN AGENT'S LIMITS, AS METERS (design pass, 0.715; UsageMeters.tsx): a
+ * meter a window in Settings > AI agents -- the window, a short bar, its
+ * figure -- toned only where that window is pressing, in the hover card's
+ * and Usage's own tones. They wrap as a row; the sentence is the tooltip.
+ */
+.lc-meters {
+  display: grid;
+  grid-template-columns: max-content 44px max-content;
+  align-items: center;
+  gap: 3px 10px;
+  margin-top: 3px;
+}
+
+/* A small table: the windows' names in one column, the bars right after the
+   longest, the figures after them -- so one agent's meters stand in line. */
+.lc-meter {
+  display: contents;
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-secondary);
+}
+
+.lc-meter__name {
+  font-size: var(--lc-text-description);
+  white-space: nowrap;
+  color: var(--lc-text-secondary);
+}
+
+.lc-meter__bar {
+  width: 44px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--lc-border-card);
+}
+
+.lc-meter__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--lc-text-secondary);
+}
+
+.lc-meter__figure {
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
+  font-variant-numeric: tabular-nums;
+  color: var(--lc-text-muted);
+}
+
+.lc-meter.is-pressing .lc-meter__fill {
+  background: var(--lc-amber);
+}
+
+.lc-meter.is-pressing .lc-meter__figure {
+  color: var(--lc-amber-text);
+}
+
+.lc-meter.is-spent .lc-meter__fill {
+  background: var(--lc-red);
+}
+
+.lc-meter.is-spent .lc-meter__figure {
+  color: var(--lc-red-text);
+}
+
+/* A window reset since the reading has no bar: its words take the bar's place too. */
+.lc-meter.is-reset .lc-meter__figure {
+  grid-column: 2 / -1;
+  color: var(--lc-text-secondary);
+}
+
+.lc-meters__read {
+  grid-column: 1 / -1;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
   color: var(--lc-text-muted);
 }

@@ -494,6 +494,19 @@ export function missionPhaseView(
 }
 
 /**
+ * A row's tone in a LIST of conversations (design pass, 0.715): a finished
+ * turn is the ordinary case, and drawn blue on every row -- a blue dot and a
+ * blue COMPLETED on all sixteen of the everyday list -- it was the loudest
+ * thing on the screen, and the rows that need a look (running, stopped short,
+ * a record that did not read to its end) had nothing left to stand out with.
+ * So a list draws the settled case quiet and keeps the colours for those.
+ * A single turn's receipt still says Completed in blue: there it is the news.
+ */
+export function listTone(view: MissionPhaseView): MissionPhaseView['tone'] {
+  return view.tone === 'blue' && view.label === 'Completed' ? 'muted' : view.tone
+}
+
+/**
  * The word the receipt card prints against the ledger path. `verified` is a
  * claim about durability, so it requires zero integrity issues -- not merely
  * that a mission was recovered.
