@@ -1,7 +1,10 @@
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import type { ReactElement } from 'react'
 
+import { colourCode, colouredAlready, languageOfPath } from '../codeColors.js'
+import type { ColouredToken } from '../codeColors.js'
 import { HUNKS_SHOWN_FIRST, afterText, completenessOf, foldContext, hunkRange, pairedSpans } from '../diff.js'
+import { hunkSides, paintRow } from '../diffColours.js'
 import type { DiffCounts, DiffFile, DiffHunk, DiffRow, WordSpan } from '../diff.js'
 import { diffNoteFor, diffNoteKey, MAX_DIFF_NOTE } from '../diffNotes.js'
 import { displayPath } from '../missionView.js'
@@ -44,12 +47,14 @@ export function DiffView({
   // Parsed hunks are offered before the truncation is confessed: a reader
   // should see every line that was recorded, then be told what was not.
   const completeness = completenessOf(file, shownHunks, truncated && !moreParsed)
+  const language = useMemo(() => languageOfPath(file.path), [file.path])
   return (
     <div className="lc-diff" role="region" aria-label={`Changes to ${file.path}`}>
       {file.hunks.slice(0, completeness.shownHunks).map((hunk, index) => (
         <Hunk
           key={`${String(hunk.oldStart)}-${String(hunk.newStart)}-${String(index)}`}
           hunk={hunk}
+          language={language}
           path={file.path}
           labelPath={displayPath(file.path, workspacePath)}
           place={place}
@@ -81,8 +86,50 @@ export function DiffView({
   )
 }
 
+/** The hunk's rows' colours (diffColours.ts), once both sides are coloured; undefined until then, and drawn plain. */
+function useHunkColours(hunk: DiffHunk, language: string | undefined): ReadonlyMap<DiffRow, readonly ColouredToken[]> | undefined {
+  const sides = useMemo(() => hunkSides(hunk), [hunk])
+  const now = (): ReadonlyMap<DiffRow, readonly ColouredToken[]> | undefined => {
+    const before = sides.before.length === 0 ? [] : colouredAlready(sides.before, language)
+    const after = sides.after.length === 0 ? [] : colouredAlready(sides.after, language)
+    return before === undefined || after === undefined ? undefined : rowsOf(sides, before, after)
+  }
+  const [colours, setColours] = useState(now)
+  useEffect(() => {
+    if (language === undefined) return
+    const already = now()
+    setColours(already)
+    if (already !== undefined) return
+    let shown = true
+    const side = (code: string) => (code.length === 0 ? Promise.resolve([]) : colourCode(code, language))
+    void Promise.all([side(sides.before), side(sides.after)]).then(([before, after]) => {
+      if (shown && before !== undefined && after !== undefined) setColours(rowsOf(sides, before, after))
+    })
+    return () => {
+      shown = false
+    }
+    // `now` reads only `sides` and `language`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sides, language])
+  return colours
+}
+
+function rowsOf(
+  sides: ReturnType<typeof hunkSides>,
+  before: readonly (readonly ColouredToken[])[],
+  after: readonly (readonly ColouredToken[])[]
+): ReadonlyMap<DiffRow, readonly ColouredToken[]> {
+  const rows = new Map<DiffRow, readonly ColouredToken[]>()
+  for (const [row, where] of sides.at) {
+    const line = (where.side === 'before' ? before : after)[where.line]
+    if (line !== undefined) rows.set(row, line)
+  }
+  return rows
+}
+
 function Hunk({
   hunk,
+  language,
   path,
   labelPath,
   place,
@@ -90,6 +137,7 @@ function Hunk({
   onEdit
 }: {
   readonly hunk: DiffHunk
+  readonly language: string | undefined
   readonly path: string
   readonly labelPath: string
   readonly place: DiffNotesPlace | undefined
@@ -99,6 +147,7 @@ function Hunk({
   const [openFolds, setOpenFolds] = useState<ReadonlySet<number>>(() => new Set())
   const spans = useMemo(() => pairedSpans(hunk.rows), [hunk])
   const segments = useMemo(() => foldContext(hunk.rows), [hunk])
+  const colours = useHunkColours(hunk, language)
   return (
     <>
       <div className="lc-diff__hunk">
@@ -112,6 +161,7 @@ function Hunk({
               key={`${String(index)}-${String(rowIndex)}`}
               row={row}
               spans={spans.get(row)}
+              tokens={colours?.get(row)}
               path={path}
               labelPath={labelPath}
               place={place}
@@ -147,6 +197,7 @@ function Hunk({
 function Row({
   row,
   spans,
+  tokens,
   path,
   labelPath,
   place,
@@ -155,6 +206,7 @@ function Row({
 }: {
   readonly row: DiffRow
   readonly spans: readonly WordSpan[] | undefined
+  readonly tokens: readonly ColouredToken[] | undefined
   readonly path: string
   readonly labelPath: string
   readonly place: DiffNotesPlace | undefined
@@ -183,7 +235,7 @@ function Row({
             <Icon name="plus" size={11} />
           </button>
         )}
-        <DiffRowCells row={row} spans={spans} />
+        <DiffRowCells row={row} spans={spans} tokens={tokens} />
       </div>
       {note !== undefined && editing !== key && place !== undefined && (
         <div className="lc-diff__note">
@@ -266,7 +318,7 @@ function NoteEditor({
   )
 }
 
-function DiffRowCells({ row, spans }: { readonly row: DiffRow; readonly spans: readonly WordSpan[] | undefined }): ReactElement {
+function DiffRowCells({ row, spans, tokens }: { readonly row: DiffRow; readonly spans: readonly WordSpan[] | undefined; readonly tokens?: readonly ColouredToken[] | undefined }): ReactElement {
   return (
     <>
       <span className="lc-diff__no" aria-hidden="true">
@@ -277,17 +329,18 @@ function DiffRowCells({ row, spans }: { readonly row: DiffRow; readonly spans: r
       </span>
       <span className="lc-diff__sign">{row.kind === 'add' ? '+' : row.kind === 'del' ? '−' : ''}</span>
       <span className="lc-diff__code">
-        {spans === undefined
+        {spans === undefined && tokens === undefined
           ? row.text
-          : spans.map((span, index) =>
-              span.changed ? (
+          : paintRow(row.text, tokens, spans).map((run, index) => {
+              const coloured = run.color === undefined ? run.text : <span style={{ color: run.color }}>{run.text}</span>
+              return run.changed ? (
                 <mark key={String(index)} className="lc-diff__word">
-                  {span.text}
+                  {coloured}
                 </mark>
               ) : (
-                <Fragment key={String(index)}>{span.text}</Fragment>
+                <Fragment key={String(index)}>{coloured}</Fragment>
               )
-            )}
+            })}
       </span>
     </>
   )

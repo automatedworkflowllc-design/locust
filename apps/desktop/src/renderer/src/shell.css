@@ -1343,9 +1343,10 @@ textarea {
  * theme, its variables set from Locust's own tones so a block follows the
  * theme. Keywords violet, strings green, numbers and constants amber,
  * functions blue, comments and punctuation the quiet text. The file viewer's
- * code wears the same. */
+ * code wears the same, and so does a diff's (0.725, diffColours.ts). */
 .lc-code,
-.lc-viewer__code {
+.lc-viewer__code,
+.lc-diff {
   --shiki-foreground: var(--lc-text-secondary);
   --shiki-background: transparent;
   --shiki-token-keyword: var(--lc-violet-text);
