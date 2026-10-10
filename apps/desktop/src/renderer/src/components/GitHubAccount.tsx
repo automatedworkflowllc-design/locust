@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import type { ReactElement } from 'react'
 
-import { GITHUB_CLI_PAGE, githubAccountLine } from '../../../shared/github-account.js'
+import { GITHUB_CLI_PAGE, githubAccountLine, githubCliIsBehind } from '../../../shared/github-account.js'
 import { copyText } from '../copyText.js'
-import type { GithubAccount as Account, GithubSignInCode } from '../../../shared/github-account.js'
+import type { GithubAccount as Account, GithubCliVersions, GithubSignInCode } from '../../../shared/github-account.js'
 
 /**
  * YOUR GITHUB, ON THE CONNECTORS PAGE (0.720, shared/github-account.ts).
@@ -36,6 +36,8 @@ export function GitHubAccount(): ReactElement {
   const [copied, setCopied] = useState(false)
   const [said, setSaid] = useState<string | undefined>(undefined)
   const [installing, setInstalling] = useState(false)
+  const [updating, setUpdating] = useState(false)
+  const [versions, setVersions] = useState<GithubCliVersions | undefined>(undefined)
 
   const read = (): void => {
     const bridge = window.desktop
@@ -43,7 +45,11 @@ export function GitHubAccount(): ReactElement {
     setAccount(undefined)
     void bridge
       .githubAccount()
-      .then(setAccount)
+      .then((read) => {
+        setAccount(read)
+        // Which gh, and whether GitHub has a newer one (0.726): only once there is a gh to ask.
+        if (read.kind !== 'no-cli') void bridge.githubCliVersions().then(setVersions, () => setVersions(undefined))
+      })
       .catch(() => setAccount({ kind: 'unknown', message: 'The GitHub CLI could not be asked. Nothing was changed; Check again asks it once more.' }))
   }
 
@@ -87,6 +93,23 @@ export function GitHubAccount(): ReactElement {
       .finally(() => setInstalling(false))
   }
 
+  const update = (): void => {
+    const bridge = window.desktop
+    if (bridge === undefined) return
+    setSaid(undefined)
+    setUpdating(true)
+    void bridge
+      .githubUpdate()
+      .then((result) => {
+        if (result.ok) {
+          setAccount(result.account)
+          void bridge.githubCliVersions().then(setVersions, () => setVersions(undefined))
+        } else setSaid(result.message)
+      })
+      .catch(() => setSaid('The update could not be started. Nothing was changed.'))
+      .finally(() => setUpdating(false))
+  }
+
   const open = (url: string): void => {
     void window.desktop
       ?.openLink(url)
@@ -105,6 +128,9 @@ export function GitHubAccount(): ReactElement {
       said={said}
       installing={installing}
       onInstall={install}
+      versions={versions}
+      updating={updating}
+      onUpdate={update}
       onRead={read}
       onSignIn={signIn}
       onStop={() => void window.desktop?.githubSignInCancel()}
@@ -124,6 +150,10 @@ export interface GitHubCardProps {
   /** The GitHub CLI being installed from the card (0.724). */
   readonly installing?: boolean
   readonly onInstall?: () => void
+  /** Which GitHub CLI this is and the newest released, and updating it from the card (0.726). */
+  readonly versions?: GithubCliVersions
+  readonly updating?: boolean
+  readonly onUpdate?: () => void
   readonly onRead: () => void
   readonly onSignIn: () => void
   readonly onStop: () => void
@@ -132,11 +162,12 @@ export interface GitHubCardProps {
 }
 
 /** The card itself, from its state: what a test draws. */
-export function GitHubCard({ account, signingIn, code, copied, said, installing = false, onInstall, onRead, onSignIn, onStop, onOpen, onCopied }: GitHubCardProps): ReactElement {
+export function GitHubCard({ account, signingIn, code, copied, said, installing = false, onInstall, versions, updating = false, onUpdate, onRead, onSignIn, onStop, onOpen, onCopied }: GitHubCardProps): ReactElement {
   const signedIn = account?.kind === 'signed-in'
-  const busy = signingIn || installing
+  const busy = signingIn || installing || updating
+  const behind = account !== undefined && account.kind !== 'no-cli' && githubCliIsBehind(versions)
   return (
-    <div className="lc-github" data-state={signingIn ? 'signing-in' : installing ? 'installing' : (account?.kind ?? 'reading')}>
+    <div className="lc-github" data-state={signingIn ? 'signing-in' : installing ? 'installing' : updating ? 'updating' : (account?.kind ?? 'reading')}>
       <div className="lc-github__head">
         <span className={`lc-github__mark${signedIn ? ' is-on' : ''}`}>
           <GitHubMark size={20} />
@@ -148,6 +179,8 @@ export function GitHubCard({ account, signingIn, code, copied, said, installing 
               ? 'Waiting for GitHub to say yes.'
               : installing
                 ? 'Installing the GitHub CLI. Your computer may ask you to allow it.'
+                : updating
+                  ? 'Updating the GitHub CLI. Your computer may ask you to allow it.'
                 : account === undefined
                   ? 'Asking the GitHub CLI.'
                   : githubAccountLine(account)}
@@ -187,6 +220,19 @@ export function GitHubCard({ account, signingIn, code, copied, said, installing 
           )}
         </span>
       </div>
+      {/* A newer GitHub CLI, said once there is one, with the update a press away (0.726). */}
+      {behind && !busy && versions?.latest !== undefined && versions.installed !== undefined && (
+        <div className="lc-github__code">
+          <span className="lc-settings__note">
+            GitHub CLI {versions.latest} is out. This computer has {versions.installed}.
+          </span>
+          {onUpdate !== undefined && (
+            <button type="button" className="lc-button" onClick={onUpdate}>
+              Update the GitHub CLI
+            </button>
+          )}
+        </div>
+      )}
       {signingIn && (
         <div className="lc-github__code" aria-live="polite">
           {code === undefined ? (

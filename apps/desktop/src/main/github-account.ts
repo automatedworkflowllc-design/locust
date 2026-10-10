@@ -7,6 +7,7 @@ import {
   githubAccountOfText,
   githubSignInCodeOf,
   type GithubAccount,
+  type GithubCliVersions,
   type GithubInstallResult,
   type GithubSignInCode,
   type GithubSignInResult
@@ -50,6 +51,7 @@ export interface GithubAccountOptions {
  * already there, and Locust does not reinstall or upgrade what a person has.
  */
 export const WINGET_GH_ARGS = ['install', '--id', 'GitHub.cli', '--exact', '--source', 'winget', '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity'] as const
+export const WINGET_GH_UPGRADE_ARGS = ['upgrade', '--id', 'GitHub.cli', '--exact', '--source', 'winget', '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity'] as const
 /** winget's "already installed" and "no newer version" exits: gh is there either way. */
 const WINGET_ALREADY = new Set([-1978335135, -1978335189])
 
@@ -184,27 +186,57 @@ export function createGithubAccount(options: GithubAccountOptions = {}) {
   const platform = options.platform ?? process.platform
   const exists = options.exists ?? existsSync
   let installing = false
-  /** One install at a time; then gh is asked again, from wherever the installer put it. */
-  const install = async (): Promise<GithubInstallResult> => {
-    if (installing) return { ok: false, message: 'The GitHub CLI is already being installed.', getItYourself: false }
+  /**
+   * One install or update at a time, with the computer's own package manager; then gh is asked again, from
+   * wherever the installer put it. An update is the same run with `upgrade` (0.726).
+   */
+  const viaPackageManager = async (update: boolean): Promise<GithubInstallResult> => {
+    const doing = update ? 'updated' : 'installed'
+    if (installing) return { ok: false, message: 'The GitHub CLI is already being installed or updated.', getItYourself: false }
     installing = true
     try {
       const brew = ['/opt/homebrew/bin/brew', '/usr/local/bin/brew'].find((path) => exists(path))
-      const how = platform === 'win32' ? { command: 'winget', args: WINGET_GH_ARGS } : platform === 'darwin' && brew !== undefined ? { command: brew, args: ['install', 'gh'] as const } : undefined
-      if (how === undefined) return { ok: false, message: 'This computer has no package manager Locust can install it with.', getItYourself: true }
+      const how =
+        platform === 'win32'
+          ? { command: 'winget', args: update ? WINGET_GH_UPGRADE_ARGS : WINGET_GH_ARGS }
+          : platform === 'darwin' && brew !== undefined
+            ? { command: brew, args: [update ? 'upgrade' : 'install', 'gh'] as const }
+            : undefined
+      if (how === undefined) return { ok: false, message: `This computer has no package manager Locust can ${update ? 'update' : 'install'} it with.`, getItYourself: true }
       const ran = await runInstaller(how.command, how.args)
-      if (ran.code === 'missing') return { ok: false, message: `${platform === 'win32' ? 'winget' : 'Homebrew'} is not on this computer, so Locust cannot install it for you.`, getItYourself: true }
+      if (ran.code === 'missing') return { ok: false, message: `${platform === 'win32' ? 'winget' : 'Homebrew'} is not on this computer, so Locust cannot ${update ? 'update' : 'install'} it for you.`, getItYourself: true }
       if (ran.code !== 0 && !(platform === 'win32' && WINGET_ALREADY.has(ran.code))) {
         const said = `${ran.stdout}\n${ran.stderr}`.split('\n').map((line) => line.trim()).filter((line) => line.length > 0).pop()
-        return { ok: false, message: `The GitHub CLI was not installed${said === undefined ? '.' : `: ${said.slice(0, 200)}`}`, getItYourself: true }
+        return { ok: false, message: `The GitHub CLI was not ${doing}${said === undefined ? '.' : `: ${said.slice(0, 200)}`}`, getItYourself: true }
       }
       const account = await read()
-      if (account.kind === 'no-cli') return { ok: false, message: 'It installed, but Locust cannot find it yet. Restart Locust and it will.', getItYourself: false }
+      if (account.kind === 'no-cli') return { ok: false, message: `It ${doing}, but Locust cannot find it yet. Restart Locust and it will.`, getItYourself: false }
       return { ok: true, account }
     } finally {
       installing = false
     }
   }
+  const install = (): Promise<GithubInstallResult> => viaPackageManager(false)
+  const update = (): Promise<GithubInstallResult> => viaPackageManager(true)
 
-  return { read, signIn, cancel, install }
+  /**
+   * Which gh this is, and the newest GitHub has released (0.726): `gh --version`, and `gh api
+   * repos/cli/cli/releases/latest` -- MEASURED 2026-10-10: "gh version 2.96.0 (2026-07-02)" and "v2.102.0".
+   * The newest is asked of GitHub once per launch; anything unread leaves it unsaid.
+   */
+  let latest: Promise<string | undefined> | undefined
+  const versions = async (): Promise<GithubCliVersions> => {
+    const said = await runGh(['--version'])
+    if (said.code === 'missing') return {}
+    const installed = /gh version (\d+\.\d+\.\d+)/.exec(said.stdout)?.[1]
+    latest ??= runGh(['api', 'repos/cli/cli/releases/latest', '--jq', '.tag_name']).then(
+      (answer) => (answer.code === 0 ? /^v?(\d+\.\d+\.\d+)\s*$/.exec(answer.stdout.trim())?.[1] : undefined),
+      () => undefined
+    )
+    const newest = await latest
+    if (newest === undefined) latest = undefined
+    return { ...(installed === undefined ? {} : { installed }), ...(newest === undefined ? {} : { latest: newest }) }
+  }
+
+  return { read, signIn, cancel, install, update, versions }
 }

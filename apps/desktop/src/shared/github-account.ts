@@ -52,6 +52,26 @@ export type GithubInstallResult =
   | { readonly ok: false; readonly message: string; readonly getItYourself: boolean }
 
 export const GITHUB_INSTALL_CHANNEL = 'locust:github-install'
+export const GITHUB_UPDATE_CHANNEL = 'locust:github-update'
+export const GITHUB_CLI_VERSIONS_CHANNEL = 'locust:github-cli-versions'
+
+/** Which GitHub CLI this computer has, and the newest GitHub has released; either unsaid when unread (0.726). */
+export interface GithubCliVersions {
+  readonly installed?: string
+  readonly latest?: string
+}
+
+/** Whether `latest` is a newer release than `installed`, by their numbers. */
+export function githubCliIsBehind(versions: GithubCliVersions | undefined): boolean {
+  if (versions?.installed === undefined || versions.latest === undefined) return false
+  const parts = (version: string): number[] => version.split('.').map((part) => Number(part))
+  const have = parts(versions.installed)
+  const out = parts(versions.latest)
+  for (let at = 0; at < 3; at += 1) {
+    if ((out[at] ?? 0) !== (have[at] ?? 0)) return (out[at] ?? 0) > (have[at] ?? 0)
+  }
+  return false
+}
 
 /** A GitHub login: letters, digits and single hyphens, as GitHub allows. */
 const LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$/

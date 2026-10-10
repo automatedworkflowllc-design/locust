@@ -18,7 +18,7 @@ export type { MemoryScope } from './memory.js'
 import type { Spend } from './spend.js'
 import type { UsageRange, UsageSummary } from './usage.js'
 import type { ConnectorAddRequest, ConnectorAddResponse, ConnectorAgent } from './connector-add.js'
-import type { GithubAccount, GithubInstallResult, GithubSignInCode, GithubSignInResult } from './github-account.js'
+import type { GithubAccount, GithubCliVersions, GithubInstallResult, GithubSignInCode, GithubSignInResult } from './github-account.js'
 import type { FolderPullRequest } from './pull-request.js'
 import type { OfficeDocument } from './office-document.js'
 import type { Workbook } from './sheet.js'
@@ -3772,6 +3772,10 @@ export interface DesktopApi {
   githubSignInCancel(): Promise<void>
   /** Install the GitHub CLI with winget, or Homebrew on a Mac (0.724); then who it is signed in as. */
   githubInstall(): Promise<GithubInstallResult>
+  /** Update the GitHub CLI the same way (0.726). */
+  githubUpdate(): Promise<GithubInstallResult>
+  /** Which GitHub CLI this is, and the newest GitHub has released (0.726). */
+  githubCliVersions(): Promise<GithubCliVersions>
   onGithubSignInCode(listener: (code: GithubSignInCode) => void): () => void
   /**
    * Attach one thing from the clipboard. `bytes` is the file's contents; the

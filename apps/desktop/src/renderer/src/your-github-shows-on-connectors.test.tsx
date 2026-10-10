@@ -52,6 +52,18 @@ describe('your GitHub on the Connectors page', () => {
     expect(card({})).toContain('Asking the GitHub CLI.')
   })
 
+  it('says when GitHub has a newer GitHub CLI, with the update a press away (0.726)', () => {
+    const signedIn = { kind: 'signed-in', login: 'octo-cat', scopes: ['repo'] } as const
+    const behind = card({ account: signedIn, versions: { installed: '2.96.0', latest: '2.102.0' }, onUpdate: nothing })
+    expect(behind).toContain('GitHub CLI 2.102.0 is out. This computer has 2.96.0.')
+    expect(behind).toContain('Update the GitHub CLI')
+    expect(card({ account: signedIn, versions: { installed: '2.102.0', latest: '2.102.0' }, onUpdate: nothing })).not.toContain('Update the GitHub CLI')
+    expect(card({ account: signedIn, versions: { installed: '2.96.0' }, onUpdate: nothing })).not.toContain('is out')
+    const updating = card({ account: signedIn, versions: { installed: '2.96.0', latest: '2.102.0' }, onUpdate: nothing, updating: true })
+    expect(updating).toContain('Updating the GitHub CLI.')
+    expect(updating).not.toContain('Update the GitHub CLI<')
+  })
+
   it('shows the one-time code while the sign-in waits, with a way to stop', () => {
     const asking = card({ account: { kind: 'signed-out' }, signingIn: true })
     expect(asking).toContain('Asking GitHub for a code.')

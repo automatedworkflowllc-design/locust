@@ -126,7 +126,7 @@ import { readPdfPages } from './pdf-pages.js'
 import { addConnector, removeConnector } from './connector-add.js'
 import { createGithubAccount } from './github-account.js'
 import { FOLDER_PULL_REQUEST_CHANNEL } from '../shared/pull-request.js'
-import { GITHUB_ACCOUNT_CHANNEL, GITHUB_INSTALL_CHANNEL, GITHUB_SIGN_IN_CANCEL_CHANNEL, GITHUB_SIGN_IN_CHANNEL, GITHUB_SIGN_IN_CODE_CHANNEL } from '../shared/github-account.js'
+import { GITHUB_ACCOUNT_CHANNEL, GITHUB_CLI_VERSIONS_CHANNEL, GITHUB_INSTALL_CHANNEL, GITHUB_UPDATE_CHANNEL, GITHUB_SIGN_IN_CANCEL_CHANNEL, GITHUB_SIGN_IN_CHANNEL, GITHUB_SIGN_IN_CODE_CHANNEL } from '../shared/github-account.js'
 import type { AgentLaunch } from './connector-add.js'
 import { CONNECTOR_ADD_CHANNEL, CONNECTOR_REMOVE_CHANNEL, isConnectorAgent } from '../shared/connector-add.js'
 import type { ConnectorAgent } from '../shared/connector-add.js'
@@ -4882,6 +4882,17 @@ if (!ownsSingleInstanceLock) {
         .catch(() => ({ ok: false, message: 'The install could not be started. Nothing was installed.', getItYourself: true }) as const)
       folderCommits.forgetSignIn()
       return result
+    })
+    // Which gh this is and the newest released, and an update from the card (0.726).
+    ipcMain.handle(GITHUB_CLI_VERSIONS_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) return {}
+      return githubAccount.versions().catch(() => ({}))
+    })
+    ipcMain.handle(GITHUB_UPDATE_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.', getItYourself: false } as const
+      return githubAccount
+        .update()
+        .catch(() => ({ ok: false, message: 'The update could not be started. Nothing was changed.', getItYourself: true }) as const)
     })
 
     // An attached PDF's page pictures, for its card in the chat and the viewer (0.714, pdf-pages.ts).

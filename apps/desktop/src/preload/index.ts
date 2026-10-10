@@ -19,8 +19,8 @@ import type { CompareSlotId } from '../shared/compare.js'
 import type { UsageRange } from '../shared/usage.js'
 import { CONNECTOR_ADD_CHANNEL, CONNECTOR_REMOVE_CHANNEL } from '../shared/connector-add.js'
 import type { ConnectorAddRequest, ConnectorAddResponse, ConnectorAgent } from '../shared/connector-add.js'
-import { GITHUB_ACCOUNT_CHANNEL, GITHUB_INSTALL_CHANNEL, GITHUB_SIGN_IN_CANCEL_CHANNEL, GITHUB_SIGN_IN_CHANNEL, GITHUB_SIGN_IN_CODE_CHANNEL } from '../shared/github-account.js'
-import type { GithubAccount, GithubInstallResult, GithubSignInCode, GithubSignInResult } from '../shared/github-account.js'
+import { GITHUB_ACCOUNT_CHANNEL, GITHUB_CLI_VERSIONS_CHANNEL, GITHUB_INSTALL_CHANNEL, GITHUB_UPDATE_CHANNEL, GITHUB_SIGN_IN_CANCEL_CHANNEL, GITHUB_SIGN_IN_CHANNEL, GITHUB_SIGN_IN_CODE_CHANNEL } from '../shared/github-account.js'
+import type { GithubAccount, GithubCliVersions, GithubInstallResult, GithubSignInCode, GithubSignInResult } from '../shared/github-account.js'
 import { FOLDER_PULL_REQUEST_CHANNEL } from '../shared/pull-request.js'
 import type { FolderPullRequest } from '../shared/pull-request.js'
 import {
@@ -644,6 +644,8 @@ const desktopApi: DesktopApi = {
   githubSignIn: () => ipcRenderer.invoke(GITHUB_SIGN_IN_CHANNEL) as Promise<GithubSignInResult>,
   githubSignInCancel: () => ipcRenderer.invoke(GITHUB_SIGN_IN_CANCEL_CHANNEL) as Promise<void>,
   githubInstall: () => ipcRenderer.invoke(GITHUB_INSTALL_CHANNEL) as Promise<GithubInstallResult>,
+  githubUpdate: () => ipcRenderer.invoke(GITHUB_UPDATE_CHANNEL) as Promise<GithubInstallResult>,
+  githubCliVersions: () => ipcRenderer.invoke(GITHUB_CLI_VERSIONS_CHANNEL) as Promise<GithubCliVersions>,
   onGithubSignInCode: (listener: (code: GithubSignInCode) => void) => {
     const handler = (_event: unknown, code: GithubSignInCode): void => listener(code)
     ipcRenderer.on(GITHUB_SIGN_IN_CODE_CHANNEL, handler)
