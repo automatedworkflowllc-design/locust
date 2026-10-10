@@ -999,7 +999,7 @@ export default function App(): ReactElement {
     const answer = await window.desktop?.renameMission(key, trimmed)
     if (answer !== undefined && !answer.ok) {
       const roster = await window.desktop?.listTeammates()
-      if (roster?.ok === true) setMissionTitles(roster.data.missionTitles)
+      if (roster?.ok === true) rememberRosterNames(roster.data)
     }
   }
 
@@ -1093,6 +1093,12 @@ export default function App(): ReactElement {
           label: 'Rename',
           shortcut: 'r',
           onSelect: () => setRenamingMissionId(missionId)
+        },
+        // Pinned to the top of the sidebar, as Claude's own list keeps its starred ones (0.729).
+        {
+          label: missionPinsRef.current.includes(conversationKeyOf(missionId)) ? 'Unpin' : 'Pin to top',
+          shortcut: 'p',
+          onSelect: () => pinConversation(missionId, !missionPinsRef.current.includes(conversationKeyOf(missionId)))
         },
         /*
          * ONE row that opens the list, not one row per group.
@@ -1349,7 +1355,7 @@ export default function App(): ReactElement {
       seedLimitsFrom(listed)
       noteStore('teammates', roster.ok)
       if (roster.ok) setMissionOwners(roster.data.missionOwners)
-      if (roster.ok) setMissionTitles(roster.data.missionTitles)
+      if (roster.ok) rememberRosterNames(roster.data)
     }
     return response
   }
@@ -1411,6 +1417,30 @@ export default function App(): ReactElement {
   const [teammates, setTeammates] = useState<readonly PublicTeammate[]>([])
   const [missionOwners, setMissionOwners] = useState<Readonly<Record<string, string>>>({})
   const [missionTitles, setMissionTitles] = useState<Readonly<Record<string, string>>>({})
+  /** Conversations pinned to the sidebar's top, by conversation key, newest pin first (0.729). */
+  const [missionPins, setMissionPins] = useState<readonly string[]>([])
+  /** What the roster says about conversations: their typed names, and which are pinned. */
+  const missionPinsRef = useRef<readonly string[]>([])
+  missionPinsRef.current = missionPins
+  /** Pin or unpin a conversation, by its key: shown at once, kept by the host, put back if it refuses. */
+  const pinConversation = (missionId: string, pinned: boolean): void => {
+    const key = conversationKeyOf(missionId)
+    const before = missionPinsRef.current
+    setMissionPins(pinned ? [key, ...before.filter((id) => id !== key)] : before.filter((id) => id !== key))
+    void window.desktop
+      ?.pinMission(key, pinned)
+      .then((answer) => {
+        if (!answer.ok) {
+          setMissionPins(before)
+          setTeammateError(answer.error.message)
+        }
+      })
+      .catch(() => setMissionPins(before))
+  }
+  const rememberRosterNames = (data: { readonly missionTitles: Readonly<Record<string, string>>; readonly missionPins?: readonly string[] }): void => {
+    setMissionTitles(data.missionTitles)
+    setMissionPins(data.missionPins ?? [])
+  }
   const [groups, setGroups] = useState<readonly PublicGroup[]>([])
   const [groupMembers, setGroupMembers] = useState<Readonly<Record<string, GroupMembership>>>({})
   const [groupLeft, setGroupLeft] = useState<Readonly<Record<string, readonly LeftMembership[]>>>({})
@@ -2799,7 +2829,7 @@ export default function App(): ReactElement {
                 window.desktop?.listTeammates().then((roster) => {
                   if (roster.ok) {
                     setMissionOwners(roster.data.missionOwners)
-                    setMissionTitles(roster.data.missionTitles)
+                    rememberRosterNames(roster.data)
                   }
                 }).catch(() => undefined),
                 refreshHistoryNow()
@@ -2864,7 +2894,7 @@ export default function App(): ReactElement {
           // its root prompt ("Wren asked: ...") until the next full refresh.
           // Measured by `_smoke/hub-smoke.mjs` on 0.234.0 before this line.
           void window.desktop?.listTeammates().then((listed) => {
-            if (listed.ok) setMissionTitles(listed.data.missionTitles)
+            if (listed.ok) rememberRosterNames(listed.data)
           }).catch(() => undefined)
         }
         // A routine that started on its own: the Team card's run count and
@@ -3274,7 +3304,7 @@ export default function App(): ReactElement {
          * app, which is the only place the difference shows.
          */
         setMissionOwners(response.data.missionOwners)
-        setMissionTitles(response.data.missionTitles)
+        rememberRosterNames(response.data)
       })
       .catch(() => {
         // The roster is optional at startup; missions still run without it.
@@ -5307,7 +5337,7 @@ export default function App(): ReactElement {
           if (!listed.ok) return
           setTeammates(listed.data.teammates)
           setMissionOwners(listed.data.missionOwners)
-          setMissionTitles(listed.data.missionTitles)
+          rememberRosterNames(listed.data)
         })
       })
       .catch(() => setTeammateError('That teammate could not be created. Nobody was added.'))
@@ -5344,7 +5374,7 @@ export default function App(): ReactElement {
     if (listed?.ok === true) {
       setTeammates(listed.data.teammates)
       setMissionOwners(listed.data.missionOwners)
-      setMissionTitles(listed.data.missionTitles)
+      rememberRosterNames(listed.data)
     }
     return problem
   }
@@ -5368,7 +5398,7 @@ export default function App(): ReactElement {
           if (!listed.ok) return
           setTeammates(listed.data.teammates)
           setMissionOwners(listed.data.missionOwners)
-          setMissionTitles(listed.data.missionTitles)
+          rememberRosterNames(listed.data)
         })
       })
       .catch(() => setTeammateError('That teammate could not be updated. Their details are unchanged.'))
@@ -5414,7 +5444,7 @@ export default function App(): ReactElement {
           if (!listed.ok) return
           setTeammates(listed.data.teammates)
           setMissionOwners(listed.data.missionOwners)
-          setMissionTitles(listed.data.missionTitles)
+          rememberRosterNames(listed.data)
         })
       })
       .catch(() => setFolderNotice('That could not be changed. The setting is as it was.'))
@@ -5437,7 +5467,7 @@ export default function App(): ReactElement {
           if (!listed.ok) return
           setTeammates(listed.data.teammates)
           setMissionOwners(listed.data.missionOwners)
-          setMissionTitles(listed.data.missionTitles)
+          rememberRosterNames(listed.data)
         })
       })
       .catch(() => setFolderNotice('That folder could not be chosen. The workspace is unchanged.'))
@@ -5778,7 +5808,7 @@ export default function App(): ReactElement {
         setSelectedTeammateId((current) => (current === teammateId ? undefined : current))
         setTeammates(listed.data.teammates)
         setMissionOwners(listed.data.missionOwners)
-        setMissionTitles(listed.data.missionTitles)
+        rememberRosterNames(listed.data)
         // Their routines went with them; the host drops those, so re-read.
         await reloadRoutines()
       })
@@ -6539,7 +6569,7 @@ export default function App(): ReactElement {
         .then((roster) => {
           if (!roster.ok) return
           setMissionOwners(roster.data.missionOwners)
-          setMissionTitles(roster.data.missionTitles)
+          rememberRosterNames(roster.data)
         })
         .catch(() => undefined)
     }
@@ -7470,6 +7500,7 @@ export default function App(): ReactElement {
             if (compare !== undefined && compare.kept === undefined) setComparingId(compare.compareId)
           }}
           onMissionMenu={openMissionMenu}
+          pinnedKeys={missionPins}
           groups={groups}
           groupMembers={groupMembers}
           unreadableConversations={unreadableLedgers}
@@ -9247,7 +9278,7 @@ export default function App(): ReactElement {
             refreshHistory()
             // Its title is the session's, kept with the roster's titles.
             void window.desktop?.listTeammates().then((listed) => {
-              if (listed.ok) setMissionTitles(listed.data.missionTitles)
+              if (listed.ok) rememberRosterNames(listed.data)
             }).catch(() => undefined)
           }}
           onCancel={() => setImportOpen(false)}

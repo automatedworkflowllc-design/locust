@@ -277,6 +277,7 @@ import {
   MISSION_RECORD_SAVE_CHANNEL,
   TEAMMATE_ASSIGN_CHANNEL,
   TEAMMATE_RENAME_MISSION_CHANNEL,
+  TEAMMATE_PIN_MISSION_CHANNEL,
   GROUP_LIST_CHANNEL,
   GROUP_CREATE_CHANNEL,
   GROUP_RENAME_CHANNEL,
@@ -5349,12 +5350,13 @@ if (!ownsSingleInstanceLock) {
 
     const listTeammates = async () => {
       try {
-        const [list, missionOwners, missionTitles] = await Promise.all([
+        const [list, missionOwners, missionTitles, missionPins] = await Promise.all([
           teammates.list(),
           teammates.missionOwners(),
-          teammates.missionTitles()
+          teammates.missionTitles(),
+          teammates.missionPins()
         ])
-        return { ok: true, data: { teammates: list, missionOwners, missionTitles } } as const
+        return { ok: true, data: { teammates: list, missionOwners, missionTitles, missionPins } } as const
       } catch {
         return teammatesUnavailable
       }
@@ -5554,6 +5556,17 @@ if (!ownsSingleInstanceLock) {
         return { ok: true, data: {} } as const
       } catch {
         return teammateRejected('That conversation could not be renamed.')
+      }
+    })
+    // Pinned to the top of the sidebar, or not (0.729).
+    ipcMain.handle(TEAMMATE_PIN_MISSION_CHANNEL, async (event, request: unknown) => {
+      if (!fromOwnWindow(event)) return teammateRejected('The conversation could not be pinned.')
+      const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
+      try {
+        await teammates.pinMission(String(input.missionId ?? ''), input.pinned === true)
+        return { ok: true, data: {} } as const
+      } catch (error) {
+        return teammateRejected(error instanceof Error && /^At most/.test(error.message) ? `${error.message}.` : 'That conversation could not be pinned.')
       }
     })
 

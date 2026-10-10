@@ -171,6 +171,9 @@ function SidebarSection({
   )
 }
 
+/** No conversation pinned. */
+const NO_PINS: readonly string[] = []
+
 export function Sidebar({
   runtimes,
   missions,
@@ -184,6 +187,7 @@ export function Sidebar({
   onSelectMission,
   onMissionMenu,
   renamingMissionId,
+  pinnedKeys = NO_PINS,
   onRenameMission,
   onRenameDone,
   groups = [],
@@ -248,6 +252,8 @@ export function Sidebar({
   readonly onMissionMenu: (missionId: string, at: { readonly x: number; readonly y: number }) => void
   /** The conversation being renamed in place, if any. */
   readonly renamingMissionId?: string
+  /** Conversations pinned to the top, by conversation key, newest pin first (0.729). */
+  readonly pinnedKeys?: readonly string[]
   /** Commit a new name. An empty string clears it back to what was typed. */
   readonly onRenameMission?: (missionId: string, title: string) => void
   readonly onRenameDone?: () => void
@@ -603,7 +609,13 @@ export function Sidebar({
     </Fragment>
   )
   const conversationList = (allInFolder: readonly SidebarMission[], keepsEmpty: boolean): ReactElement => {
-    const inFolder = allInFolder.filter((mission) => !isNestedChild(mission))
+    /*
+     * PINNED, AT THE TOP (0.729): what the person pinned, newest pin first, above projects and the rest, as
+     * Claude's own list keeps its starred conversations -- and not listed again below.
+     */
+    const pinRank = (mission: SidebarMission): number => pinnedKeys.indexOf(mission.rootId ?? mission.missionId)
+    const pinned = allInFolder.filter((mission) => !isNestedChild(mission) && pinRank(mission) >= 0).sort((left, right) => pinRank(left) - pinRank(right))
+    const inFolder = allInFolder.filter((mission) => !isNestedChild(mission) && pinRank(mission) < 0)
     /*
      * PROJECTS, AS CLAUDE HAS THEM (Colin, 2026-09-29: "claude has
      * projects/and workspace folders, like they arent the same thing so
@@ -619,6 +631,14 @@ export function Sidebar({
     const groupsShown = drawnGroups.some((group) => showsGroup(group.groupId, inFolder, keepsEmpty))
     return (
           <>
+            {pinned.length > 0 && (
+              <div className="lc-convgroup">
+                <div className="lc-project__head is-plain">
+                  <span className="lc-project__name">Pinned</span>
+                </div>
+                {pinned.map(rowAndChildren)}
+              </div>
+            )}
             {drawnGroups.filter((group) => showsGroup(group.groupId, inFolder, keepsEmpty)).map((group) => {
               const theirs = inFolder.filter(
                 (mission) => heldFor(mission, groupMembers)?.groupId === group.groupId
@@ -709,9 +729,10 @@ export function Sidebar({
               * ungrouped FROM. With no groups at all this is the whole
               * sidebar and a label over it would name the only thing there.
               */}
-            {groupsShown && folderUngrouped.length > 0 && (
+            {/* Under Pinned with no projects beside it, the rest is Recents, as Claude's list names it (0.729). */}
+            {(groupsShown || pinned.length > 0) && folderUngrouped.length > 0 && (
               <div className="lc-project__head is-plain">
-                <span className="lc-project__name">Ungrouped</span>
+                <span className="lc-project__name">{groupsShown ? 'Ungrouped' : 'Recents'}</span>
               </div>
             )}
             {folderUngrouped.map((entry) => (entry.kind === 'room' ? roomRow(entry.room, entry.missions) : rowAndChildren(entry.mission)))}

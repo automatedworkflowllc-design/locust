@@ -154,6 +154,7 @@ import {
   ROOM_TASK_CHANNEL,
   TEAMMATE_ASSIGN_CHANNEL,
   TEAMMATE_RENAME_MISSION_CHANNEL,
+  TEAMMATE_PIN_MISSION_CHANNEL,
   GROUP_LIST_CHANNEL,
   GROUP_CREATE_CHANNEL,
   GROUP_RENAME_CHANNEL,
@@ -499,6 +500,8 @@ const desktopApi: DesktopApi = {
     ipcRenderer.invoke(TEAMMATE_ASSIGN_CHANNEL, { teammateId, missionId }) as Promise<TeammateMutationResponse>,
   renameMission: (missionId: string, title: string) =>
     ipcRenderer.invoke(TEAMMATE_RENAME_MISSION_CHANNEL, { missionId, title }) as Promise<TeammateMutationResponse>,
+  pinMission: (missionId: string, pinned: boolean) =>
+    ipcRenderer.invoke(TEAMMATE_PIN_MISSION_CHANNEL, { missionId, pinned }) as Promise<TeammateMutationResponse>,
   readQueuedMessages: () => ipcRenderer.invoke(QUEUED_MESSAGES_READ_CHANNEL) as Promise<QueuedMessagesResponse>,
   writeQueuedMessages: (rows: readonly SavedQueuedMessage[]) => ipcRenderer.invoke(QUEUED_MESSAGES_WRITE_CHANNEL, rows) as Promise<QueuedMessagesResponse>,
   listGroups: () => ipcRenderer.invoke(GROUP_LIST_CHANNEL) as Promise<GroupListResponse>,

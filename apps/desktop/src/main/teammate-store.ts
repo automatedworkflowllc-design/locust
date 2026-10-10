@@ -63,6 +63,8 @@ export const MAX_MISSION_OWNERS = 5_000
  */
 export const MAX_MISSION_TITLES = 1_000
 export const MAX_MISSION_TITLE_LENGTH = 120
+/** Pinned conversations a sidebar keeps at its top (0.729): enough for any list, few enough to read. */
+export const MAX_MISSION_PINS = 50
 const MAX_FILE_BYTES = 1_000_000
 /**
  * What a caller sees when the roster file exists and cannot be read.
@@ -121,6 +123,9 @@ export interface TeammateStore {
   missionTitles(): Promise<Readonly<Record<string, string>>>
   /** An empty or blank name CLEARS it, back to the words that were typed. */
   renameMission(missionId: string, title: string): Promise<void>
+  /** Conversations pinned to the top of the sidebar, newest pin first, by conversation key (0.729). */
+  missionPins(): Promise<readonly string[]>
+  pinMission(missionId: string, pinned: boolean): Promise<void>
   /**
    * Record the newest turn of this teammate's hub -- the conversation their
    * replies to other teammates continue. Unknown teammate or bad id: nothing
@@ -137,6 +142,8 @@ interface StoredFile {
   readonly missionOwners: Readonly<Record<string, string>>
   /** Names people typed for conversations, by mission id. */
   readonly missionTitles: Readonly<Record<string, string>>
+  /** Conversations pinned to the top of the sidebar, newest pin first (0.729). */
+  readonly missionPins: readonly string[]
   readonly settings: WorkspaceSettings
 }
 
@@ -587,7 +594,16 @@ function parsedFile(text: string): StoredFile {
       : {})
   }
 
-  return { schemaVersion: SCHEMA_VERSION, teammates, missionOwners: owners, missionTitles: titles, settings }
+  // Pins, read as untrusted as titles are: ids only, each once, no more than the cap (0.729).
+  const pins: string[] = []
+  if (Array.isArray(record.missionPins)) {
+    for (const missionId of record.missionPins as unknown[]) {
+      if (pins.length >= MAX_MISSION_PINS) break
+      if (typeof missionId === 'string' && safeId(missionId) && !pins.includes(missionId)) pins.push(missionId)
+    }
+  }
+
+  return { schemaVersion: SCHEMA_VERSION, teammates, missionOwners: owners, missionTitles: titles, missionPins: pins, settings }
 }
 
 export function createTeammateStore(options: { readonly rootDirectory: string }): TeammateStore {
@@ -613,7 +629,7 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
       text = await readFile(path, 'utf8')
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        return { schemaVersion: SCHEMA_VERSION, teammates: [], missionOwners: {}, missionTitles: {}, settings: DEFAULT_SETTINGS }
+        return { schemaVersion: SCHEMA_VERSION, teammates: [], missionOwners: {}, missionTitles: {}, missionPins: [], settings: DEFAULT_SETTINGS }
       }
       throw new Error(TEAMMATES_UNREADABLE)
     }
@@ -902,6 +918,25 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
           throw new Error('Too many renamed conversations')
         }
         await write({ ...file, missionTitles: { ...file.missionTitles, [missionId]: trimmed } })
+      })
+    },
+
+    missionPins(): Promise<readonly string[]> {
+      return serialize(async () => (await read()).missionPins)
+    },
+
+    pinMission(missionId, pinned): Promise<void> {
+      return serialize(async () => {
+        if (!safeId(missionId)) throw new Error('Mission id is invalid')
+        const file = await read()
+        const others = file.missionPins.filter((id) => id !== missionId)
+        if (!pinned) {
+          if (others.length === file.missionPins.length) return
+          await write({ ...file, missionPins: others })
+          return
+        }
+        if (others.length >= MAX_MISSION_PINS) throw new Error(`At most ${String(MAX_MISSION_PINS)} conversations can be pinned`)
+        await write({ ...file, missionPins: [missionId, ...others] })
       })
     },
 

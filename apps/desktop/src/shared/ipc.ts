@@ -577,6 +577,8 @@ export const TEAMMATE_ASSIGN_CHANNEL = 'teammates:assign'
  * undoing it.
  */
 export const TEAMMATE_RENAME_MISSION_CHANNEL = 'teammates:renameMission'
+/** Pin a conversation to the top of the sidebar, or unpin it (0.729). */
+export const TEAMMATE_PIN_MISSION_CHANNEL = 'teammates:pinMission'
 export const ROUTINE_LIST_CHANNEL = 'routines:list'
 export const ROUTINE_CREATE_CHANNEL = 'routines:create'
 export const ROUTINE_UPDATE_CHANNEL = 'routines:update'
@@ -1712,6 +1714,8 @@ export type TeammateListResponse =
         readonly missionOwners: Readonly<Record<string, string>>
         /** Names people typed for conversations, by mission id. */
         readonly missionTitles: Readonly<Record<string, string>>
+        /** Conversations pinned to the sidebar's top, newest pin first (0.729). */
+        readonly missionPins?: readonly string[]
       }
     }
   | { readonly ok: false; readonly error: { readonly code: 'TEAMMATES_UNAVAILABLE'; readonly message: string } }
@@ -3608,6 +3612,8 @@ export interface DesktopApi {
   assignMission(teammateId: string, missionId: string): Promise<TeammateMutationResponse>
   /** Name a conversation. An empty name clears it back to what was typed. */
   renameMission(missionId: string, title: string): Promise<TeammateMutationResponse>
+  /** Pin a conversation (its key) to the top of the sidebar, or unpin it (0.729). */
+  pinMission(missionId: string, pinned: boolean): Promise<TeammateMutationResponse>
   listGroups(): Promise<GroupListResponse>
   createGroup(name: string): Promise<GroupMutationResponse>
   renameGroup(groupId: string, name: string): Promise<GroupMutationResponse>

@@ -239,7 +239,8 @@ describe('a name that was saved is read back', () => {
     lines.forEach((line, index) => {
       if (!/setMissionOwners\((?:response|roster|listed)\.data\.missionOwners\)/.test(line)) return
       const near = lines.slice(index, index + 4).join(' ')
-      if (!near.includes('.data.missionTitles')) missed.push(`App.tsx:${String(index + 1)}: ${line.trim()}`)
+      // 0.729: the titles come off it through rememberRosterNames(x.data), which takes the pins too.
+      if (!near.includes('.data.missionTitles') && !/rememberRosterNames\(\w+\.data\)/.test(near)) missed.push(`App.tsx:${String(index + 1)}: ${line.trim()}`)
     })
     expect(missed).toEqual([])
   })
@@ -248,6 +249,6 @@ describe('a name that was saved is read back', () => {
     // The specific miss. `listTeammates` on mount is the only read that
     // happens before anyone can look at a row.
     const mount = APP.slice(APP.indexOf('.listTeammates()'), APP.indexOf('.listTeammates()') + 1600)
-    expect(mount).toContain('setMissionTitles')
+    expect(mount).toMatch(/setMissionTitles|rememberRosterNames/)
   })
 })
