@@ -895,6 +895,39 @@ describe("a call Claude Code refused", () => {
     const [done] = n.accept(record({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "toolu_x", is_error: true, content: "exit code 1" }] } }));
     expect(done).toMatchObject({ type: "tool.failed", payload: { status: "error" } });
   });
+
+  // 0.717: Locust's command guard, a PreToolUse hook. Its refusal comes back only as the call's error -- no
+  // `permission_denied` record (MEASURED 2026-10-10 on 2.1.296, Haiku, Auto) -- and in the result's denials.
+  // Read as an error it "exited non-zero", under a line that blamed the mode, on Auto.
+  it("is refused when Locust's guard stopped it, and said as the guard's, not the mode's", () => {
+    const reason = "Locust stopped this command before it ran: it ends Vivaldi by name, which ends every Vivaldi on this computer, the person's own windows too. End only what you started yourself, by its process id: taskkill /PID <id> /F on Windows, or kill <id>.";
+    const n = normalizer();
+    n.accept(record({ type: "stream_event", event: { type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "toolu_guard", name: "Bash" } } }));
+    n.accept(record({ type: "assistant", message: { id: "msg_g", content: [{ type: "tool_use", id: "toolu_guard", name: "Bash", input: { command: "taskkill //F //IM vivaldi.exe", description: "End Vivaldi" } }] } }));
+    const [done] = n.accept(record({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "toolu_guard", is_error: true, content: `PreToolUse:Bash hook error: ${reason}` }] } }));
+    expect(done).toMatchObject({ type: "tool.failed", payload: { itemId: "toolu_guard", status: "refused", output: reason } });
+    const said = n
+      .accept(record({ type: "result", subtype: "success", is_error: false, result: "It was refused.", permission_denials: [{ tool_name: "Bash", tool_use_id: "toolu_guard", tool_input: { command: "taskkill //F //IM vivaldi.exe" } }] }))
+      .filter((event) => event.type === "adapter.diagnostic")
+      .map((event) => String(event.payload.message));
+    expect(said).toEqual([
+      "Locust stopped Bash `taskkill //F //IM vivaldi.exe` before it ran: it would have ended every Vivaldi on this computer, your own windows too. Ending what the teammate started itself, by its process id, still works.",
+    ]);
+  });
+
+  it("says the guard's and the mode's apart when a run met both", () => {
+    const n = normalizer();
+    n.accept(record({ type: "stream_event", event: { type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "toolu_g2", name: "Bash" } } }));
+    n.accept(record({ type: "assistant", message: { id: "msg_h", content: [{ type: "tool_use", id: "toolu_g2", name: "Bash", input: { command: "pkill node" } }] } }));
+    n.accept(record({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "toolu_g2", is_error: true, content: "PreToolUse:Bash hook error: Locust stopped this command before it ran: it ends Node by name, which ends every Node on this computer, the person's own programs and other teammates' work too. End only what you started yourself, by its process id: taskkill /PID <id> /F on Windows, or kill <id>." }] } }));
+    // No call id in this one's denial: matched by its command.
+    const said = n
+      .accept(record({ type: "result", subtype: "success", is_error: false, result: "ok", permission_denials: [{ tool_name: "Bash", tool_input: { command: "pkill node" } }, { tool_name: "Bash", tool_use_id: "toolu_other", tool_input: { command: "node t.mjs" } }] }))
+      .filter((event) => event.type === "adapter.diagnostic")
+      .map((event) => String(event.payload.message));
+    expect(said[0]).toBe("Locust stopped Bash `pkill node` before it ran: it would have ended every Node on this computer, your own programs and other teammates' work too. Ending what the teammate started itself, by its process id, still works.");
+    expect(said[1]).toMatch(/^Claude Code was not permitted to use Bash `node t\.mjs`, so it did not\./);
+  });
 });
 
 /*

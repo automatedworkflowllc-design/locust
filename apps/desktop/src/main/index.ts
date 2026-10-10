@@ -185,6 +185,7 @@ import { createRelay } from './relay.js'
 import { createAttention, finishFrom } from './attention.js'
 import { boundedShutdown } from './bounded-shutdown.js'
 import { createPermissionHost } from './permission-host.js'
+import { writeCommandGuard } from './command-guard.js'
 import { chooseFolderCaution, isInsideDirectory, notATeammateFolder, readRememberedWorkspace, resolveWorkspacePath, WORKSPACE_ARGUMENT, writeRememberedWorkspace, workspaceIdFor } from './workspace.js'
 import { createUnwrittenAnswers } from './approval-record-note.js'
 import { createRaisedApprovals } from './raised-approvals.js'
@@ -2132,6 +2133,11 @@ if (!ownsSingleInstanceLock) {
       emitApproval: raiseApproval
     })
     permissionHostForShutdown = permissionHost
+    // No teammate ends your browser (0.717): the hook every Claude Code run is given. Beside app.asar, as the bridge is.
+    const commandGuardWritten = writeCommandGuard(app.getPath('userData'), {
+      node: process.execPath,
+      guardPath: app.isPackaged ? join(process.resourcesPath, 'locust-command-guard.mjs') : join(__dirname, '../../resources/locust-command-guard.mjs')
+    })
 
     /*
      * What answers a run that stops to ask. Approve-each used to have a whole
@@ -2255,6 +2261,7 @@ if (!ownsSingleInstanceLock) {
       spendRefusal,
       ownProvider: (model) => ownModels.providerFor(model),
       permissionHost,
+      commandGuard: () => commandGuardWritten,
       approvals,
       // A ledger write that fails mid-run names its reason in locust-errors.log.
       note,

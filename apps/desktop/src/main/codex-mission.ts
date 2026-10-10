@@ -609,6 +609,12 @@ interface CodexMissionServiceOptions {
     release(runId: string): Promise<void>
   }
   /**
+   * The settings file naming Locust's command guard (0.717,
+   * command-guard.ts), for every Claude Code run in every mode; undefined
+   * when it could not be written, and runs go without it.
+   */
+  readonly commandGuard?: () => Promise<string | undefined>
+  /**
    * What answers a Codex run that stops to ask -- Approve-each's whole point.
    * Without it that mode has nobody to ask, and every request is refused.
    */
@@ -1921,6 +1927,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
          */
         const askEveryConnector =
           globalThis.process.env.LOCUST_ASK_CONNECTORS === '1' || (await options.askConnectors?.()) === true
+        const commandGuardPath = runtime === 'claude' ? await options.commandGuard?.() : undefined
         const permissionBridge =
           runtime === 'claude' && effectiveSandbox !== 'full-access' && options.permissionHost !== undefined
             ? await options.permissionHost.register({ runId, missionId, cwd: runCwd, beforeApproval: flushBeforeApproval })
@@ -2040,6 +2047,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             ? createClaudePrintCommand(executable, {
                 workspacePath: runCwd,
                 ...(permissionBridge === undefined ? {} : { permissionBridge }),
+                ...(commandGuardPath === undefined ? {} : { commandGuard: { settingsPath: commandGuardPath } }),
                 ...(skillPlugins.length === 0 ? {} : { skillPlugins }),
                 // Every connector the person's own Claude Code can reach.
                 // Without a named allow rule the tools are offered and every

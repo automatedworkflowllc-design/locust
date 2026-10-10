@@ -27,7 +27,7 @@ Locust can stop a run only where its AI agent asks first. Where it asks, a card 
 
 **Asks first.** In Ask and Plan, every connector call. In Edit, a connector call the teammate was not given (or every one, when “Ask before every connector call” is on), a command it does not run on its own say, and a change to a file outside this folder.
 
-**Without asking.** Reading files, in every mode. In Edit, changes to files in this folder and the commands Claude Code runs on its own say. In Auto, everything.
+**Without asking.** Reading files, in every mode. In Edit, changes to files in this folder and the commands Claude Code runs on its own say. In Auto, everything. In every mode, Locust refuses one kind of command without asking: one that ends a browser, Node, Locust or another AI agent by name, which would end yours too.
 
 **Always.** Locust keeps an Always for the rest of the run, and your saved rules come first.
 

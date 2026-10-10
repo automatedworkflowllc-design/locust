@@ -525,6 +525,27 @@ export function whyRefused(refused: readonly { readonly tool: string }[]): strin
   return "Claude Code asks for approval before running commands in this mode, and a printed run has no way to give it.";
 }
 
+/** How Locust's command guard begins every refusal (apps/desktop/resources/locust-command-guard.mjs, 0.717). */
+export const LOCUST_GUARD_SAID = "Locust stopped this command before it ran";
+
+/**
+ * What Locust's command guard stopped, said to the person (0.717). The
+ * guard's reason is written to the model -- "...the person's own windows too.
+ * End only what you started yourself..." -- so the person is told the same
+ * fact as theirs: what it would have ended. Not the mode: on Auto the line it
+ * replaces said Claude Code "asks for approval before running commands in
+ * this mode", which was false (first drive, 2026-10-10).
+ */
+export function guardedSentence(stopped: readonly { readonly text: string; readonly guarded?: string }[]): string {
+  const still = "Ending what the teammate started itself, by its process id, still works.";
+  if (stopped.length === 1) {
+    const match = /which ends every (.+?) on this computer, (.+?) too\./.exec(stopped[0]!.guarded ?? "");
+    const ended = match === null ? "a program you, or another teammate, also run" : `every ${match[1]!} on this computer, ${match[2]!.replace(/^the person's own/, "your own")} too`;
+    return `Locust stopped ${stopped[0]!.text} before it ran: it would have ended ${ended}. ${still}`;
+  }
+  return `Locust stopped ${String(stopped.length)} commands before they ran: ${stopped.map((entry) => entry.text).join("; ")}. Each would have ended a program by name that you, or another teammate, also run. ${still}`;
+}
+
 export function createClaudeEventNormalizer(
   context: ClaudeInvocationContext,
 ): ClaudeEventNormalizer {
@@ -556,6 +577,15 @@ export function createClaudeEventNormalizer(
    * refused" over five that ran and two that never did.
    */
   const refusedCalls = new Map<string, string>();
+  /**
+   * Calls Locust's command guard stopped (0.717), by call and by command,
+   * with its reason. A hook's refusal comes back only as the call's error
+   * text -- MEASURED on 2.1.296, no `permission_denied` record -- so without
+   * this it read as a command that ran and "exited non-zero", under a notice
+   * blaming the mode.
+   */
+  const guardedCalls = new Map<string, string>();
+  const guardedCommands = new Map<string, string>();
   let runtimeThreadId: string | undefined;
   let normalizedSequence = 0;
   let finalized = false;
@@ -1182,8 +1212,18 @@ export function createClaudeEventNormalizer(
         if (open === undefined && fromSubagent(parsed)) continue;
         openTools.delete(itemId);
         const failed = block.is_error === true;
-        const refusedFor = refusedCalls.get(itemId);
+        let refusedFor = refusedCalls.get(itemId);
         refusedCalls.delete(itemId);
+        // Locust's own guard said no: refused, never run, in its words (0.717).
+        if (failed) {
+          const said = claudeToolResultText(block) ?? "";
+          const at = said.indexOf(LOCUST_GUARD_SAID);
+          if (at >= 0) {
+            refusedFor = said.slice(at);
+            guardedCalls.set(itemId, refusedFor);
+            if (open?.target !== undefined) guardedCommands.set(open.target, refusedFor);
+          }
+        }
         const subagentKind = subagentKinds.get(itemId);
         const subagentSummary = subagentSummaries.get(itemId);
         subagentKinds.delete(itemId);
@@ -1304,7 +1344,7 @@ export function createClaudeEventNormalizer(
       // failure of the run and is not reported as one: it is the run saying
       // what it could not do.
       const denials = Array.isArray(parsed.permission_denials) ? parsed.permission_denials : [];
-      const refused = denials
+      const all = denials
         .filter(isObject)
         .map((denial) => {
           const tool = stringValue(denial.tool_name) ?? "a tool";
@@ -1312,10 +1352,17 @@ export function createClaudeEventNormalizer(
           const detail = stringValue(input.command) ?? stringValue(input.file_path) ?? stringValue(input.description);
           const said = namedTool(tool);
           const brief = detail === undefined ? undefined : brieflyPut(detail);
-          return { tool, text: brief === undefined ? said : `${said} \`${brief}\`` };
+          const callId = identityValue(denial.tool_use_id);
+          const guarded = (callId === undefined ? undefined : guardedCalls.get(callId)) ?? (detail === undefined ? undefined : guardedCommands.get(detail));
+          return { tool, text: brief === undefined ? said : `${said} \`${brief}\``, ...(guarded === undefined ? {} : { guarded }) };
         });
+      // Locust's guard is not the mode: said apart, in what it stopped and why (0.717).
+      const guardedOnes = all.filter((entry) => entry.guarded !== undefined);
+      const refused = all.filter((entry) => entry.guarded === undefined);
+      const said: ReturnType<typeof diagnostic>[] = [];
+      if (guardedOnes.length > 0) said.push(diagnostic("warning", "claude.permission_denied", guardedSentence(guardedOnes), evidence));
       if (refused.length > 0) {
-        return [
+        said.push(
           diagnostic(
             "warning",
             "claude.permission_denied",
@@ -1324,9 +1371,9 @@ export function createClaudeEventNormalizer(
               : `Claude Code was not permitted to use ${String(refused.length)} tools, so it did not: ${refused.map((entry) => entry.text).join("; ")}. ${whyRefused(refused)}`,
             evidence,
           ),
-        ];
+        );
       }
-      return [];
+      return said;
     }
 
     return [diagnostic("info", "claude.unknown_event", `Unhandled Claude record: ${type}`, evidence)];

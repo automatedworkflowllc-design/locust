@@ -456,6 +456,13 @@ export interface RuntimeCommandOptions {
    */
   readonly permissionBridge?: { readonly configPath: string; readonly toolName: string };
   /**
+   * Locust's command guard (0.717): a settings file naming a PreToolUse hook
+   * that refuses ending a program BY NAME the person or another teammate runs
+   * -- a browser, Node, Locust. Sent in EVERY mode, Auto included: it asks
+   * nobody, it only refuses that. Claude Code only.
+   */
+  readonly commandGuard?: { readonly settingsPath: string };
+  /**
    * One of the runtime's own slash commands, typed by the person (0.427):
    * `opencode run --command <name>`, its arguments being what arrives on
    * stdin. MEASURED 2026-09-28 on 1.18.27 with the free Nemotron: `--command
@@ -929,6 +936,8 @@ export function createClaudePrintCommand(
      * granted by `--tools` -- so this is connectors only, which is the one
      * thing the mode was never able to govern.
      */
+    // No teammate ends the person's browser (0.717, main/command-guard.ts).
+    ...(options.commandGuard === undefined ? [] : ["--settings", requireText(options.commandGuard.settingsPath, "Command guard settings")]),
     ...(auto || options.permissionBridge === undefined
       ? []
       : [

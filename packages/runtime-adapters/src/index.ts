@@ -54,6 +54,8 @@ export {
   claudeToolBackgrounded,
   claudeToolTitle,
   createClaudeEventNormalizer,
+  guardedSentence,
+  LOCUST_GUARD_SAID,
   limitKindFor,
   resetsAtIso,
   runtimeCommandsFrom,
