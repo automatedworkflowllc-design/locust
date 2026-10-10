@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.729.0 - 2026-10-10
+
+### New
+
+- **Pin conversations to the top.** Right-click a conversation and choose Pin to top. Pinned conversations stay at the top of the sidebar under Pinned, newest first, with everything else under Recents. They stay pinned after Locust restarts. Unpin from the same menu.
+
 ## 0.728.0 - 2026-10-10
 
 ### Improved
