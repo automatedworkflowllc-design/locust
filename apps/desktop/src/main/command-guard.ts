@@ -14,16 +14,21 @@ import { join } from 'node:path'
  * Forward slashes: Windows takes them, and a backslash means something to a
  * shell. `--settings` applies under `--restricted` too (Claude Code's help), so
  * every mode gets it, Auto included.
+ *
+ * LOCUST_GUARD_PARENT (0.718) is this Locust's own process id: a process the
+ * run started descends from the agent Locust started for it, whose parent is
+ * Locust, and the guard ends only those by id.
  */
-export function commandGuardSettings(options: { readonly node: string; readonly guardPath: string }): string {
+export function commandGuardSettings(options: { readonly node: string; readonly guardPath: string; readonly parent: number }): string {
   const quoted = (path: string): string => `"${path.replace(/\\/g, '/').replace(/(["$`])/g, '\\$1')}"`
+  const parent = Number.isInteger(options.parent) && options.parent > 0 ? options.parent : 0
   return JSON.stringify(
     {
       hooks: {
         PreToolUse: [
           {
             matcher: 'Bash|PowerShell',
-            hooks: [{ type: 'command', command: `ELECTRON_RUN_AS_NODE=1 ${quoted(options.node)} ${quoted(options.guardPath)}`, timeout: 10 }]
+            hooks: [{ type: 'command', command: `ELECTRON_RUN_AS_NODE=1 LOCUST_GUARD_PARENT=${String(parent)} ${quoted(options.node)} ${quoted(options.guardPath)}`, timeout: 15 }]
           }
         ]
       }
@@ -34,7 +39,7 @@ export function commandGuardSettings(options: { readonly node: string; readonly 
 }
 
 /** Written once at start, in the profile; undefined if it could not be, and runs go without it. */
-export async function writeCommandGuard(folder: string, options: { readonly node: string; readonly guardPath: string }): Promise<string | undefined> {
+export async function writeCommandGuard(folder: string, options: { readonly node: string; readonly guardPath: string; readonly parent: number }): Promise<string | undefined> {
   try {
     await mkdir(folder, { recursive: true })
     const path = join(folder, 'command-guard.json')

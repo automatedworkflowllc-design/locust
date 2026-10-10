@@ -911,8 +911,44 @@ describe("a call Claude Code refused", () => {
       .filter((event) => event.type === "adapter.diagnostic")
       .map((event) => String(event.payload.message));
     expect(said).toEqual([
-      "Locust stopped Bash `taskkill //F //IM vivaldi.exe` before it ran: it would have ended every Vivaldi on this computer, your own windows too. Ending what the teammate started itself, by its process id, still works.",
+      "Locust stopped Bash `taskkill //F //IM vivaldi.exe` before it ran: it would have ended every Vivaldi on this computer, your own windows too. A teammate may end only what it started itself.",
     ]);
+  });
+
+  // 0.718: by id. The night after 0.717, refused by name, Fable ended the person's Chrome by the ids tasklist showed.
+  it("says an id it stopped as the person's program, which the teammate did not start", () => {
+    const reason = "Locust stopped this command before it ran: process 10544 is Chrome, which no teammate started, so it is the person's own. Leave it running. A test browser you start needs a profile of its own (--user-data-dir=<a new folder>), so it never meets theirs.";
+    const n = normalizer();
+    n.accept(record({ type: "stream_event", event: { type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "toolu_pid", name: "Bash" } } }));
+    n.accept(record({ type: "assistant", message: { id: "msg_p", content: [{ type: "tool_use", id: "toolu_pid", name: "Bash", input: { command: "taskkill //F //PID 10544" } }] } }));
+    const [done] = n.accept(record({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "toolu_pid", is_error: true, content: `PreToolUse:Bash hook error: ${reason}` }] } }));
+    expect(done).toMatchObject({ type: "tool.failed", payload: { status: "refused", output: reason } });
+    const said = n
+      .accept(record({ type: "result", subtype: "success", is_error: false, result: "ok", permission_denials: [{ tool_name: "Bash", tool_use_id: "toolu_pid", tool_input: { command: "taskkill //F //PID 10544" } }] }))
+      .filter((event) => event.type === "adapter.diagnostic")
+      .map((event) => String(event.payload.message));
+    expect(said).toEqual([
+      "Locust stopped Bash `taskkill //F //PID 10544` before it ran: process 10544 is Chrome, which no teammate started, so it is yours. A teammate may end only what it started itself.",
+    ]);
+  });
+
+  it("says another teammate's agent, and the teammate's own agent, as theirs", () => {
+    const sentence = (reason: string): string => {
+      const n = normalizer();
+      n.accept(record({ type: "stream_event", event: { type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "toolu_a", name: "Bash" } } }));
+      n.accept(record({ type: "assistant", message: { id: "msg_a", content: [{ type: "tool_use", id: "toolu_a", name: "Bash", input: { command: "taskkill //F //PID 8100" } }] } }));
+      n.accept(record({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "toolu_a", is_error: true, content: `PreToolUse:Bash hook error: ${reason}` }] } }));
+      return n
+        .accept(record({ type: "result", subtype: "success", is_error: false, result: "ok", permission_denials: [{ tool_name: "Bash", tool_use_id: "toolu_a", tool_input: { command: "taskkill //F //PID 8100" } }] }))
+        .filter((event) => event.type === "adapter.diagnostic")
+        .map((event) => String(event.payload.message))[0] ?? "";
+    };
+    expect(sentence("Locust stopped this command before it ran: process 8100 is an AI agent on Node, which this run did not start, so it is another teammate's or the person's. Leave it running.")).toBe(
+      "Locust stopped Bash `taskkill //F //PID 8100` before it ran: process 8100 is an AI agent on Node, which this teammate did not start, so it is another teammate's or yours. A teammate may end only what it started itself.",
+    );
+    expect(sentence("Locust stopped this command before it ran: process 8100 is the agent this run is, so it is not this run's to end. Leave it running.")).toBe(
+      "Locust stopped Bash `taskkill //F //PID 8100` before it ran: process 8100 is the agent this teammate runs on. A teammate may end only what it started itself.",
+    );
   });
 
   it("says the guard's and the mode's apart when a run met both", () => {
@@ -925,7 +961,7 @@ describe("a call Claude Code refused", () => {
       .accept(record({ type: "result", subtype: "success", is_error: false, result: "ok", permission_denials: [{ tool_name: "Bash", tool_input: { command: "pkill node" } }, { tool_name: "Bash", tool_use_id: "toolu_other", tool_input: { command: "node t.mjs" } }] }))
       .filter((event) => event.type === "adapter.diagnostic")
       .map((event) => String(event.payload.message));
-    expect(said[0]).toBe("Locust stopped Bash `pkill node` before it ran: it would have ended every Node on this computer, your own programs and other teammates' work too. Ending what the teammate started itself, by its process id, still works.");
+    expect(said[0]).toBe("Locust stopped Bash `pkill node` before it ran: it would have ended every Node on this computer, your own programs and other teammates' work too. A teammate may end only what it started itself.");
     expect(said[1]).toMatch(/^Claude Code was not permitted to use Bash `node t\.mjs`, so it did not\./);
   });
 });

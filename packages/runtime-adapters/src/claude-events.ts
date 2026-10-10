@@ -537,13 +537,26 @@ export const LOCUST_GUARD_SAID = "Locust stopped this command before it ran";
  * this mode", which was false (first drive, 2026-10-10).
  */
 export function guardedSentence(stopped: readonly { readonly text: string; readonly guarded?: string }[]): string {
-  const still = "Ending what the teammate started itself, by its process id, still works.";
+  const still = "A teammate may end only what it started itself.";
   if (stopped.length === 1) {
-    const match = /which ends every (.+?) on this computer, (.+?) too\./.exec(stopped[0]!.guarded ?? "");
+    const reason = stopped[0]!.guarded ?? "";
+    // By id (0.718): "process 10544 is Chrome, which no teammate started, so it is the person's own."
+    const byId = /process (\d+) is (.+?), which (no teammate started|this run did not start), so it is (.+?)\./.exec(reason);
+    if (byId !== null) {
+      const whose = byId[4]!.replace(/^the person's own$/, "yours").replace(/^the person's or another teammate's$/, "yours or another teammate's").replace(/^another teammate's or the person's$/, "another teammate's or yours");
+      const started = byId[3] === "no teammate started" ? "which no teammate started" : "which this teammate did not start";
+      return `Locust stopped ${stopped[0]!.text} before it ran: process ${byId[1]!} is ${byId[2]!}, ${started}, so it is ${whose}. ${still}`;
+    }
+    // Locust itself, or the agent the teammate runs on.
+    const own = /process (\d+) is (the agent this run is|Locust itself)/.exec(reason);
+    if (own !== null) {
+      return `Locust stopped ${stopped[0]!.text} before it ran: process ${own[1]!} is ${own[2] === "Locust itself" ? "Locust itself" : "the agent this teammate runs on"}. ${still}`;
+    }
+    const match = /which ends every (.+?) on this computer, (.+?) too\./.exec(reason);
     const ended = match === null ? "a program you, or another teammate, also run" : `every ${match[1]!} on this computer, ${match[2]!.replace(/^the person's own/, "your own")} too`;
     return `Locust stopped ${stopped[0]!.text} before it ran: it would have ended ${ended}. ${still}`;
   }
-  return `Locust stopped ${String(stopped.length)} commands before they ran: ${stopped.map((entry) => entry.text).join("; ")}. Each would have ended a program by name that you, or another teammate, also run. ${still}`;
+  return `Locust stopped ${String(stopped.length)} commands before they ran: ${stopped.map((entry) => entry.text).join("; ")}. Each would have ended a program that you, or another teammate, also run. ${still}`;
 }
 
 export function createClaudeEventNormalizer(

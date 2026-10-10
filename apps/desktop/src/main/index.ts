@@ -2136,7 +2136,9 @@ if (!ownsSingleInstanceLock) {
     // No teammate ends your browser (0.717): the hook every Claude Code run is given. Beside app.asar, as the bridge is.
     const commandGuardWritten = writeCommandGuard(app.getPath('userData'), {
       node: process.execPath,
-      guardPath: app.isPackaged ? join(process.resourcesPath, 'locust-command-guard.mjs') : join(__dirname, '../../resources/locust-command-guard.mjs')
+      guardPath: app.isPackaged ? join(process.resourcesPath, 'locust-command-guard.mjs') : join(__dirname, '../../resources/locust-command-guard.mjs'),
+      // 0.718: whose children the runs' agents are, so the guard can tell what a run started.
+      parent: process.pid
     })
 
     /*
