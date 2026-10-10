@@ -211,6 +211,7 @@ import { splitAttachments, withAttachments } from '../../shared/attachments.js'
 import { conversationKeys, heldFor, routineOf } from './conversationList.js'
 import { snoozeChoices } from './settled.js'
 import { PullRequestNewsBanner } from './components/PullRequestNewsBanner.js'
+import { ChangesPanel } from './components/ChangesPanel.js'
 import type { PullRequestNews } from '../../shared/pull-request.js'
 import type { SettledEntry } from './settled.js'
 import { collapseConversations, staleChecking, defaultEffort, defaultRoute, effortAfterRouteChange, routeAfterKeep, effortIsInModelId, modelFamily, listedAsMission, modeFacts, modeRunsOn, modesFor, modeUnavailableReason, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, runtimeReach, teammateStatusView, startRoute, freeStartStillFree, freeStartModel, nextFreeModel, integrationOf, ACCOUNT_DEFAULT_MODEL} from './status.js'
@@ -1853,6 +1854,8 @@ export default function App(): ReactElement {
   }, [])
   /** Review changes (0.439): the teammate whose own branch is open beside the thread. */
   const [reviewingId, setReviewingId] = useState<string>()
+  /** The folder's changes, in one panel beside the conversation (0.732, ChangesPanel.tsx). */
+  const [changesOpen, setChangesOpen] = useState(false)
   /*
    * The file open beside the conversation, if any.
    *
@@ -7490,7 +7493,7 @@ export default function App(): ReactElement {
    */
   return (
     <ApprovalRuleContext.Provider value={ruleOfCard}>
-    <div className={`lc-shell${layoutMode === 'compact' ? ' is-compact' : ''}${(viewingFile !== undefined || viewerRefusal !== undefined || besideRun !== undefined || reviewing !== undefined) && screen === 'workroom' ? ' has-viewer' :inspectorOpen && liveRun !== undefined && screen === 'workroom' ? ' has-inspector' : ''}`}>
+    <div className={`lc-shell${layoutMode === 'compact' ? ' is-compact' : ''}${changesOpen && screen === 'workroom' && viewingFile === undefined && viewerRefusal === undefined && besideRun === undefined && reviewing === undefined ? ' has-viewer has-changes' : ''}${(viewingFile !== undefined || viewerRefusal !== undefined || besideRun !== undefined || reviewing !== undefined) && screen === 'workroom' ? ' has-viewer' :inspectorOpen && liveRun !== undefined && screen === 'workroom' ? ' has-inspector' : ''}`}>
       <TitleBar
         // With no folder the composer chip already says so; the bar shows the
         // build instead (Colin, 2026-09-05).
@@ -8407,12 +8410,30 @@ export default function App(): ReactElement {
                       <Icon name="diff" size={13} /> Review changes
                     </button>
                   )}
+                  {/* The folder's changes, as Claude Code's Changes panel (0.732); a branch of a teammate's own has Review changes. */}
+                  {workspacePath !== undefined && pickedTeammate?.worktree !== true && (
+                    <button
+                      type="button"
+                      className={`lc-button${changesOpen ? ' is-active' : ''}`}
+                      aria-pressed={changesOpen}
+                      title="Every file this folder's branch changed, against where it left its base"
+                      onClick={() => {
+                        setReviewingId(undefined)
+                        setInspectorOpen(false)
+                        setChangesOpen(!changesOpen)
+                      }}
+                    >
+                      <Icon name="diff" size={13} /> Changes
+                    </button>
+                  )}
                   <button
                     type="button"
                     className={`lc-button${inspectorOpen ? ' is-active' : ''}`}
                     aria-pressed={inspectorOpen}
+                    title="Activity: what this conversation's runs did"
                     onClick={() => {
                       setReviewingId(undefined)
+                      setChangesOpen(false)
                       setInspectorOpen(!inspectorOpen)
                     }}
                   >
@@ -9148,6 +9169,8 @@ export default function App(): ReactElement {
             }}
             onClose={() => setBesideId(undefined)}
           />
+        ) : changesOpen && reviewing === undefined && screen === 'workroom' ? (
+          <ChangesPanel workspacePath={workspacePath} running={running} onClose={() => setChangesOpen(false)} />
         ) : reviewing !== undefined && screen === 'workroom' ? (
           <ReviewChanges
             key={reviewing.teammateId}

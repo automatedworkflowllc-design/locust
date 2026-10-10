@@ -20,6 +20,7 @@ import type { UsageRange, UsageSummary } from './usage.js'
 import type { ConnectorAddRequest, ConnectorAddResponse, ConnectorAgent } from './connector-add.js'
 import type { GithubAccount, GithubCliVersions, GithubInstallResult, GithubSignInCode, GithubSignInResult } from './github-account.js'
 import type { FolderPullRequest, PullRequestNews } from './pull-request.js'
+import type { FolderDiff } from './folder-diff.js'
 import type { OfficeDocument } from './office-document.js'
 import type { Workbook } from './sheet.js'
 import type { AboutYouSuggestion } from './about-you.js'
@@ -3675,6 +3676,8 @@ export interface DesktopApi {
   folderPullRequest(): Promise<FolderPullRequest | undefined>
   /** Watch the folder's pull request, or stop (0.731); answers whether it is watched now. */
   watchPullRequest(url: string, on: boolean): Promise<boolean>
+  /** The folder's changes against its base, or one of its branch's commits (0.732). */
+  folderDiff(sha?: string): Promise<FolderDiff>
   /** What changed about the watched pull request (0.731). */
   onPullRequestNews(listener: (news: PullRequestNews) => void): () => void
   /** Commit it all as the person, then push or open a pull request when asked. */

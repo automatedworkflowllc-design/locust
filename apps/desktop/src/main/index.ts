@@ -127,6 +127,7 @@ import { addConnector, removeConnector } from './connector-add.js'
 import { createGithubAccount } from './github-account.js'
 import { FOLDER_PULL_REQUEST_CHANNEL, PULL_REQUEST_NEWS_CHANNEL, PULL_REQUEST_WATCH_CHANNEL } from '../shared/pull-request.js'
 import { createPullRequestWatch } from './pull-request-watch.js'
+import { FOLDER_DIFF_CHANNEL } from '../shared/folder-diff.js'
 import { GITHUB_ACCOUNT_CHANNEL, GITHUB_CLI_VERSIONS_CHANNEL, GITHUB_INSTALL_CHANNEL, GITHUB_UPDATE_CHANNEL, GITHUB_SIGN_IN_CANCEL_CHANNEL, GITHUB_SIGN_IN_CHANNEL, GITHUB_SIGN_IN_CODE_CHANNEL } from '../shared/github-account.js'
 import type { AgentLaunch } from './connector-add.js'
 import { CONNECTOR_ADD_CHANNEL, CONNECTOR_REMOVE_CHANNEL, isConnectorAgent } from '../shared/connector-add.js'
@@ -2686,6 +2687,12 @@ if (!ownsSingleInstanceLock) {
     // The folder's pull request, for the header (0.720, shared/pull-request.ts): read with the person's own gh.
     ipcMain.handle(FOLDER_PULL_REQUEST_CHANNEL, (event) =>
       fromOwnWindow(event) ? folderCommits.pullRequest(workspacePath).catch(() => undefined) : undefined
+    )
+    // The folder's changes in one panel (0.732): the whole change, or one of the branch's commits.
+    ipcMain.handle(FOLDER_DIFF_CHANNEL, (event, sha: unknown) =>
+      fromOwnWindow(event) && (sha === undefined || (typeof sha === 'string' && /^[0-9a-f]{40,64}$/.test(sha)))
+        ? folderCommits.diff(workspacePath, sha as string | undefined).catch(() => ({ kind: 'none', why: 'not-a-repository' }) as const)
+        : ({ kind: 'none', why: 'not-a-repository' } as const)
     )
     /*
      * Watching the folder's pull request (0.731, pull-request-watch.ts): news goes to every window, and as a

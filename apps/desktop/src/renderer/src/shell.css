@@ -574,6 +574,8 @@ textarea {
   display: flex;
   align-items: center;
   gap: var(--lc-space-5);
+  /* A narrow middle (a panel open beside it, 0.732) cuts the name; it never runs under the buttons. */
+  overflow: hidden;
 }
 
 /*
@@ -604,6 +606,13 @@ textarea {
   font-size: var(--lc-text-teammate-name);
   font-weight: 500;
   color: var(--lc-text-name);
+  /*
+   * The name keeps its width, up to most of the line: in a narrow middle (0.732, a panel open beside it) it was
+   * the name that went first, down to its ellipsis, while the role kept all of its room. A long title still
+   * ellipsises at 60%, so the role is never squeezed out by one either.
+   */
+  flex: 0 0 auto;
+  max-width: 60%;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -614,9 +623,11 @@ textarea {
   font-size: var(--lc-text-description);
   color: var(--lc-text-muted);
   margin-left: var(--lc-space-4);
-  /* Never squeezed out by a long title: the title ellipsises, this does not. */
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* The model, and news (App.tsx). In the reading face, as the composer's route
@@ -7189,6 +7200,222 @@ textarea {
 .lc-githubmark {
   display: block;
   flex: none;
+}
+
+/*
+ * THE FOLDER'S CHANGES, IN ONE PANEL (0.732, ChangesPanel.tsx), as Claude Code's: the panel takes about half the
+ * window while it is open -- the shell widens the one width the workroom insets by, so the layout's own rule holds.
+ */
+.lc-shell.has-changes {
+  --lc-viewer-width: clamp(520px, 42vw, 900px);
+}
+/* The middle is narrow while it is open: its header's buttons say what they are by icon (their names stay, for
+   a screen reader and on hover), so the face and the name keep their room. The pull request keeps its number. */
+.lc-shell.has-changes .lc-workroom__actions > .lc-button:not(.lc-prchip):not(.lc-prwatch),
+.lc-shell.has-changes .lc-workroom__actions .lc-commitwrap > .lc-button {
+  font-size: 0;
+  gap: 0;
+}
+/* Its own scroll areas inside: the panel itself never scrolls or grows past the window. */
+.lc-changes {
+  min-width: 0;
+  overflow: hidden;
+}
+.lc-changes__head {
+  gap: var(--lc-space-2);
+}
+.lc-changes__branch {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--lc-text-secondary);
+  font-size: var(--lc-text-description);
+}
+.lc-changes__count {
+  flex: none;
+  font-size: var(--lc-text-description);
+}
+.lc-viewer__action.is-on {
+  color: var(--lc-text-primary);
+  background: var(--lc-bg-control);
+}
+.lc-changes__menuwrap {
+  position: relative;
+  display: inline-flex;
+}
+.lc-changes__menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 190px;
+  padding: 4px;
+  border: 1px solid var(--lc-border-hairline);
+  border-radius: var(--lc-radius-control);
+  background: var(--lc-bg-raised);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.lc-changes__menuitem {
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--lc-radius-control);
+  background: transparent;
+  color: var(--lc-text-secondary);
+  font: inherit;
+  font-size: var(--lc-text-description);
+  text-align: left;
+  cursor: pointer;
+}
+.lc-changes__menuitem:hover,
+.lc-changes__menuitem:focus-visible {
+  background: var(--lc-bg-control);
+  color: var(--lc-text-primary);
+}
+.lc-changes__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.lc-changes__note {
+  margin: var(--lc-space-5);
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-description);
+}
+.lc-changes__side {
+  flex: none;
+  width: 190px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--lc-border-hairline);
+}
+.lc-changes__tree {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--lc-space-2) 0;
+}
+.lc-changes__treefolder,
+.lc-changes__treefile {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding-top: 3px;
+  padding-bottom: 3px;
+  padding-right: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--lc-text-secondary);
+  font: inherit;
+  font-size: var(--lc-text-description);
+  text-align: left;
+  cursor: pointer;
+}
+.lc-changes__treefolder:hover,
+.lc-changes__treefile:hover {
+  background: var(--lc-hover-surface);
+}
+.lc-changes__treename {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lc-changes__treecount {
+  flex: none;
+  font-size: 11px;
+}
+.lc-changes__commits {
+  flex: none;
+  max-height: 40%;
+  overflow-y: auto;
+  border-top: 1px solid var(--lc-border-hairline);
+  padding-bottom: var(--lc-space-2);
+}
+.lc-changes__commitshead {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 10px;
+  color: var(--lc-text-muted);
+  font-size: var(--lc-text-description);
+}
+.lc-changes__commit {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  padding: 5px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--lc-text-secondary);
+  font: inherit;
+  font-size: var(--lc-text-description);
+  text-align: left;
+  cursor: pointer;
+}
+.lc-changes__commit:hover {
+  background: var(--lc-hover-surface);
+}
+.lc-changes__commit.is-active {
+  background: var(--lc-bg-control);
+  color: var(--lc-text-primary);
+}
+.lc-changes__commitsubject {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lc-changes__commitmeta {
+  font-size: 11px;
+  color: var(--lc-text-muted);
+}
+.lc-changes__diffs {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+}
+.lc-changes__file + .lc-changes__file {
+  border-top: 1px solid var(--lc-border-hairline);
+}
+.lc-changes__filehead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  border-bottom: 1px solid var(--lc-border-hairline);
+  background: var(--lc-bg-chrome);
+  color: var(--lc-text-primary);
+  font: inherit;
+  font-size: var(--lc-text-description);
+  text-align: left;
+  cursor: pointer;
+}
+.lc-changes__filename {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.lc-changes__filedir {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--lc-text-muted);
+  font-size: 11px;
+}
+.lc-changes__filecount {
+  margin-left: auto;
+  flex: none;
+  font-size: 11px;
 }
 
 /* The watched pull request's news, above the box (0.731, PullRequestNewsBanner.tsx). */

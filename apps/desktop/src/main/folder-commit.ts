@@ -8,6 +8,7 @@ import type { ChangeStatus, CommitResult, CommitThen, FolderChanges, FolderRemot
 import { blockedSentence } from '../shared/folder-commit.js'
 import { githubRepoOf } from './cloud-tasks.js'
 import { PULL_REQUEST_FIELDS, pullRequestOf, type FolderPullRequest } from '../shared/pull-request.js'
+import { FOLDER_DIFF_MAX_BYTES, FOLDER_DIFF_MAX_NEW_FILE_BYTES, FOLDER_DIFF_MAX_NEW_FILES, type FolderCommitRow, type FolderDiff } from '../shared/folder-diff.js'
 
 /**
  * COMMIT, PUSH, PULL REQUEST (0.680): the folder's changes, saved in git by
@@ -272,7 +273,66 @@ export function createFolderCommits(options: FolderCommitOptions = {}) {
     pullRequests.clear()
   }
 
-  return { changes, commit, forgetSignIn, pullRequest }
+  /**
+   * The folder's changes against where its branch left the base (shared/folder-diff.ts, 0.732): committed and
+   * uncommitted together, new files whole, and the branch's commits -- or one commit alone, by its sha.
+   */
+  const diff = async (folder: string, sha?: string): Promise<FolderDiff> => {
+    const inside = (await runGit(['rev-parse', '--is-inside-work-tree'], folder).catch(() => '')).trim()
+    if (inside !== 'true') return { kind: 'none', why: 'not-a-repository' }
+    const top = (await runGit(['rev-parse', '--show-toplevel'], folder).catch(() => '')).trim()
+    const norm = (path: string): string => path.replace(/[\\/]+/g, '/').replace(/\/$/, '').toLowerCase()
+    if (top.length === 0 || norm(top) !== norm(folder)) return { kind: 'none', why: 'not-a-repository' }
+    const branch = (await runGit(['symbolic-ref', '--short', '-q', 'HEAD'], folder).catch(() => '')).trim() || 'HEAD'
+    const remote = branch === 'HEAD' ? undefined : await remoteOf(folder, branch)
+    const defaultBranch = remote?.defaultBranch ?? 'main'
+    // The base the branch came from: origin's default branch, else the local one; on it, the last commit.
+    let base = 'HEAD'
+    let since = 'HEAD'
+    if (branch !== defaultBranch) {
+      for (const ref of [`refs/remotes/origin/${defaultBranch}`, `refs/heads/${defaultBranch}`]) {
+        const found = (await runGit(['merge-base', 'HEAD', ref], folder).catch(() => '')).trim()
+        if (/^[0-9a-f]{40,64}$/.test(found)) {
+          base = defaultBranch
+          since = found
+          break
+        }
+      }
+    }
+    const logged = since === 'HEAD' ? '' : await runGit(['log', '--max-count=100', '--format=%H%x1f%h%x1f%s%x1f%an%x1f%cI', `${since}..HEAD`], folder).catch(() => '')
+    const commits: FolderCommitRow[] = logged
+      .split('\n')
+      .map((line) => line.split('\x1f'))
+      .filter((parts) => parts.length === 5 && /^[0-9a-f]{40,64}$/.test(parts[0]!))
+      .map(([full, short, subject, author, at]) => ({ sha: full!, short: short!, subject: subject!.slice(0, 200), author: author!.slice(0, 100), at: at! }))
+    // What git printed, even past its buffer or with the exit 1 `--no-index` gives for a difference.
+    const printed = (args: readonly string[]): Promise<string> =>
+      runGit(args, folder).catch((error: unknown) => String((error as { stdout?: unknown }).stdout ?? ''))
+    let text: string
+    if (sha !== undefined) {
+      if (!commits.some((row) => row.sha === sha)) return { kind: 'none', why: 'clean' }
+      text = await printed(['show', '--format=', '--no-color', '--no-ext-diff', '-M', sha, ...NOT_LOCUST])
+    } else {
+      text = await printed(['diff', '--no-color', '--no-ext-diff', '-M', since, ...NOT_LOCUST])
+      // New files are not in `git diff`; each is shown whole, as an addition, the index untouched.
+      const untracked = (await runGit(['ls-files', '--others', '--exclude-standard', '-z', ...NOT_LOCUST], folder).catch(() => ''))
+        .split('\0')
+        .filter((path) => path.length > 0)
+        .slice(0, FOLDER_DIFF_MAX_NEW_FILES)
+      for (const path of untracked) {
+        if (text.length >= FOLDER_DIFF_MAX_BYTES) break
+        const size = await stat(join(folder, path)).then((info) => info.size, () => Infinity)
+        if (size > FOLDER_DIFF_MAX_NEW_FILE_BYTES) continue
+        const added = await printed(['diff', '--no-color', '--no-ext-diff', '--no-index', '--', '/dev/null', path])
+        text += added.endsWith('\n') || added.length === 0 ? added : `${added}\n`
+      }
+    }
+    if (text.trim().length === 0 && commits.length === 0) return { kind: 'none', why: 'clean' }
+    const truncated = text.length > FOLDER_DIFF_MAX_BYTES
+    return { kind: 'diff', base, branch, text: truncated ? text.slice(0, text.lastIndexOf('\ndiff --git ', FOLDER_DIFF_MAX_BYTES) + 1 || FOLDER_DIFF_MAX_BYTES) : text, truncated, commits, showing: sha ?? 'all' }
+  }
+
+  return { changes, commit, diff, forgetSignIn, pullRequest }
 }
 
 export type FolderCommits = ReturnType<typeof createFolderCommits>

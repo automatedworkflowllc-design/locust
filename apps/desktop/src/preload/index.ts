@@ -23,6 +23,8 @@ import { GITHUB_ACCOUNT_CHANNEL, GITHUB_CLI_VERSIONS_CHANNEL, GITHUB_INSTALL_CHA
 import type { GithubAccount, GithubCliVersions, GithubInstallResult, GithubSignInCode, GithubSignInResult } from '../shared/github-account.js'
 import { FOLDER_PULL_REQUEST_CHANNEL, PULL_REQUEST_NEWS_CHANNEL, PULL_REQUEST_WATCH_CHANNEL } from '../shared/pull-request.js'
 import type { PullRequestNews } from '../shared/pull-request.js'
+import { FOLDER_DIFF_CHANNEL } from '../shared/folder-diff.js'
+import type { FolderDiff } from '../shared/folder-diff.js'
 import type { FolderPullRequest } from '../shared/pull-request.js'
 import {
   CODEX_MISSION_CANCEL_CHANNEL,
@@ -587,6 +589,7 @@ const desktopApi: DesktopApi = {
   folderChanges: () => ipcRenderer.invoke(FOLDER_CHANGES_CHANNEL) as Promise<FolderChanges>,
   folderPullRequest: () => ipcRenderer.invoke(FOLDER_PULL_REQUEST_CHANNEL) as Promise<FolderPullRequest | undefined>,
   watchPullRequest: (url: string, on: boolean) => ipcRenderer.invoke(PULL_REQUEST_WATCH_CHANNEL, url, on) as Promise<boolean>,
+  folderDiff: (sha?: string) => ipcRenderer.invoke(FOLDER_DIFF_CHANNEL, sha) as Promise<FolderDiff>,
   onPullRequestNews: (listener: (news: PullRequestNews) => void) => {
     const handler = (_event: unknown, news: PullRequestNews): void => listener(news)
     ipcRenderer.on(PULL_REQUEST_NEWS_CHANNEL, handler)
