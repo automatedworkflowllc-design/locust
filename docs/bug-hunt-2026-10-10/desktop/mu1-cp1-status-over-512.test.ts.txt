@@ -1,0 +1,73 @@
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+
+import { createFileMissionLedger } from "@teammate/mission-store";
+import type { MissionLedgerMetadata } from "@teammate/mission-store";
+import type { NormalizedRuntimeEvent } from "@teammate/runtime-adapters";
+import { createCopilotEventNormalizer } from "../../../packages/runtime-adapters/src/copilot-events.js";
+import { createMuseEventNormalizer } from "../../../packages/runtime-adapters/src/muse-events.js";
+
+/*
+ * MU1 / CP1. A failed task's reason (Muse) or a failed tool's error message
+ * (Copilot) goes into `status` unbounded; the ledger reader caps status at
+ * 512, so the writer refuses the event and the host ends the run.
+ */
+const NOW = "2026-09-21T18:03:00.000Z";
+const TASK = "01a0c5fe-9999-7000-8000-000000000001";
+
+function museRecord(payloadType: string, payload: Record<string, unknown>, sequence: number) {
+  return {
+    sequence,
+    raw: JSON.stringify({
+      schema_version: 1, id: `018f0000-0000-7000-8000-0000000000${String(sequence).padStart(2, "0")}`,
+      stream: { kind: "session", id: "01a0c5fe-68c8-7903-b6db-0d3c9021bfa6" }, sequence, recorded_at: 1780531400000000 + sequence,
+      record_type: "event", durability: "durable", causation_id: "2dcba620-64bd-4fb8-93b6-c0f0af3d116b",
+      payload_type: payloadType, payload_schema_version: 1, payload,
+    }),
+  };
+}
+const lifecycle = (kind: string, extra: Record<string, unknown>, sequence: number) =>
+  museRecord(`task.lifecycle.${kind}`, { kind: "task_lifecycle", task_id: TASK, event: { kind, task_id: TASK, ...extra } }, sequence);
+
+async function ledgerAccepts(runtime: "muse" | "copilot", events: readonly NormalizedRuntimeEvent[]): Promise<void> {
+  const root = await mkdtemp(join(tmpdir(), "hunt-status-"));
+  const ledger = createFileMissionLedger({ rootDirectory: root });
+  await ledger.createMission({
+    missionId: "mission_1", runId: "run_1", prompt: "Run the probe.", runtime, model: "default", requestedRouteId: runtime,
+    resolvedRouteId: `${runtime}:default`, cliVersion: null, workspaceId: "ws_1", sandbox: "workspace-write", executionPolicyVersion: 1, createdAt: NOW,
+  } as MissionLedgerMetadata);
+  const base = { runId: "run_1", missionId: "mission_1", sourceAdapter: runtime, runtimeThreadId: "thread_1" };
+  const started = { ...base, id: "run_1:0", sequence: 1, occurredAt: NOW, type: "run.started", payload: { runtimeThreadId: "thread_1", evidence: { redacted: true } } };
+  const renumbered = events.map((event, index) => ({ ...event, sequence: index + 2, id: `run_1:${String(index + 2)}` }));
+  await ledger.appendEvents("mission_1", [started, ...renumbered] as unknown as NormalizedRuntimeEvent[]);
+}
+
+describe("MU1: a Muse task that failed with a long reason", () => {
+  it("is a row the ledger can keep", async () => {
+    const muse = createMuseEventNormalizer({ runId: "run_1", missionId: "mission_1", cliVersion: "1.3.0", now: () => new Date(NOW) });
+    const events = [
+      ...muse.accept(lifecycle("proposed", { task_kind: "tool.shell.command" }, 1)),
+      ...muse.accept(lifecycle("started", {}, 2)),
+      ...muse.accept(lifecycle("failed", { reason: "x".repeat(600) }, 3)),
+    ];
+    expect(events.some((event) => event.type === "tool.failed")).toBe(true);
+    await expect(ledgerAccepts("muse", events.filter((event) => event.type.startsWith("tool.")))).resolves.toBeUndefined();
+  });
+});
+
+describe("CP1: a Copilot tool that failed with a long message and no code", () => {
+  it("is a row the ledger can keep", async () => {
+    const copilot = createCopilotEventNormalizer({ runId: "run_1", missionId: "mission_1", cliVersion: "1.0.83", sessionId: "11111111-2222-3333-4444-555555555555", now: () => new Date(NOW) });
+    const lines = [
+      { type: "session.auto_mode_resolved", data: { chosenModel: "m", availableModels: ["m"] } },
+      { type: "tool.execution_start", data: { toolCallId: "t1", toolName: "powershell", arguments: { command: "ls" } } },
+      { type: "tool.execution_complete", data: { toolCallId: "t1", success: false, error: { message: "y".repeat(600) } } },
+    ];
+    const events: NormalizedRuntimeEvent[] = [];
+    lines.forEach((line, index) => events.push(...copilot.accept({ sequence: index + 1, raw: JSON.stringify(line) })));
+    expect(events.some((event) => event.type === "tool.failed")).toBe(true);
+    await expect(ledgerAccepts("copilot", events.filter((event) => event.type.startsWith("tool.")))).resolves.toBeUndefined();
+  });
+});

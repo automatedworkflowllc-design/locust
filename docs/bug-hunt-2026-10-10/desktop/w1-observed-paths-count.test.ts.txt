@@ -1,0 +1,35 @@
+import { mkdtemp } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { describe, expect, it } from 'vitest'
+
+import { createFileWorkroom } from '@teammate/mission-store'
+
+/*
+ * W1. post() lists the VALID observed paths (up to 40) but counts the tail
+ * from the raw input length, so dropped (over-long) entries skew the count.
+ */
+describe('W1: the +N more tail on observed paths', () => {
+  it('counts what was not listed', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'hunt-w1-'))
+    const workroom = createFileWorkroom({ rootDirectory: root })
+    const valid = Array.from({ length: 35 }, (_, i) => `src/file-${String(i)}.ts`)
+    const tooLong = Array.from({ length: 10 }, (_, i) => `${'x'.repeat(310)}/long-${String(i)}.ts`)
+    await workroom.post({
+      from: { teammateId: 'tm_wren', name: 'Wren', missionId: 'mission_1' },
+      to: { teammateId: 'tm_booty', name: 'Booty' },
+      text: 'Done.',
+      observed: [...valid, ...tooLong]
+    })
+    const [message] = (await workroom.read()).messages
+    const observed = message?.observed ?? []
+    const tail = /^\+(\d+) more$/.exec(observed.at(-1) ?? '')
+    const listed = tail === null ? observed.length : observed.length - 1
+    const counted = tail === null ? 0 : Number(tail[1])
+    // 35 valid paths fit under the cap of 40, so either nothing is "more"
+    // (the over-long ones were never paths) or the 10 dropped ones are.
+    // "+5 more" (45 given minus the cap) is neither.
+    expect(listed).toBe(35)
+    expect([0, 10]).toContain(counted)
+  })
+})

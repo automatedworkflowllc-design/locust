@@ -1,0 +1,39 @@
+import { EventEmitter } from "node:events";
+import { describe, expect, it } from "vitest";
+
+import { createNodeRuntimeProcessRunner } from "../src/process-runner.js";
+import type { SpawnedRuntimeProcess } from "../src/process-runner.js";
+
+/*
+ * PR1. An oversized line with no newline yet is given up on and the rest of
+ * it is to be skipped at its newline; finish() emits the remainder without
+ * checking that flag, so a process that ends mid-line hands the adapter the
+ * line's tail as a record.
+ */
+function child() {
+  const stdout = new EventEmitter();
+  const stderr = new EventEmitter();
+  const stdin = Object.assign(new EventEmitter(), {
+    write: (_value: string, callback?: (error?: Error | null) => void) => { callback?.(); return true; },
+    end: () => undefined,
+  });
+  const process = Object.assign(new EventEmitter(), { stdin, stdout, stderr, kill: () => true });
+  return { process: process as unknown as SpawnedRuntimeProcess, stdout, close: (code: number) => process.emit("close", code, null) };
+}
+
+describe("PR1: a process that ends in the middle of an oversized line", () => {
+  it("hands the adapter no fragment of that line", async () => {
+    const fake = child();
+    const run = createNodeRuntimeProcessRunner({ spawnProcess: () => fake.process }).start(
+      { runtime: "claude", executablePath: "/tools/claude", args: ["-p"], cwd: "/work", stdin: "prompt", stdout: "jsonl" },
+      "hello",
+    );
+    fake.stdout.emit("data", '{"type":"assistant","text":"' + "a".repeat(300_000));
+    fake.stdout.emit("data", "b".repeat(100));
+    fake.close(0);
+    const raw: string[] = [];
+    for await (const record of run.records) raw.push(record.raw);
+    await run.completion;
+    expect(raw.filter((line) => line.includes("bbbb"))).toEqual([]);
+  });
+});

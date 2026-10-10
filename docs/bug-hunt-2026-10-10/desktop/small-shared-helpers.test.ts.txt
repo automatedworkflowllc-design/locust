@@ -1,0 +1,43 @@
+import { describe, expect, it } from 'vitest'
+
+import { rowNamedByPost } from '../src/shared/room-task.js'
+import { slotPassedDuring } from '../src/shared/routine-schedule.js'
+import { compareVersions } from '../src/main/runtime-updates.js'
+import { citedPaths } from '../src/shared/memory.js'
+import { decideByRules } from '../src/shared/approval-rules.js'
+
+describe('RT1: a post that quotes an open row', () => {
+  it('claims the row when the row text has punctuation', () => {
+    const tasks = [{ taskId: 't1', text: 'Fix the sign-in bug', state: 'open' }]
+    expect(rowNamedByPost('Wren, start Fix the sign-in bug', tasks)).toBe('t1')
+  })
+})
+
+describe('RS1: a daily time that passed while a run crossed midnight', () => {
+  it('is recorded as the slot that passed', () => {
+    const started = new Date(2026, 9, 1, 23, 0).toISOString()
+    const ended = new Date(2026, 9, 2, 0, 30)
+    const passed = slotPassedDuring({ kind: 'daily', at: '23:30' }, started, ended)
+    expect(passed?.getTime()).toBe(new Date(2026, 9, 1, 23, 30).getTime())
+  })
+})
+
+describe('RU2: prerelease versions', () => {
+  it('compares numerically within a prerelease tag', () => {
+    expect(compareVersions('0.158.0-alpha.10', '0.158.0-alpha.9')).toBeGreaterThan(0)
+  })
+})
+
+describe('M1: a memory naming a Windows path', () => {
+  it('cites the path so it can be checked for staleness', () => {
+    expect(citedPaths('see C:\\proj\\src\\net.ts for the fix')).toContain('C:\\proj\\src\\net.ts')
+  })
+})
+
+describe('AR1: a saved path rule off Windows', () => {
+  it.skipIf(process.platform === 'win32')('does not allow a folder that differs only in case', () => {
+    const rule = { ruleId: 'r1', effect: 'allow' as const, kind: 'edit' as const, pattern: 'src/**', folder: '/work', createdAt: '2026-10-01T00:00:00.000Z' }
+    const verdict = decideByRules({ kind: 'edit', paths: ['/work/SRC/x.ts'] }, [rule], { folder: '/work' })
+    expect(verdict.decision).toBe('ask')
+  })
+})

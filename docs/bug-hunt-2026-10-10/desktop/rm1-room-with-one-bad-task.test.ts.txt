@@ -1,0 +1,29 @@
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { describe, expect, it } from 'vitest'
+
+import { createRoomStore } from '../src/main/room-store.js'
+
+/*
+ * RM1. One task (or post) this build cannot read makes parsedRoom drop the
+ * WHOLE room; the next write persists the file without it.
+ */
+describe('RM1: a room holding one task this build cannot read', () => {
+  it('survives the creation of another room', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'hunt-rm1-'))
+    await mkdir(root, { recursive: true })
+    const stored = {
+      schemaVersion: 1,
+      rooms: [{
+        roomId: 'room_first', name: 'First', teammateIds: ['tm_a'], createdAt: '2026-10-01T00:00:00.000Z', posts: [],
+        tasks: [{ taskId: 'task_1', text: 'Do it', state: 'blocked', at: '2026-10-01T00:00:00.000Z' }]
+      }]
+    }
+    await writeFile(join(root, 'rooms.json'), JSON.stringify(stored, null, 2))
+    const store = createRoomStore({ rootDirectory: root })
+    await store.create({ name: 'Second', teammateIds: ['tm_a'] })
+    const after = JSON.parse(await readFile(join(root, 'rooms.json'), 'utf8')) as { rooms: { roomId: string }[] }
+    expect(after.rooms.map((room) => room.roomId)).toContain('room_first')
+  })
+})

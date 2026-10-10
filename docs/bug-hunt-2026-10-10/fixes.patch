@@ -1,0 +1,527 @@
+diff --git a/apps/desktop/src/main/antigravity-mission.ts b/apps/desktop/src/main/antigravity-mission.ts
+index dd7589b84..74fdfd5a0 100644
+--- a/apps/desktop/src/main/antigravity-mission.ts
++++ b/apps/desktop/src/main/antigravity-mission.ts
+@@ -618,7 +618,7 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
+       const info = await statTranscript(run.transcriptPath)
+       const unmoved = info !== undefined && run.seen !== undefined && info.size === run.seen.size && info.mtimeMs === run.seen.mtimeMs
+       const text = unmoved ? undefined : await readTranscript(run.transcriptPath)
+-      if (!unmoved) run.seen = info
++      if (!unmoved && text !== undefined) run.seen = info
+       const lines = text === undefined ? [] : text.split('\n').filter((line) => line.trim().length > 0)
+       let fresh: readonly NormalizedRuntimeEvent[] = []
+       const read: NormalizedRuntimeEvent[] = []
+diff --git a/apps/desktop/src/main/claude-background.ts b/apps/desktop/src/main/claude-background.ts
+index 5eaf9926d..be218f8e4 100644
+--- a/apps/desktop/src/main/claude-background.ts
++++ b/apps/desktop/src/main/claude-background.ts
+@@ -175,9 +175,11 @@ export function createBackgroundWatch(options: {
+   const setTimer = options.setTimer ?? ((run, ms) => setTimeout(run, ms))
+   const clearTimer = options.clearTimer ?? ((handle) => clearTimeout(handle as ReturnType<typeof setTimeout>))
+   let timer: unknown
++  let ticking = false
+   let last = ''
+   const tick = async (): Promise<void> => {
+     timer = undefined
++    ticking = true
+     const all = await options.list().catch(() => undefined)
+     if (all !== undefined) {
+       const ours = all.filter((agent) => watched.has(agent.id))
+@@ -191,13 +193,14 @@ export function createBackgroundWatch(options: {
+         options.onChange(seen)
+       }
+     }
++    ticking = false
+     if (watched.size > 0) timer = setTimer(() => void tick(), intervalMs)
+   }
+   return {
+     /** Start (or keep) watching these ids. */
+     watch(ids: readonly string[]): void {
+       for (const id of ids) watched.add(id)
+-      if (watched.size > 0 && timer === undefined) timer = setTimer(() => void tick(), 0)
++      if (watched.size > 0 && timer === undefined && !ticking) timer = setTimer(() => void tick(), 0)
+     },
+     watching(): readonly string[] {
+       return [...watched]
+diff --git a/apps/desktop/src/main/codex-mission.ts b/apps/desktop/src/main/codex-mission.ts
+index cdfa7a9f0..b876461c5 100644
+--- a/apps/desktop/src/main/codex-mission.ts
++++ b/apps/desktop/src/main/codex-mission.ts
+@@ -2024,7 +2024,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions):
+             // The prompt and the session travel over the protocol, not the argv.
+             return createCopilotAcpCommand(executable, {
+               workspacePath: runCwd,
+-              ...(chosenModel === undefined || chosenModel === 'auto' ? {} : { model: chosenModel })
++              ...(chosenModel === undefined || chosenModel === 'auto' ? {} : { model: chosenModel }),
++              ...(chosenEffort === undefined ? {} : { effort: chosenEffort })
+             })
+           }
+           if (runtime === 'copilot') {
+@@ -2033,6 +2034,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions):
+               sandbox: effectiveSandbox,
+               prompt: promptText,
+               ...(chosenModel === undefined || chosenModel === 'auto' ? {} : { model: chosenModel }),
++              ...(chosenEffort === undefined ? {} : { effort: chosenEffort }),
+               ...(resumeThreadId === undefined ? { sessionId: copilotSessionId } : { resumeThreadId })
+             })
+           }
+diff --git a/apps/desktop/src/main/edit-check.ts b/apps/desktop/src/main/edit-check.ts
+index 6f08e4865..5d4302308 100644
+--- a/apps/desktop/src/main/edit-check.ts
++++ b/apps/desktop/src/main/edit-check.ts
+@@ -45,10 +45,11 @@ export function runCheckCommand(command: string, cwd: string, timeoutMs = CHECK_
+     let output = ''
+     let timedOut = false
+     let settled = false
++    let timer: ReturnType<typeof setTimeout> | undefined
+     const done = (run: CheckRun): void => {
+       if (settled) return
+       settled = true
+-      clearTimeout(timer)
++      if (timer !== undefined) clearTimeout(timer)
+       resolve(run)
+     }
+     let child: ReturnType<typeof spawn>
+@@ -66,7 +67,7 @@ export function runCheckCommand(command: string, cwd: string, timeoutMs = CHECK_
+     child.stderr?.on('data', take)
+     child.on('error', (error) => done({ exitCode: null, output, timedOut, error: error.message }))
+     child.on('close', (code) => done({ exitCode: code, output, timedOut }))
+-    const timer = setTimeout(() => {
++    timer = setTimeout(() => {
+       timedOut = true
+       // The whole tree: a test runner's workers outlive its shell.
+       void releaseProcessTree(child.pid).then((released) => {
+diff --git a/apps/desktop/src/main/mission-export.ts b/apps/desktop/src/main/mission-export.ts
+index 2e7d3781d..81a73ce4e 100644
+--- a/apps/desktop/src/main/mission-export.ts
++++ b/apps/desktop/src/main/mission-export.ts
+@@ -558,7 +558,15 @@ export function missionRecordMarkdown(source: RecordSource): string {
+   })
+   out.push('')
+   turns.forEach((turn) => out.push(turn, ''))
+-  return `${out.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd()}\n`
++  return `${collapseOutsideFences(out.join('\n')).trimEnd()}\n`
++}
++
++/** Runs of blank lines are collapsed between blocks, never inside a fence, where output is as recorded. */
++function collapseOutsideFences(text: string): string {
++  return text
++    .split(/(^`{3,}[^\n]*\n[\s\S]*?\n`{3,}$)/m)
++    .map((piece, index) => (index % 2 === 1 ? piece : piece.replace(/\n{3,}/g, '\n\n')))
++    .join('')
+ }
+ 
+ /** The events exactly as the ledger holds them, for the person who wants to check the Markdown against them. */
+diff --git a/apps/desktop/src/main/office-text.ts b/apps/desktop/src/main/office-text.ts
+index 60e3932a4..81626202d 100644
+--- a/apps/desktop/src/main/office-text.ts
++++ b/apps/desktop/src/main/office-text.ts
+@@ -48,7 +48,7 @@ function wordChildren(xml: string): { readonly kind: 'p' | 'tbl'; readonly xml:
+ function wordParagraphText(paragraph: string): string {
+   const runs = paragraph.replace(/<w:pPr\b[\s\S]*?<\/w:pPr>/g, '')
+   let text = ''
+-  for (const match of runs.matchAll(/<w:t\b[^>]*>([\s\S]*?)<\/w:t>|<w:t\b[^>]*\/>|<w:(tab|br|cr)\b[^>]*\/>/g)) {
++  for (const match of runs.matchAll(/<w:t\b[^>]*\/>|<w:t\b[^>]*>([\s\S]*?)<\/w:t>|<w:(tab|br|cr)\b[^>]*\/>/g)) {
+     if (match[2] === 'tab') text += '\t'
+     else if (match[2] !== undefined) text += '\n'
+     else text += decodeXml(match[1] ?? '')
+@@ -123,7 +123,7 @@ export function readDocx(bytes: Buffer): OfficeDocument {
+ /** A PowerPoint paragraph's words: runs and line breaks. */
+ function slideParagraphText(paragraph: string): string {
+   let text = ''
+-  for (const match of paragraph.matchAll(/<a:t\b[^>]*>([\s\S]*?)<\/a:t>|<a:br\b[^>]*\/?>/g)) {
++  for (const match of paragraph.matchAll(/<a:t\b[^>]*\/>|<a:t\b[^>]*>([\s\S]*?)<\/a:t>|<a:br\b[^>]*\/?>/g)) {
+     text += match[1] === undefined ? ' ' : decodeXml(match[1])
+   }
+   return text.replace(/\s+/g, ' ').trim()
+diff --git a/apps/desktop/src/main/relay.ts b/apps/desktop/src/main/relay.ts
+index b4c55a90f..0008e11c5 100644
+--- a/apps/desktop/src/main/relay.ts
++++ b/apps/desktop/src/main/relay.ts
+@@ -736,6 +736,9 @@ export function createRelay(options: RelayOptions): Relay {
+    * run that had already been told everything.
+    */
+   const deferred = new Map<string, DeferredReply>()
++  /** Further threads waiting on the same held reply, by recipient; their exchanges ride with it once it starts. */
++  const alsoAsking = new Map<string, OpenExchange[]>()
++  const extraExchanges = new Map<string, OpenExchange[]>()
+ 
+   const notify = (runId: string, missionId: string, message: string, level: 'info' | 'warning' = 'warning'): void => {
+     options.notify({ kind: 'relay-notice', runId, missionId, message, level })
+@@ -1025,7 +1028,12 @@ export function createRelay(options: RelayOptions): Relay {
+    */
+   const defer = (entry: DeferredReply, pool = false): void => {
+     const teammateId = entry.recipient.self.teammateId
+-    if (deferred.has(teammateId)) return
++    if (deferred.has(teammateId)) {
++      // Said once per held reply (relay.test.ts pins that); the later thread's
++      // exchange still rides with it, so silence afterwards is reported to it.
++      if (entry.exchange !== undefined) alsoAsking.set(teammateId, [...(alsoAsking.get(teammateId) ?? []), entry.exchange])
++      return
++    }
+     deferred.set(teammateId, entry)
+     entry.notice(
+       pool
+@@ -1104,6 +1112,11 @@ export function createRelay(options: RelayOptions): Relay {
+       return
+     }
+     if (outcome.kind === 'started' && entry.exchange !== undefined) exchanges.set(outcome.missionId, entry.exchange)
++    if (outcome.kind === 'started') {
++      const extra = alsoAsking.get(teammateId)
++      alsoAsking.delete(teammateId)
++      if (extra !== undefined && extra.length > 0) extraExchanges.set(outcome.missionId, extra)
++    }
+   }
+ 
+   /** The asker's next turn, once, briefed with everyone's reply. */
+@@ -1398,17 +1411,19 @@ export function createRelay(options: RelayOptions): Relay {
+       // rather than being left to conclude the message never arrived.
+       const exchange = exchanges.get(mission.missionId)
+       exchanges.delete(mission.missionId)
++      const extra = extraExchanges.get(mission.missionId) ?? []
++      extraExchanges.delete(mission.missionId)
+       const ended = options.howEnded === undefined ? undefined : await options.howEnded(mission.missionId).catch(() => undefined)
+-      if (exchange !== undefined) {
++      for (const each of [...(exchange === undefined ? [] : [exchange]), ...extra]) {
+         // Only a run that completed has an answer to bring back (0.572).
+-        const returned = ended === undefined && exchange.wantsAnswer === true && (await returnAnswer(exchange, mission).catch(() => false))
++        const returned = ended === undefined && each.wantsAnswer === true && (await returnAnswer(each, mission).catch(() => false))
+         if (!returned) {
+           notifyAndKeep(
+-            exchange.askerRunId,
+-            exchange.askerMissionId,
++            each.askerRunId,
++            each.askerMissionId,
+             ended === undefined
+-              ? `${exchange.recipientName} finished without writing back. Anything they said is in their own conversation.`
+-              : `${exchange.recipientName} stopped before writing back: ${ended}. Anything they said is in their own conversation.`
++              ? `${each.recipientName} finished without writing back. Anything they said is in their own conversation.`
++              : `${each.recipientName} stopped before writing back: ${ended}. Anything they said is in their own conversation.`
+           )
+         }
+       }
+diff --git a/apps/desktop/src/main/room-store.ts b/apps/desktop/src/main/room-store.ts
+index beb7dce1e..e71caaa7c 100644
+--- a/apps/desktop/src/main/room-store.ts
++++ b/apps/desktop/src/main/room-store.ts
+@@ -248,7 +248,7 @@ export function parsedRoom(value: unknown): PublicRoom | undefined {
+   const posts: RoomPost[] = []
+   for (const entry of record.posts) {
+     const post = parsedPost(entry)
+-    if (post === undefined) return undefined
++    if (post === undefined) continue
+     posts.push(post)
+     if (posts.length >= MAX_ROOM_POSTS) break
+   }
+@@ -258,7 +258,7 @@ export function parsedRoom(value: unknown): PublicRoom | undefined {
+     if (!Array.isArray(record.tasks)) return undefined
+     for (const entry of record.tasks) {
+       const task = parsedTask(entry)
+-      if (task === undefined) return undefined
++      if (task === undefined) continue
+       tasks.push(task)
+       if (tasks.length >= MAX_ROOM_TASKS) break
+     }
+diff --git a/apps/desktop/src/main/runtime-updates.ts b/apps/desktop/src/main/runtime-updates.ts
+index b11b6d573..0201de276 100644
+--- a/apps/desktop/src/main/runtime-updates.ts
++++ b/apps/desktop/src/main/runtime-updates.ts
+@@ -178,7 +178,22 @@ export function compareVersions(left: string, right: string): number {
+   if (a.pre === b.pre) return 0
+   if (a.pre === undefined) return 1
+   if (b.pre === undefined) return -1
+-  return a.pre < b.pre ? -1 : 1
++  const aTags = a.pre.split('.')
++  const bTags = b.pre.split('.')
++  for (let index = 0; index < Math.max(aTags.length, bTags.length); index += 1) {
++    const l = aTags[index]
++    const r = bTags[index]
++    if (l === r) continue
++    if (l === undefined) return -1
++    if (r === undefined) return 1
++    const ln = /^\d+$/.test(l) ? Number(l) : undefined
++    const rn = /^\d+$/.test(r) ? Number(r) : undefined
++    if (ln !== undefined && rn !== undefined) return Math.sign(ln - rn)
++    if (ln !== undefined) return -1
++    if (rn !== undefined) return 1
++    return l < r ? -1 : 1
++  }
++  return 0
+ }
+ 
+ /**
+diff --git a/apps/desktop/src/main/skill-library.ts b/apps/desktop/src/main/skill-library.ts
+index 67bb0079e..5a28ef0cc 100644
+--- a/apps/desktop/src/main/skill-library.ts
++++ b/apps/desktop/src/main/skill-library.ts
+@@ -385,7 +385,8 @@ export function createSkillLibrary(options: { readonly root: string; readonly fe
+         }
+         // The tree again, at the same commit: a commit never changes, so this is the list the person saw.
+         const { tree } = await treeAt(owner, repo, sha)
+-        const found = skillsInTree(tree, repo)
++        const under = typeof asked?.path === 'string' && asked.path.length > 0 && asked.path.length <= 200 ? asked.path : undefined
++        const found = skillsInTree(tree, repo, under)
+         const record = await readRecord()
+         const others = record.sources.filter((kept) => !sameSource(kept.source, source))
+         const chosen = names.map((name) => {
+diff --git a/apps/desktop/src/main/terminal-catch-up.ts b/apps/desktop/src/main/terminal-catch-up.ts
+index 5e73590c3..66df24432 100644
+--- a/apps/desktop/src/main/terminal-catch-up.ts
++++ b/apps/desktop/src/main/terminal-catch-up.ts
+@@ -327,7 +327,7 @@ export interface CatchUpResult {
+   readonly owners?: Readonly<Record<string, string>>
+ }
+ 
+-const MAX_PROMPT = 16_000
++const MAX_PROMPT = 8_000
+ const MAX_ANSWER = 16_000
+ const bounded = (text: string, max: number): string => (text.length <= max ? text : `${text.slice(0, max - 1)}…`)
+ 
+diff --git a/apps/desktop/src/shared/approval-rules.ts b/apps/desktop/src/shared/approval-rules.ts
+index f99d50c67..0f809ec33 100644
+--- a/apps/desktop/src/shared/approval-rules.ts
++++ b/apps/desktop/src/shared/approval-rules.ts
+@@ -125,7 +125,7 @@ export function insideFolder(path: string, folder: string): string | undefined {
+   return rest.slice(1)
+ }
+ 
+-function globToRegExp(pattern: string): RegExp {
++function globToRegExp(pattern: string, caseBlind = true): RegExp {
+   let out = ''
+   const text = slashes(pattern).replace(/^\.\//, '')
+   for (let index = 0; index < text.length; index += 1) {
+@@ -149,11 +149,11 @@ function globToRegExp(pattern: string): RegExp {
+       out += character.replace(/[.+^${}()|[\]\\]/g, '\\$&')
+     }
+   }
+-  return new RegExp(`^${out}$`, 'i')
++  return new RegExp(`^${out}$`, caseBlind ? 'i' : '')
+ }
+ 
+-function pathMatches(pattern: string, relative: string): boolean {
+-  return globToRegExp(pattern).test(relative)
++function pathMatches(pattern: string, relative: string, caseBlind = true): boolean {
++  return globToRegExp(pattern, caseBlind).test(relative)
+ }
+ 
+ function scoped(rule: ApprovalRule, context: RuleContext): boolean {
+@@ -176,9 +176,11 @@ function matches(rule: ApprovalRule, action: RuledAction, context: RuleContext):
+     const folder = rule.folder ?? context.folder
+     if (folder === undefined || action.paths.length === 0) return false
+     const relative = action.paths.map((path) => insideFolder(path, folder))
++    // Case-blind only where the file system is (a Windows folder).
++    const caseBlind = /^[A-Za-z]:/.test(folder)
+     // Deny: any path it names. Allow: every path inside the folder, and every one matching.
+-    if (rule.effect === 'deny') return relative.some((path) => path !== undefined && pathMatches(rule.pattern, path)) || action.paths.some((path) => pathMatches(rule.pattern, slashes(path)))
+-    return relative.every((path) => path !== undefined && path.length > 0 && pathMatches(rule.pattern, path))
++    if (rule.effect === 'deny') return relative.some((path) => path !== undefined && pathMatches(rule.pattern, path, caseBlind)) || action.paths.some((path) => pathMatches(rule.pattern, slashes(path), caseBlind))
++    return relative.every((path) => path !== undefined && path.length > 0 && pathMatches(rule.pattern, path, caseBlind))
+   }
+   if (action.kind === 'connector') {
+     const [server, tool] = rule.pattern.split('/')
+diff --git a/apps/desktop/src/shared/ipc.ts b/apps/desktop/src/shared/ipc.ts
+index 38749b96f..e6a5d901b 100644
+--- a/apps/desktop/src/shared/ipc.ts
++++ b/apps/desktop/src/shared/ipc.ts
+@@ -1346,6 +1346,8 @@ export interface SkillLibraryInstallRequest {
+   readonly ref: string
+   readonly sha: string
+   readonly names: readonly string[]
++  /** The folder the look was narrowed to, so the same list is kept from. */
++  readonly path?: string
+ }
+ 
+ export interface SkillLibraryKept {
+diff --git a/apps/desktop/src/shared/memory.ts b/apps/desktop/src/shared/memory.ts
+index b594ff95d..2c3fe5e0c 100644
+--- a/apps/desktop/src/shared/memory.ts
++++ b/apps/desktop/src/shared/memory.ts
+@@ -595,7 +595,7 @@ export function citedPaths(text: string): readonly string[] {
+   for (const raw of text.split(/[\s,;()[\]{}<>"'`]+/)) {
+     // Only trailing punctuation: a leading dot is a dotfile's name (.env).
+     const token = raw.replace(/^[:!?]+/, '').replace(/[.:!?]+$/, '')
+-    if (token.length === 0 || token.length > 200 || /:\/\//.test(token) || /^[a-z]+:/i.test(token)) continue
++    if (token.length === 0 || token.length > 200 || /:\/\//.test(token) || /^[a-z][a-z0-9+.-]+:/i.test(token)) continue
+     const extension = /\.([A-Za-z0-9]{1,10})$/.exec(token)?.[1]?.toLowerCase()
+     const pathLike = /[\\/]/.test(token) && /[A-Za-z]/.test(token)
+     const named = extension !== undefined && FILE_EXTENSIONS.has(extension) && /[A-Za-z_]/.test(token.slice(0, -(extension.length + 1)))
+diff --git a/apps/desktop/src/shared/room-task.ts b/apps/desktop/src/shared/room-task.ts
+index b7f083399..fb2ee8cec 100644
+--- a/apps/desktop/src/shared/room-task.ts
++++ b/apps/desktop/src/shared/room-task.ts
+@@ -306,7 +306,7 @@ export function rowNamedByPost(
+   postText: string,
+   tasks: readonly { readonly taskId: string; readonly text: string; readonly state: string; readonly ownerId?: string }[]
+ ): string | undefined {
+-  const said = postText.toLowerCase();
++  const said = postText.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ");
+   const open = tasks.filter((task) => task.state === "open" && task.ownerId === undefined);
+   const named = open.filter((task) => {
+     const words = task.text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+diff --git a/apps/desktop/src/shared/routine-schedule.ts b/apps/desktop/src/shared/routine-schedule.ts
+index e8724d43a..10c67f62d 100644
+--- a/apps/desktop/src/shared/routine-schedule.ts
++++ b/apps/desktop/src/shared/routine-schedule.ts
+@@ -182,7 +182,7 @@ export function slotPassedDuring(schedule: RoutineSchedule, startedAt: string, e
+   if (schedule.kind === 'every' || schedule.kind === 'files') return undefined
+   const start = new Date(startedAt)
+   if (Number.isNaN(start.getTime())) return undefined
+-  const next = nextRunAfter(schedule, startedAt, endedAt)
++  const next = nextRunAfter(schedule, startedAt, start)
+   if (next === undefined || next.getTime() <= start.getTime() || next.getTime() > endedAt.getTime()) return undefined
+   return next
+ }
+diff --git a/packages/mission-store/src/workroom.ts b/packages/mission-store/src/workroom.ts
+index a967788f2..01d22904e 100644
+--- a/packages/mission-store/src/workroom.ts
++++ b/packages/mission-store/src/workroom.ts
+@@ -462,10 +462,10 @@ export function createFileWorkroom(options: FileWorkroomOptions): Workroom {
+           ...(input.observed === undefined
+             ? {}
+             : {
+-                observed: [
+-                  ...input.observed.filter(isObservedPath).slice(0, MAX_OBSERVED_PATHS),
+-                  ...(input.observed.length > MAX_OBSERVED_PATHS ? [`+${String(input.observed.length - MAX_OBSERVED_PATHS)} more`] : [])
+-                ]
++                observed: ((kept) => [
++                  ...kept.slice(0, MAX_OBSERVED_PATHS),
++                  ...(kept.length > MAX_OBSERVED_PATHS ? [`+${String(kept.length - MAX_OBSERVED_PATHS)} more`] : [])
++                ])(input.observed.filter(isObservedPath))
+               })
+         }
+         let sequence = 0
+diff --git a/packages/runtime-adapters/src/antigravity-events.ts b/packages/runtime-adapters/src/antigravity-events.ts
+index ca007e0ce..496fa346e 100644
+--- a/packages/runtime-adapters/src/antigravity-events.ts
++++ b/packages/runtime-adapters/src/antigravity-events.ts
+@@ -406,10 +406,12 @@ export function createAntigravityEventNormalizer(
+       // draws them: "in the background", then done / failed / stopped.
+       background.set(task.taskId, open);
+       const watched = timerConditions.get(open.itemId);
++      let overAlready = false;
+       if (watched !== undefined) {
+         timerConditions.delete(open.itemId);
+-        // Already over? Then this timer will never fire either.
++        // Already over? Then this timer will never fire either: settled now.
+         if (background.has(watched)) timerWaitsOn.set(task.taskId, watched);
++        else overAlready = true;
+       }
+       return [
+         emit("tool.completed", { ...open, background: true, phase: "completed", evidence }),
+@@ -421,6 +423,7 @@ export function createAntigravityEventNormalizer(
+           ...(task.doing === undefined ? {} : { message: boundedMessageText(task.doing) }),
+           evidence,
+         }),
++        ...(overAlready ? settle(task.taskId, "completed", "no longer needed: what it waited on had finished", evidence) : []),
+       ];
+     }
+     return [
+diff --git a/packages/runtime-adapters/src/antigravity-projects.ts b/packages/runtime-adapters/src/antigravity-projects.ts
+index 45a670eff..a0a111d87 100644
+--- a/packages/runtime-adapters/src/antigravity-projects.ts
++++ b/packages/runtime-adapters/src/antigravity-projects.ts
+@@ -66,14 +66,17 @@ const decoder = new TextDecoder("utf-8", { fatal: false });
+  */
+ export function normalizeAntigravityWorkspace(value: string): string {
+   let path = value;
+-  if (path.startsWith("file:///")) path = path.slice("file:///".length);
+-  else if (path.startsWith("file://")) path = path.slice("file://".length);
++  const fromUri = path.startsWith("file://");
++  if (fromUri) path = path.slice("file://".length);
+   try {
+     path = decodeURIComponent(path);
+   } catch {
+     // A stray `%` that is not an escape. The undecoded text is still a better
+     // key than nothing, and it simply will not match a caller's path.
+   }
++  // A drive letter follows the third slash on Windows (`file:///C:/x`); on
++  // POSIX that slash IS the root (`file:///home/x`) and stays.
++  if (fromUri && /^\/[A-Za-z]:/.test(path)) path = path.slice(1);
+   path = path.replace(/\\/g, "/");
+   while (path.length > 1 && path.endsWith("/")) path = path.slice(0, -1);
+   return /^[A-Za-z]:/.test(path) ? path[0]!.toLowerCase() + path.slice(1) : path;
+diff --git a/packages/runtime-adapters/src/commands.ts b/packages/runtime-adapters/src/commands.ts
+index f2d321a99..e26cabadd 100644
+--- a/packages/runtime-adapters/src/commands.ts
++++ b/packages/runtime-adapters/src/commands.ts
+@@ -1355,6 +1355,12 @@ export const OPENCODE_READ_ONLY_CONFIG = JSON.stringify({
+  * a file pointing there; it does not need the parent's working tree, and
+  * being able to reach it is the whole bug.
+  */
++/** `<root>/.git/*` with the root's own separators: backslashes for a Windows path, slashes otherwise. */
++function gitGlob(repositoryRoot: string): string {
++  const separator = /^[A-Za-z]:\\|^\\\\/.test(repositoryRoot) || repositoryRoot.includes("\\") ? "\\" : "/";
++  return `${repositoryRoot}${separator}.git${separator}*`;
++}
++
+ export function opencodeWorktreeConfig(repositoryRoot: string, readOnly: boolean): string {
+   return JSON.stringify({
+     permission: {
+@@ -1364,7 +1370,7 @@ export function opencodeWorktreeConfig(repositoryRoot: string, readOnly: boolean
+       // "deny" until 2026-09-22, and it cost every read-only worktree run
+       // on the free model -- three defaults at once.
+       ...(readOnly ? OPENCODE_READ_ONLY_PERMISSIONS : {}),
+-      external_directory: { [`${repositoryRoot}\\.git\\*`]: "allow", "*": "deny" },
++      external_directory: { [gitGlob(repositoryRoot)]: "allow", "*": "deny" },
+     },
+     ...(readOnly ? { experimental: OPENCODE_KEEP_GOING } : {}),
+   });
+@@ -1750,7 +1756,7 @@ export function createOpenCodeServeCommand(
+       webfetch: "ask",
+       external_directory: options.repositoryRoot === undefined
+         ? "ask"
+-        : { [`${options.repositoryRoot}\\.git\\*`]: "allow", "*": "ask" },
++        : { [gitGlob(options.repositoryRoot)]: "allow", "*": "ask" },
+     },
+   });
+   return baseSpec("opencode", executable, options.workspacePath, ["serve", "--port", "0", "--hostname", "127.0.0.1"], {
+@@ -1854,6 +1860,9 @@ export function createCopilotAcpCommand(
+   if (options.model !== undefined) {
+     args.push("--model", requireText(options.model, "Model"));
+   }
++  if (options.effort !== undefined) {
++    args.push("--effort", requireEffort(options.effort));
++  }
+   return baseSpec("copilot", executable, options.workspacePath, args, { stdin: "protocol", sandbox: "workspace-write" });
+ }
+ 
+diff --git a/packages/runtime-adapters/src/copilot-events.ts b/packages/runtime-adapters/src/copilot-events.ts
+index ed6901084..ca2b3f133 100644
+--- a/packages/runtime-adapters/src/copilot-events.ts
++++ b/packages/runtime-adapters/src/copilot-events.ts
+@@ -522,7 +522,7 @@ export function createCopilotEventNormalizer(
+       const failed = data.success !== true;
+       const error = isObject(data.error) ? data.error : {};
+       const status = failed
+-        ? stringValue(error.code) ?? stringValue(error.message) ?? "unknown"
++        ? (stringValue(error.code) ?? stringValue(error.message) ?? "unknown").slice(0, 512)
+         : undefined;
+       const result = isObject(data.result) ? data.result : {};
+       const detailed = stringValue(result.detailedContent);
+diff --git a/packages/runtime-adapters/src/muse-events.ts b/packages/runtime-adapters/src/muse-events.ts
+index d946b3136..d0db218f7 100644
+--- a/packages/runtime-adapters/src/muse-events.ts
++++ b/packages/runtime-adapters/src/muse-events.ts
+@@ -270,7 +270,7 @@ export function createMuseEventNormalizer(
+       return [
+         emit("tool.failed", {
+           ...toolRow(taskId),
+-          ...(reason === undefined ? {} : { status: reason }),
++          ...(reason === undefined ? {} : { status: reason.slice(0, 512) }),
+           phase: "completed",
+           evidence,
+         }),
+diff --git a/packages/runtime-adapters/src/process-runner.ts b/packages/runtime-adapters/src/process-runner.ts
+index 107477ff1..705c75448 100644
+--- a/packages/runtime-adapters/src/process-runner.ts
++++ b/packages/runtime-adapters/src/process-runner.ts
+@@ -845,7 +845,8 @@ export function createNodeRuntimeProcessRunner(
+         if (stdoutRemainder.endsWith("\r")) {
+           stdoutRemainder = stdoutRemainder.slice(0, -1);
+         }
+-        emitRecord(stdoutRemainder);
++        // The tail of a line already given up on is not a record.
++        if (!skippingOversizedLine) emitRecord(stdoutRemainder);
+         stdoutRemainder = "";
+         records.close();
+         const capturedStderr = Buffer.concat(stderr.chunks, stderr.keptBytes).toString("utf8");

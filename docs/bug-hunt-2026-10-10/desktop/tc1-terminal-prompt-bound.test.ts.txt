@@ -1,0 +1,89 @@
+import { mkdtemp } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+import { createFileMissionLedger } from '@teammate/mission-store'
+import type { MissionLedger, MissionLedgerMetadata } from '@teammate/mission-store'
+import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
+import { describe, expect, it } from 'vitest'
+
+import { runtimeThreadIdOf } from '../src/main/codex-mission.js'
+import { newestTurnOf } from '../src/main/mission-history.js'
+import { catchUpTerminal, createTerminalImports } from '../src/main/terminal-catch-up.js'
+import type { CatchUpFacts } from '../src/main/terminal-catch-up.js'
+
+/*
+ * TC1. terminal-catch-up.ts bounds a terminal prompt at 16,000 characters
+ * (MAX_PROMPT) while the ledger refuses a prompt over 8,000
+ * (mission-store MAX_PROMPT_LENGTH). A pasted log in the terminal therefore
+ * makes createMission throw, and nothing after it is ever brought back.
+ */
+const SESSION = '5f0c2a1e-8d4b-4c6a-9e2f-1b3c4d5e6f70'
+const T0 = '2026-09-27T10:00:00.000Z'
+const claudeLine = (value: Record<string, unknown>): string => JSON.stringify({ sessionId: SESSION, cwd: '/work', isSidechain: false, ...value })
+const typed = (text: string, at: string, entrypoint: 'cli' | 'sdk-cli'): string =>
+  claudeLine({ type: 'user', entrypoint, timestamp: at, uuid: `u-${at}`, message: { role: 'user', content: text } })
+const answer = (text: string, at: string): string =>
+  claudeLine({ type: 'assistant', timestamp: at, uuid: `a-${at}`, message: { role: 'assistant', model: 'claude-opus-5-5', stop_reason: 'end_turn', content: [{ type: 'text', text }] } })
+const PROCESS = { signal: null, stderr: '', stderrTruncated: false, recordCount: 2, inputDeliveryFailed: false, outputLimitExceeded: false, oversizedRecordsDropped: 0, forcedTerminationAttempted: false, terminationUnconfirmed: false }
+
+async function recordTurn(ledger: MissionLedger, missionId: string, startedAt: string, finishedAt: string): Promise<void> {
+  const runId = `run_${missionId}`
+  await ledger.createMission({
+    missionId, runId, prompt: 'Who takes what?', runtime: 'claude', model: 'opus', requestedRouteId: 'claude:opus', resolvedRouteId: 'claude:opus',
+    cliVersion: '2.1.283', workspaceId: 'ws_1', sandbox: 'workspace-write', executionPolicyVersion: 1, createdAt: startedAt
+  } as MissionLedgerMetadata)
+  const base = { runId, missionId, sourceAdapter: 'claude', runtimeThreadId: SESSION }
+  await ledger.appendEvents(missionId, [
+    { ...base, id: `${runId}:1`, sequence: 1, occurredAt: startedAt, type: 'run.started', payload: { runtimeThreadId: SESSION, evidence: { redacted: true } } },
+    { ...base, id: `${runId}:2`, sequence: 2, occurredAt: finishedAt, type: 'run.completed', payload: { runtimeThreadId: SESSION, process: { ...PROCESS, exitCode: 0, startedAt, finishedAt } } }
+  ] as unknown as NormalizedRuntimeEvent[])
+}
+
+async function conversation(transcript: string) {
+  const root = await mkdtemp(join(tmpdir(), 'hunt-tc1-'))
+  const ledger = createFileMissionLedger({ rootDirectory: join(root, 'ledger') })
+  await recordTurn(ledger, 'mission_first', '2026-09-27T09:58:00.000Z', T0)
+  let ids = 0
+  const facts: CatchUpFacts = {
+    ledger,
+    liveMissionIds: () => [],
+    sessionOf: runtimeThreadIdOf,
+    transcriptOf: async () => transcript,
+    imports: createTerminalImports(join(root, 'terminal-imports.json')),
+    ownerOf: async () => undefined,
+    assign: async () => undefined,
+    newestTurnOf: (missionId) => newestTurnOf(ledger, missionId),
+    createId: () => `id${String(++ids)}`
+  }
+  return { ledger, facts }
+}
+
+describe('TC1: a long prompt typed in the terminal', () => {
+  const pasted = 'x'.repeat(9_000)
+  const transcript = [
+    typed('Who takes what?', '2026-09-27T09:58:00.000Z', 'sdk-cli'),
+    answer('Wren takes the migrations.', '2026-09-27T09:59:00.000Z'),
+    typed(pasted, '2026-09-27T10:05:00.000Z', 'cli'),
+    answer('Read it.', '2026-09-27T10:05:10.000Z'),
+    typed('And now?', '2026-09-27T10:06:00.000Z', 'cli'),
+    answer('Done.', '2026-09-27T10:06:10.000Z')
+  ].join('\n')
+
+  it('comes back bounded, and the exchange after it comes back too', async () => {
+    const { ledger, facts } = await conversation(transcript)
+    const result = await catchUpTerminal('mission_first', facts)
+    expect(result.imported).toBe(2)
+    const first = await ledger.getMission('mission_id1')
+    expect(first?.issues).toEqual([])
+    expect(first?.metadata.prompt.length).toBeLessThanOrEqual(8_000)
+    expect((await ledger.getMission('mission_id3'))?.metadata.prompt).toBe('And now?')
+  })
+
+  it('does not leave every later catch-up failing at the same exchange', async () => {
+    const { facts } = await conversation(transcript)
+    await catchUpTerminal('mission_first', facts).catch(() => undefined)
+    // A second ask: nothing new, and no error.
+    await expect(catchUpTerminal('mission_first', facts)).resolves.toMatchObject({ imported: 0 })
+  })
+})

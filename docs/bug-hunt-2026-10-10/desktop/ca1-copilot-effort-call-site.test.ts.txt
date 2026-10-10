@@ -1,0 +1,71 @@
+import type { MissionLedger } from '@teammate/mission-store'
+import type { RuntimeDiscovery, RuntimeProcessRunner } from '@teammate/runtime-adapters'
+import { describe, expect, it } from 'vitest'
+
+import { createCodexMissionService } from '../src/main/codex-mission.js'
+
+/*
+ * CA1, the call site. codex-mission.ts builds every other runtime's command
+ * with `...choice` (model, effort, resume); the two Copilot branches pass
+ * the model and the session and leave the effort out, so a Copilot
+ * teammate's chosen level never reaches `copilot -p` either.
+ */
+const WORKSPACE = process.platform === 'win32' ? 'C:\\safe-workspace' : '/safe-workspace'
+
+function runtime(id: 'codex' | 'copilot'): RuntimeDiscovery {
+  const features = ['non-interactive', 'jsonl-events', 'stdin-prompt', 'workspace-selection', 'read-only-sandbox'] as const
+  return {
+    id,
+    kind: 'agent-runtime',
+    displayName: id === 'codex' ? 'Codex CLI' : 'GitHub Copilot CLI',
+    optional: false,
+    availability: 'available',
+    readiness: 'ready',
+    executable: { commandName: id, discoveredPath: `/tools/${id}`, executablePath: `/tools/${id}`, prefixArgs: [], kind: 'native' },
+    version: { raw: `${id} 1.0.0`, version: '1.0.0', major: 1, minor: 0, patch: 0 },
+    supportedFeatures: [...features],
+    requiredFeatures: [...features],
+    diagnostics: []
+  } as unknown as RuntimeDiscovery
+}
+
+function fakeLedger(): MissionLedger {
+  return {
+    createMission: async () => undefined,
+    appendEvents: async () => undefined,
+    appendHostFailure: async () => undefined,
+    createCheckpoint: async () => { throw new Error('not used') },
+    appendPeerLinks: async () => undefined, appendEditCheck: async () => undefined, appendApproval: async () => undefined,
+    deleteMission: async () => true,
+    listTrashedMissions: async () => [],
+    restoreMission: async () => true,
+    emptyTrash: async () => 0,
+    storageReport: async () => ({ missionCount: 0, byteTotal: 0, unreadableCount: 0 }),
+    pruneMissions: async () => ({ deleted: [], failed: [], unreadable: [], keptForContinuity: [], keptAsRunning: [] }),
+    getMission: async () => undefined,
+    listMissions: async () => ({ missions: [], issues: [], unreadableCount: 0 }),
+    flush: async () => undefined
+  } as unknown as MissionLedger
+}
+
+async function argvFor(id: 'codex' | 'copilot', effort: string): Promise<string> {
+  let launched: { readonly args: readonly string[] } | undefined
+  const start = ((spec: { readonly args: readonly string[] }) => {
+    launched = spec
+    throw new Error('stop here')
+  }) as unknown as RuntimeProcessRunner['start']
+  const service = createCodexMissionService({ workspacePath: WORKSPACE, discover: async () => [runtime(id)], runner: { start }, ledger: fakeLedger() })
+  const response = await service.start('Say hi.', id, 'ask', { effort }, () => undefined)
+  if (launched === undefined) throw new Error(`nothing launched: ${JSON.stringify(response)}`)
+  return launched.args.join(' ')
+}
+
+describe('CA1: the effort a teammate was started with', () => {
+  it('reaches Codex (control)', async () => {
+    expect(await argvFor('codex', 'high')).toContain('high')
+  })
+
+  it('reaches Copilot', async () => {
+    expect(await argvFor('copilot', 'high')).toContain('--effort high')
+  })
+})

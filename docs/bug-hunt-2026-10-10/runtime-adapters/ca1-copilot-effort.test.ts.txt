@@ -1,0 +1,24 @@
+import { describe, expect, it } from "vitest";
+
+import { createCopilotAcpCommand, createCopilotPromptCommand } from "../src/commands.js";
+import type { ExecutableLaunch } from "../src/commands.js";
+
+/*
+ * CA1. The composer offers Copilot seven effort levels (parseEffortChoices),
+ * the print builder sends --effort, but the ACP builder -- the Approve-each
+ * route -- has no effort at all, so the chosen level never reaches the run.
+ */
+const copilot: ExecutableLaunch = { commandName: "copilot", executablePath: "/usr/bin/copilot", prefixArgs: [], discoveredPath: "/usr/bin/copilot" };
+
+describe("CA1: a Copilot teammate's chosen effort", () => {
+  it("rides on the print command", () => {
+    const spec = createCopilotPromptCommand(copilot, { workspacePath: "/work", prompt: "hi", model: "gpt-5.6", effort: "high" });
+    expect(spec.args).toContain("--effort");
+  });
+
+  it("rides on the ACP command too", () => {
+    const spec = createCopilotAcpCommand(copilot, { workspacePath: "/work", model: "gpt-5.6", effort: "high" });
+    expect(spec.args).toContain("--effort");
+    expect(spec.args[spec.args.indexOf("--effort") + 1]).toBe("high");
+  });
+});

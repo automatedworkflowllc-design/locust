@@ -1,0 +1,52 @@
+import { mkdtemp } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { describe, expect, it } from 'vitest'
+
+import { createFileMissionLedger } from '@teammate/mission-store'
+import type { MissionLedgerMetadata } from '@teammate/mission-store'
+import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
+
+import { missionRecordMarkdown, recordTurns } from '../src/main/mission-export.js'
+
+/*
+ * ME1. The saved record's final `.replace(/\n{3,}/g, '\n\n')` runs over the
+ * whole file, fenced command output included.
+ */
+const ISO = (minute: number, second = 0): string => `2026-10-02T09:${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}.000Z`
+const MISSION = {
+  missionId: 'mission_blank', runId: 'run_blank', prompt: 'Show the file.', runtime: 'codex', model: 'gpt-test',
+  requestedRouteId: 'codex', resolvedRouteId: 'codex:default', cliVersion: '0.160.0', workspaceId: 'ws_test', sandbox: 'workspace-write',
+  mode: 'approve-each', executionPolicyVersion: 1, createdAt: ISO(0)
+} as MissionLedgerMetadata
+const processEvidence = {
+  exitCode: 0, signal: null, stderr: '', stderrTruncated: false, recordCount: 1, inputDeliveryFailed: false,
+  outputLimitExceeded: false, oversizedRecordsDropped: 0, forcedTerminationAttempted: false, terminationUnconfirmed: false,
+  startedAt: ISO(0), finishedAt: ISO(1)
+}
+let sequence = 0
+function event(type: string, payload: Record<string, unknown>, second: number): NormalizedRuntimeEvent {
+  sequence += 1
+  return { id: `run_blank:${String(sequence)}`, runId: 'run_blank', missionId: 'mission_blank', sequence, occurredAt: ISO(1, second), sourceAdapter: 'codex', type, payload } as unknown as NormalizedRuntimeEvent
+}
+const tool = (type: 'tool.started' | 'tool.completed', fields: Record<string, unknown>, second: number): NormalizedRuntimeEvent =>
+  event(type, { itemId: 'c1', toolKind: 'command_execution', name: 'shell', phase: type === 'tool.started' ? 'started' : 'completed', evidence: { redacted: true }, ...fields }, second)
+
+describe('ME1: command output in the saved record', () => {
+  it('is written as recorded, blank lines included', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'hunt-me1-'))
+    const ledger = createFileMissionLedger({ rootDirectory: root, now: () => new Date(ISO(30)) })
+    const output = 'alpha\n\n\nomega'
+    await ledger.createMission(MISSION)
+    await ledger.appendEvents(MISSION.missionId, [
+      event('run.started', { runtimeThreadId: 'thread_1', evidence: { redacted: true } }, 0),
+      tool('tool.started', { command: 'cat notes.txt' }, 1),
+      tool('tool.completed', { command: 'cat notes.txt', output, exitCode: 0, status: 'completed', durationMs: 10 }, 2),
+      event('run.completed', { runtimeThreadId: 'thread_1', process: processEvidence }, 50)
+    ])
+    await ledger.flush()
+    const turns = (await recordTurns((id) => ledger.getMission(id), MISSION.missionId)).missions
+    const markdown = missionRecordMarkdown({ missions: turns, teammate: 'Wren', locustVersion: '0.715.0', savedAt: ISO(40) })
+    expect(markdown).toContain(output)
+  })
+})

@@ -1,0 +1,69 @@
+import { describe, expect, it } from "vitest";
+
+import { createAntigravityEventNormalizer } from "../src/antigravity-events.js";
+
+/*
+ * AT1. A `schedule` whose TimerCondition names a task that already ended is
+ * put in `background` with nothing to settle it: "Already over? Then this
+ * timer will never fire either" -- and nothing settles it, so the turn is
+ * held open until the idle limit.
+ */
+const CONV = "11111111-2222-3333-4444-555555555555";
+const at = (fields: Record<string, unknown>) =>
+  JSON.stringify({ source: "MODEL", status: "DONE", created_at: "2026-09-21T20:22:22Z", ...fields });
+const user = JSON.stringify({ step_index: 0, source: "USER_EXPLICIT", type: "USER_INPUT", status: "DONE", created_at: "2026-09-21T20:22:00Z", content: "run the probe" });
+const planner = at({
+  step_index: 9,
+  type: "PLANNER_RESPONSE",
+  tool_calls: [{ name: "run_command", args: { CommandLine: JSON.stringify("node _tools/probe.mjs --dev"), toolAction: JSON.stringify("Running the picker probe"), WaitMsBeforeAsync: JSON.stringify(500) } }],
+});
+const running = at({
+  step_index: 10,
+  type: "GENERIC",
+  status: "RUNNING",
+  content: `Created At: 2026-09-21T16:22:22-04:00\nTool is running as a background task with task id: ${CONV}/task-10\nTask Description: node _tools/probe.mjs --dev\n`,
+});
+const notice = (step: number, body: string) => JSON.stringify({
+  step_index: step,
+  source: "SYSTEM",
+  type: "SYSTEM_MESSAGE",
+  status: "DONE",
+  created_at: "2026-09-21T20:23:15Z",
+  content: `The following is a <SYSTEM_MESSAGE> not actually sent by the user.\n\n<SYSTEM_MESSAGE>\n[Message] timestamp=2026-09-21T20:23:13Z sender=${CONV}/task-10 priority=MESSAGE_PRIORITY_HIGH content:\n${body}\n</SYSTEM_MESSAGE>`,
+});
+const finished = notice(12, `Task id "${CONV}/task-10" finished with result:\n\nThe command exited with code 0.\nOutput:\nprobing the DEV build`);
+const timerPlanner = at({
+  step_index: 13,
+  type: "PLANNER_RESPONSE",
+  tool_calls: [{ name: "schedule", args: { TimerCondition: JSON.stringify(`${CONV}/task-10`), Prompt: JSON.stringify("Check if task-10 finished"), DelaySeconds: JSON.stringify(30) } }],
+});
+const timerRunning = at({
+  step_index: 14,
+  type: "GENERIC",
+  status: "RUNNING",
+  content: `Created At: 2026-09-21T16:23:20-04:00\nTool is running as a background task with task id: ${CONV}/task-14\nTask Description: schedule\n`,
+});
+const after = at({ step_index: 15, type: "PLANNER_RESPONSE", content: "The probe passed." });
+
+describe("AT1: a timer set on a task that had already finished", () => {
+  it("holds nothing open", () => {
+    const normalizer = createAntigravityEventNormalizer({ runId: "run_1", missionId: "mission_1", conversationId: CONV, now: () => new Date("2026-09-21T20:22:00Z") });
+    const pending: number[] = [];
+    [user, planner, running, finished, timerPlanner, timerRunning, after].forEach((raw, index) => {
+      normalizer.accept({ sequence: index + 1, raw });
+      pending.push(normalizer.pendingBackground);
+    });
+    // The probe's task was over before the timer was set; nothing is pending.
+    expect(pending.at(-1)).toBe(0);
+  });
+
+  it("control: a timer set while its task runs settles when the task ends", () => {
+    const normalizer = createAntigravityEventNormalizer({ runId: "run_1", missionId: "mission_1", conversationId: CONV, now: () => new Date("2026-09-21T20:22:00Z") });
+    const pending: number[] = [];
+    [user, planner, running, timerPlanner, timerRunning, finished, after].forEach((raw, index) => {
+      normalizer.accept({ sequence: index + 1, raw });
+      pending.push(normalizer.pendingBackground);
+    });
+    expect(pending).toEqual([0, 0, 1, 1, 2, 0, 0]);
+  });
+});

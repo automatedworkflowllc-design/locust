@@ -1,0 +1,27 @@
+import { mkdtemp } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { describe, expect, it } from 'vitest'
+
+import { createEditCheck, runCheckCommand } from '../src/main/edit-check.js'
+
+/*
+ * EC2. runCheckCommand's catch around spawn() calls done(), which clears a
+ * timer declared with `const` further down -- still in its temporal dead
+ * zone when spawn throws synchronously. The promise rejects with a
+ * ReferenceError instead of resolving as a check that could not run.
+ */
+describe('EC2: a check command the shell cannot be handed', () => {
+  it('resolves as a run with an error rather than rejecting', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'hunt-ec2-'))
+    const run = await runCheckCommand('echo hi\u0000there', root)
+    expect(run.exitCode).toBeNull()
+    expect(run.error).toBeDefined()
+  })
+
+  it('reaches the card as could-not-run', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'hunt-ec2-'))
+    const check = createEditCheck({ commandFor: async () => 'echo hi\u0000there' })
+    await expect(check.after(root)).resolves.toMatchObject({ outcome: 'could-not-run' })
+  })
+})

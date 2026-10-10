@@ -1,0 +1,35 @@
+import { describe, expect, it } from "vitest";
+
+import { createOpenCodeServeCommand, opencodeWorktreeConfig } from "../src/commands.js";
+import type { ExecutableLaunch } from "../src/commands.js";
+import { normalizeAntigravityWorkspace } from "../src/antigravity-projects.js";
+
+/*
+ * CM2. The one allow pattern for a worktree's parent repository is built
+ * with backslashes, so on macOS and Linux it names no path.
+ * AG2. `file:///home/x` loses its leading slash while a caller's `/home/x`
+ * keeps it, so the two forms never meet on a POSIX machine.
+ */
+const opencode: ExecutableLaunch = { commandName: "opencode", executablePath: "/usr/bin/opencode", prefixArgs: [], discoveredPath: "/usr/bin/opencode" };
+
+const allowKeys = (config: string): string[] => {
+  const parsed = JSON.parse(config) as { permission: { external_directory: Record<string, string> } };
+  return Object.entries(parsed.permission.external_directory).filter(([, effect]) => effect === "allow").map(([key]) => key);
+};
+
+describe("CM2: the worktree's reach into its repository", () => {
+  it("names the repository's .git as a POSIX path when the repository is one", () => {
+    expect(allowKeys(opencodeWorktreeConfig("/home/u/repo", false))).toEqual(["/home/u/repo/.git/*"]);
+  });
+
+  it("does so for the server route too", () => {
+    const spec = createOpenCodeServeCommand(opencode, { workspacePath: "/home/u/repo/.locust/worktrees/tm_1", repositoryRoot: "/home/u/repo" });
+    expect(allowKeys(String(spec.env?.OPENCODE_CONFIG_CONTENT))).toEqual(["/home/u/repo/.git/*"]);
+  });
+});
+
+describe("AG2: an Antigravity workspace key", () => {
+  it("is the same for the file URI and the path on a POSIX machine", () => {
+    expect(normalizeAntigravityWorkspace("file:///home/x/proj")).toBe(normalizeAntigravityWorkspace("/home/x/proj"));
+  });
+});

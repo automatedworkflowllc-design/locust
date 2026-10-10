@@ -1,0 +1,71 @@
+import { mkdtemp, readFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { describe, expect, it } from 'vitest'
+
+import { createSkillLibrary, gitBlobId, type Fetcher } from '../src/main/skill-library.js'
+
+/*
+ * SL1. preview() lists the skills under the folder a link named
+ * (skillsInTree(tree, repo, path)); install() lists the WHOLE tree
+ * (skillsInTree(tree, repo)) and picks the first folder of that name.
+ */
+const SHA = 'a'.repeat(40)
+
+function fakeGitHub(files: Record<string, string>): Fetcher {
+  const answer = (status: number, body: unknown): Response =>
+    new Response(typeof body === 'string' ? body : JSON.stringify(body), { status })
+  return async (url) => {
+    const api = /^https:\/\/api\.github\.com\/repos\/acme\/kit(\/.*)?$/.exec(url.replace(/\?.*$/, ''))
+    if (api !== null) {
+      const rest = api[1] ?? ''
+      if (rest === '') return answer(200, { full_name: 'acme/kit', default_branch: 'main', private: false })
+      if (rest.startsWith('/commits/')) return answer(200, { sha: SHA })
+      if (rest === `/git/trees/${SHA}`) {
+        return answer(200, {
+          sha: SHA,
+          truncated: false,
+          tree: Object.entries(files).map(([path, text]) => ({ path, mode: '100644', type: 'blob', sha: gitBlobId(new TextEncoder().encode(text)), size: text.length }))
+        })
+      }
+      return answer(404, { message: 'Not Found' })
+    }
+    const raw = /^https:\/\/raw\.githubusercontent\.com\/acme\/kit\/[0-9a-f]{40}\/(.+)$/.exec(url)
+    if (raw !== null) {
+      const text = files[(raw[1] as string).split('/').map(decodeURIComponent).join('/')]
+      return text === undefined ? answer(404, 'nope') : answer(200, text)
+    }
+    return answer(404, 'nowhere')
+  }
+}
+
+describe('SL1: keeping a skill seen through a folder link', () => {
+  it('keeps the folder that was shown, not a namesake elsewhere in the repository', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'hunt-sl1-'))
+    const library = createSkillLibrary({
+      root,
+      fetch: fakeGitHub({
+        'a/foo/SKILL.md': '---\ndescription: The A foo.\n---\nA\n',
+        'b/foo/SKILL.md': '---\ndescription: The B foo.\n---\nB\n'
+      })
+    })
+    const preview = await library.preview('https://github.com/acme/kit/tree/main/b')
+    expect(preview.skills.map((skill) => [skill.name, skill.description])).toEqual([['foo', 'The B foo.']])
+    await library.install({ source: preview.source, ref: preview.ref, sha: preview.sha, names: ['foo'], path: 'b' })
+    expect(await readFile(join(library.skillsFolder, 'foo', 'SKILL.md'), 'utf8')).toBe('---\ndescription: The B foo.\n---\nB\n')
+  })
+
+  it('can keep a skill shown under a folder when the repository root is a skill too', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'hunt-sl1-'))
+    const library = createSkillLibrary({
+      root,
+      fetch: fakeGitHub({
+        'SKILL.md': '---\ndescription: The whole repo is a skill.\n---\nroot\n',
+        'skills/foo/SKILL.md': '---\ndescription: foo.\n---\nfoo\n'
+      })
+    })
+    const preview = await library.preview('https://github.com/acme/kit/tree/main/skills')
+    expect(preview.skills.map((skill) => skill.name)).toEqual(['foo'])
+    await expect(library.install({ source: preview.source, ref: preview.ref, sha: preview.sha, names: ['foo'], path: 'skills' })).resolves.toBeDefined()
+  })
+})

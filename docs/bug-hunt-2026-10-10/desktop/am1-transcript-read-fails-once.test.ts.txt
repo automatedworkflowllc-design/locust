@@ -1,0 +1,78 @@
+import type { MissionLedger, Workroom, WorkroomMessage } from '@teammate/mission-store'
+import type { NormalizedRuntimeEvent } from '@teammate/runtime-adapters'
+import { describe, expect, it, vi } from 'vitest'
+
+import { createAntigravityMissionService } from '../src/main/antigravity-mission.js'
+import type { MissionPeerContext } from '../src/main/workroom-briefing.js'
+
+/*
+ * AM1. poll() records the transcript's size and mtime BEFORE the read's
+ * result is known. A read that fails once (the file mid-write) leaves
+ * `run.seen` at the new size, so every later poll says "unmoved" and the
+ * lines in that growth are never read.
+ */
+const NOW = '2026-10-06T12:00:00.000Z'
+const PEER: MissionPeerContext = { self: { teammateId: 'tm_wren', name: 'Wren', role: 'Code' }, others: [{ teammateId: 'tm_atlas', name: 'Atlas', role: 'Research' }] }
+const MESSAGE: WorkroomMessage = {
+  messageId: 'wm_1', sequence: 1, postedAt: NOW,
+  from: { teammateId: 'tm_atlas', name: 'Atlas', missionId: 'mission_origin' },
+  to: { teammateId: 'tm_wren', name: 'Wren' }, text: 'Check the PELICAN migration.'
+}
+const RELAY = { hop: 1, lastMissionOf: {}, answering: [MESSAGE.messageId] }
+const LINE = JSON.stringify({ step_index: 0, source: 'MODEL', type: 'PLANNER_RESPONSE', status: 'DONE', created_at: NOW, tool_calls: [{ name: 'read_file', args: { TargetFile: 'notes.md' } }] })
+
+async function feed(failFirst: boolean): Promise<{ readonly types: string[]; readonly reads: number }> {
+    const events: NormalizedRuntimeEvent[] = []
+    const workroom: Workroom = {
+      unread: async () => ({ messages: [MESSAGE], remaining: 0 }),
+      markDelivered: async () => undefined,
+      read: async () => ({ messages: [MESSAGE], deliveries: [], issues: [] }),
+      post: async () => { throw new Error('No share is expected') },
+      flush: async () => undefined
+    }
+    const ledger = {
+      createMission: async () => undefined,
+      appendPeerLinks: async () => undefined,
+      appendEvents: async (_missionId: string, appended: readonly NormalizedRuntimeEvent[]) => { events.push(...appended) },
+      appendHostFailure: async () => undefined,
+      appendEditCheck: async () => undefined,
+      getMission: async () => undefined
+    } as unknown as MissionLedger
+    let reads = 0
+    let ids = 0
+    const service = createAntigravityMissionService({
+      workspacePath: 'C:\\work\\pebble', home: 'C:\\Users\\dev', ledger, workroom,
+      probe: async () => ({ executablePath: '/tools/server', version: '2.11.0', address: 'localhost:1', csrfToken: 'fixture', projects: new Map([['c:/work/pebble', 'project']]) }),
+      agentApi: () => ({ newConversation: async () => 'conversation_1', sendMessage: async () => undefined }),
+      cascadeApi: () => ({ plannerTexts: async () => [], pendingQuestion: async () => undefined, answerQuestion: async () => undefined }),
+      // The file has grown; the first read of it fails (mid-write), every later one succeeds.
+      statTranscript: async () => ({ size: LINE.length + 1, mtimeMs: 1 }),
+      readTranscript: async () => { reads += 1; return failFirst && reads === 1 ? undefined : `${LINE}\n` },
+      observeDisk: async () => undefined, pollMs: 5, idleTimeoutMs: 60_000,
+      createId: () => String(++ids), now: () => new Date(NOW), emitEvent: () => undefined, emitUpdate: () => undefined
+    })
+    const run = await service.start('Atlas sent you a message; it is quoted below.', PEER, { relay: RELAY })
+    try {
+      await vi.waitFor(() => expect(events.map((event) => event.type)).toContain('tool.started'), { timeout: 1_000, interval: 10 })
+    } catch {
+      // Reported below.
+    } finally {
+      service.cancel(run.runId)
+      await vi.waitFor(() => expect(service.liveMissionIds()).toEqual([]))
+      await service.dispose()
+    }
+    return { types: events.map((event) => event.type), reads }
+}
+
+describe('AM1: a transcript read that fails once', () => {
+  it('control: a read that succeeds first time feeds the lines', async () => {
+    const { types } = await feed(false)
+    expect(types).toContain('tool.started')
+  })
+
+  it('is retried on the next tick, so the lines are still fed', async () => {
+    const { types, reads } = await feed(true)
+    expect(reads).toBeGreaterThan(1)
+    expect(types).toContain('tool.started')
+  })
+})

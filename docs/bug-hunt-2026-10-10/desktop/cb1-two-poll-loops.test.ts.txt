@@ -1,0 +1,43 @@
+import { describe, expect, it } from 'vitest'
+
+import { createBackgroundWatch } from '../src/main/claude-background.js'
+import type { BackgroundAgent } from '../src/main/claude-background.js'
+
+/*
+ * CB1. tick() clears `timer` before awaiting list(); a watch() that lands
+ * during that await sees no timer and schedules a second tick. Both ticks
+ * reschedule themselves, so two loops poll from then on.
+ */
+const flush = async (): Promise<void> => {
+  for (let i = 0; i < 5; i += 1) await new Promise((resolve) => setTimeout(resolve, 0))
+}
+
+describe('CB1: a second watch while the first tick is listing', () => {
+  it('leaves one poll loop, not two', async () => {
+    const live: BackgroundAgent[] = [{ id: 'a', state: 'working' }, { id: 'b', state: 'working' }]
+    const pending: (() => void)[] = []
+    let release: (() => void) | undefined
+    let calls = 0
+    const watch = createBackgroundWatch({
+      list: () => {
+        calls += 1
+        if (calls === 1) return new Promise<readonly BackgroundAgent[]>((resolve) => { release = () => resolve(live) })
+        return Promise.resolve(live)
+      },
+      onChange: () => undefined,
+      intervalMs: 5_000,
+      setTimer: (run) => { pending.push(run); return pending.length },
+      clearTimer: () => undefined
+    })
+    watch.watch(['a'])
+    expect(pending).toHaveLength(1)
+    pending.shift()!()            // the first tick: timer cleared, list() pending
+    watch.watch(['b'])            // lands during the await
+    release!()
+    await flush()
+    // Run whatever got scheduled once, then count what is waiting.
+    for (const run of pending.splice(0)) run()
+    await flush()
+    expect(pending).toHaveLength(1)
+  })
+})
