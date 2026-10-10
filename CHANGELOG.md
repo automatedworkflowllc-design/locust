@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.732.0 - 2026-10-10
+
+### New
+
+- **Every change in the folder, in one panel.** Press Changes in a conversation's header to see everything the folder's branch changed since it left main, beside the conversation, as Claude Code shows it. The changed files are listed by folder with how many lines each added and removed, every file's changes are in one coloured scroll, and the branch's commits are underneath. Pick one to see just that commit. The ⋯ menu shows or hides the file list (Ctrl+Shift+Y), folds or opens every file, and refreshes.
+
 ## 0.731.0 - 2026-10-10
 
 ### New
