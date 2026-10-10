@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.724.0 - 2026-10-10
+
+### Improved
+
+- **Install the GitHub CLI from Locust.** If your computer doesn't have the GitHub CLI, Settings › Connectors now offers to install it, with winget on Windows or Homebrew on a Mac that has it. Your computer may ask you to allow the installer. "Get it from GitHub" is still beside it, and if the install can't run, the card says why.
+
 ## 0.723.0 - 2026-10-10
 
 ### Improved
