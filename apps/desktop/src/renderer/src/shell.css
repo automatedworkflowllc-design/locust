@@ -1342,8 +1342,10 @@ textarea {
 /* Code in a reply, in colour (0.719, codeColors.ts): Shiki's css-variables
  * theme, its variables set from Locust's own tones so a block follows the
  * theme. Keywords violet, strings green, numbers and constants amber,
- * functions blue, comments and punctuation the quiet text. */
-.lc-code {
+ * functions blue, comments and punctuation the quiet text. The file viewer's
+ * code wears the same. */
+.lc-code,
+.lc-viewer__code {
   --shiki-foreground: var(--lc-text-secondary);
   --shiki-background: transparent;
   --shiki-token-keyword: var(--lc-violet-text);

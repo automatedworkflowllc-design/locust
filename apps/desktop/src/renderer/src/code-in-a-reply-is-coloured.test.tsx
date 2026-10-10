@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
-import { colourCode, colouredAlready, grammarFor, MAX_COLOURED_CHARACTERS } from './codeColors.js'
+import { colourCode, colouredAlready, grammarFor, languageOfPath, MAX_COLOURED_CHARACTERS } from './codeColors.js'
 import { ColouredCode } from './components/ColouredCode.js'
 
 /*
@@ -19,6 +19,15 @@ describe('code in a reply', () => {
     expect(grammarFor(undefined)).toBeUndefined()
     // Not a key of the table's own prototype.
     expect(grammarFor('constructor')).toBeUndefined()
+  })
+
+  it('knows an opened file’s language by its name', () => {
+    expect(languageOfPath('C:\\work\\shop\\cart.py')).toBe('py')
+    expect(languageOfPath('src/App.TSX')).toBe('tsx')
+    expect(languageOfPath('deploy/Dockerfile')).toBe('dockerfile')
+    expect(languageOfPath('notes.txt')).toBeUndefined()
+    expect(languageOfPath('.env')).toBeUndefined()
+    expect(languageOfPath('README')).toBeUndefined()
   })
 
   it('is coloured with the theme’s own variables, and keeps every character', async () => {

@@ -20,7 +20,7 @@ heading: the home screen then shows it once, as a splash.
 
 ### Improved
 
-- **Code in a reply is in colour.** Keywords, strings, numbers, functions and comments each have their own colour, in 31 languages, read with the same grammars VS Code uses. A block is coloured once it is finished, so nothing changes shape while you read it.
+- **Code in a reply is in colour.** Keywords, strings, numbers, functions and comments each have their own colour, in 31 languages, read with the same grammars VS Code uses. A block is coloured once it is finished, so nothing changes shape while you read it. A file you open from the conversation is coloured the same way, by its name.
 - **A teammate may close the test browser it started, found by its own profile.** Ending a browser by name is still refused. A command that finds the browser by name and narrows it to the teammate's own command line, such as its own profile folder, now runs when every window it matches is one a teammate started. If the filter also matches one of yours, it is refused and the teammate is told which. Process ids written into a loop, such as `for p in 101 102; do taskkill /PID $p; done`, are now checked too, the same as ids written one at a time.
 
 ### Fixed

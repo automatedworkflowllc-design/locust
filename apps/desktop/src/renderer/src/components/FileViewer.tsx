@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 
 import type { FileTurn } from '../missionView.js'
+import { ColouredCode } from './ColouredCode.js'
+import { languageOfPath } from '../codeColors.js'
 import { AgentText } from './ThreadItems.js'
 import { DiffView } from './DiffView.js'
 import { Icon } from './Icon.js'
@@ -14,6 +16,12 @@ import { DocumentChange } from './DocumentChange.js'
 import type { OfficeDocument } from '../../../shared/office-document.js'
 import type { Workbook } from '../../../shared/sheet.js'
 import { quoteOfPagePick, VIEWER_FRAME_NAME } from '../../../shared/page-pick.js'
+
+/** The file's language for colouring its code (0.719), when Locust carries one. */
+const languageProp = (path: string): { language?: string } => {
+  const language = languageOfPath(path)
+  return language === undefined ? {} : { language }
+}
 
 /**
  * A file a teammate wrote, open beside the conversation.
@@ -239,7 +247,7 @@ export function FileViewer({
               <AgentText text={rebuilt.next} streaming={false} />
             </div>
           ) : (
-            <pre className="lc-viewer__code">{rebuilt.next}</pre>
+            <pre className="lc-viewer__code"><ColouredCode code={rebuilt.next} {...languageProp(path)} /></pre>
           )}
         </div>
       ) : version !== undefined ? (
@@ -339,7 +347,7 @@ export function FileViewer({
            * must not make the whole drawer scroll sideways -- that is the
            * rule every wide thing in this app follows.
            */
-          <pre className="lc-viewer__code">{text}</pre>
+          <pre className="lc-viewer__code"><ColouredCode code={text} {...languageProp(path)} /></pre>
         )}
       </div>
       )}

@@ -112,6 +112,19 @@ export function grammarFor(language: string | undefined): string | undefined {
   return Object.hasOwn(GRAMMARS, name) ? name : undefined
 }
 
+/** Files known by their whole name rather than an extension. */
+const FILE_NAMES: Readonly<Record<string, string>> = { dockerfile: 'dockerfile', makefile: 'shellscript', '.bashrc': 'shellscript', '.zshrc': 'shellscript', '.gitconfig': 'ini', '.editorconfig': 'ini' }
+
+/** A file's language, from its name: `cart.py` -> `py`, `Dockerfile` -> `dockerfile`; undefined when Locust carries none. */
+export function languageOfPath(path: string): string | undefined {
+  const name = path.replace(/\\/g, '/').split('/').pop()?.toLowerCase() ?? ''
+  if (Object.hasOwn(FILE_NAMES, name)) return FILE_NAMES[name]
+  const dot = name.lastIndexOf('.')
+  if (dot <= 0 || dot === name.length - 1) return undefined
+  const extension = name.slice(dot + 1)
+  return grammarFor(extension) === undefined ? undefined : extension
+}
+
 let highlighter: Promise<HighlighterCore> | undefined
 const loaded = new Map<string, Promise<void>>()
 /** The last blocks coloured, so a reply drawn again is coloured at once. */
