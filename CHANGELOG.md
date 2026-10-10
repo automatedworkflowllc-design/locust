@@ -11,6 +11,17 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.723.0 - 2026-10-10
+
+### Improved
+
+- **Less clutter.** A teammate with no fixed model no longer says "runs on the model you pick" on every card. A route on your account's default model now reads just "Codex" or "Claude", not "Codex / Account Default", in the message box, the conversation header and the lists. The conversation list shows what a conversation cost you, or that it was free, instead of token counts, which are still in Details. Headers drop lines that said nothing, such as "all readable".
+
+### Fixed
+
+- **Every agent's limits read the same way.** Codex's limits said "33% used" while every other agent's said "% left". They all say what's left now.
+- **A teammate's Recent work lists conversations.** It used to list each message of one conversation, such as "Good, ship it", as if it were separate work.
+
 ## 0.722.0 - 2026-10-10
 
 ### Improved
