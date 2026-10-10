@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.727.0 - 2026-10-10
+
+### New
+
+- **What a teammate publishes shows as a card.** When a reply links to something a teammate made elsewhere, such as a Claude artifact, a Google Doc, Sheet or Slides, a Notion page, a Figma file or a gist, a card under the reply shows its name, what it is and where it lives, with Open. A bare web address of one of these now opens from its card too.
+
 ## 0.726.0 - 2026-10-10
 
 ### Improved
