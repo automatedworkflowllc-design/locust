@@ -161,7 +161,7 @@ export function UsageDialog({
                             <div className={`lc-usage__window${tone}`} key={window.name}>
                               <span className="lc-usage__windowhead">
                                 <span className="lc-usage__windowname">{name}</span>
-                                <span className="lc-usage__percent">{window.remaining === undefined ? `${String(window.percent)}% used` : `${String(window.remaining)}% left`}</span>
+                                <span className="lc-usage__percent">{`${String(window.remaining ?? Math.max(0, 100 - window.percent))}% left`}</span>
                               </span>
                               <span className="lc-usage__bar" role="meter" aria-label={`${name} used`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={window.percent}>
                                 <span className="lc-usage__fill" style={{ width: `${String(Math.min(100, window.percent))}%` }} />

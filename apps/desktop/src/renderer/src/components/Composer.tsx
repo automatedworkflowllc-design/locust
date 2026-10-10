@@ -2398,6 +2398,9 @@ export function Composer({
                     */}
                   {comparing ? null : nothingConnected ? (
                     <span className="lc-control__model">No AI agent</span>
+                  ) : shownModel === 'account-default' && !ownModel ? (
+                    // The account's own default is the runtime alone, "Claude", as every other surface says it (0.723).
+                    runtimeLabel
                   ) : (
                     <>
                       {!ownModel && (

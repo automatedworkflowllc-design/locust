@@ -81,9 +81,9 @@ const header = (
 
 describe('what the Missions header says about a damaged ledger', () => {
   it('says verified only when there is genuinely nothing wrong', () => {
-    // The control. Without it, a header that never says "verified" would pass
-    // every assertion below while being just as wrong in the other direction.
-    expect(header([mission('m_1', 0)], 0)).toContain('all readable')
+    // The control. A healthy list says nothing about its records (0.723: "all readable" on every healthy list
+    // was noise), so the damaged headers below are the only ones that speak -- and the count is all this says.
+    expect(header([mission('m_1', 0)], 0)).toBe('1 conversation')
   })
 
   it('never claims verification while a file could not be read', () => {

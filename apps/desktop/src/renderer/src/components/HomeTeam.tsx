@@ -117,18 +117,19 @@ export function HomeTeam({
                 * accessible name. A model of the person's own has no mark and
                 * keeps its name, which is the whole of its route anyway.
                 */}
-              <span className="lc-hometeam__route" {...(mate.route === undefined ? {} : { title: mate.route })}>
-                {mate.route === undefined ? (
-                  'runs on the model you pick'
-                ) : mate.runtime !== undefined && mate.model !== undefined ? (
-                  <>
-                    <RuntimeMark runtime={mate.runtime} size={11} className="is-inline" />
-                    {mate.model}
-                  </>
-                ) : (
-                  mate.route
-                )}
-              </span>
+              {/* No fixed model: no line. A line saying so sat on every such card and told nobody anything (declutter, 0.723). */}
+              {mate.route !== undefined && (
+                <span className="lc-hometeam__route" title={mate.route}>
+                  {mate.runtime !== undefined && mate.model !== undefined ? (
+                    <>
+                      <RuntimeMark runtime={mate.runtime} size={11} className="is-inline" />
+                      {mate.model}
+                    </>
+                  ) : (
+                    mate.route
+                  )}
+                </span>
+              )}
             </span>
             <span className="lc-hometeam__go" aria-hidden="true">
               <Icon name="chevron-right" size={13} />

@@ -156,6 +156,9 @@ export function isOwnRoute(modelId: string): boolean {
   return OWN_ROUTE_MODEL.test(modelId)
 }
 
+/** Locust's own word for "send no model; the account picks" (status.ts ACCOUNT_DEFAULT_MODEL). */
+const ACCOUNT_DEFAULT_ID = 'account-default'
+
 /**
  * A route as chrome, "Runtime / Model" -- and a model of the person's own by
  * its own name alone (0.361).
@@ -171,7 +174,14 @@ export function isOwnRoute(modelId: string): boolean {
  * mission's); only whether the runtime's word goes in front is decided here.
  */
 export function routeChrome(runtime: MissionRuntimeId, modelId: string, model: string, separator = ' / '): string {
-  return isOwnRoute(modelId) ? model : `${shortRuntimeName(runtime)}${separator}${model}`
+  if (isOwnRoute(modelId)) return model
+  // The account's own default is the runtime's name alone: "Codex", not "Codex / Account Default" on every row
+  // (declutter, 0.723). What follows the model's name -- a level, " · Medium" -- stays.
+  if (modelId === ACCOUNT_DEFAULT_ID) {
+    const rest = model.replace(/^(?:Account Default|default)(?: · )?/i, '')
+    return rest.length === 0 ? shortRuntimeName(runtime) : `${shortRuntimeName(runtime)}${separator}${rest}`
+  }
+  return `${shortRuntimeName(runtime)}${separator}${model}`
 }
 
 export function modelDisplayName(runtime: string, modelId: string): string {

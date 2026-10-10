@@ -182,13 +182,15 @@ describe('physical torn ledger: reader → history → preload → rendered Miss
     expect(result.html).not.toContain('with an incomplete receipt')
   })
 
-  it('clean control: zero issues across the boundary and all readable on screen', async () => {
+  it('clean control: zero issues across the boundary, and nothing said about the records on screen', async () => {
     const result = await displayed(clean)
     expect(result.snapshot.issues).toEqual([])
     expect(result.data.issueCount).toBe(0)
     expect(result.data.unreadableCount).toBe(0)
     expect(result.data.missions.map((mission) => mission.integrityIssueCount)).toEqual([0])
-    expect(result.html).toContain('1 conversation, 0 in this folder · all readable')
+    // A healthy list says only its count (0.723); the torn cases above and below are the ones that speak.
+    expect(result.html).toContain('1 conversation, 0 in this folder<')
+    expect(result.html).not.toContain('all readable')
     expect(result.html).not.toContain('with an incomplete receipt')
     expect(result.html).not.toContain('could not be read')
   })

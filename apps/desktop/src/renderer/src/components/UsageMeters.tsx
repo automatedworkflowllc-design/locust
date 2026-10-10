@@ -36,7 +36,7 @@ export function UsageMeters({ said, now = new Date() }: { readonly said: string;
             <span className="lc-meter__bar" aria-hidden="true">
               <span className="lc-meter__fill" style={{ width: `${String(Math.min(100, window.percent))}%` }} />
             </span>
-            <span className="lc-meter__figure">{window.remaining === undefined ? `${String(window.percent)}% used` : `${String(window.remaining)}% left`}</span>
+            <span className="lc-meter__figure">{`${String(window.remaining ?? Math.max(0, 100 - window.percent))}% left`}</span>
           </span>
         )
       })}

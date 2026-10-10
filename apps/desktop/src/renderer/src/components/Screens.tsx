@@ -65,7 +65,7 @@ import { WHAT_LOCUST_CAN_STOP_LEDE } from '../../../shared/what-locust-can-stop.
 import { NETWORK_DOC_LINK } from '../../../shared/outbound-links.js'
 import { keepCurrentNote, offersUpdate, updateLine } from '../agentUpdates.js'
 import { Icon } from './Icon.js'
-import { costCell, costTotal, missionCost, monthSpendLine, sumCosts } from '../cost.js'
+import { costGlanceCell, costTotal, missionCost, monthSpendLine, sumCosts } from '../cost.js'
 import { conversationsOf } from '../missionsList.js'
 import { shortAgo } from '../railFlyout.js'
 import { agoLabel, teammateWork } from '../teammateWork.js'
@@ -333,12 +333,13 @@ export function MissionsScreen({
          * 0.349). The ledger's verdict stays: on this screen it is the claim
          * the tests below it guard, and it is never said when untrue.
          */
-        meta={`${conversations.length} ${conversations.length === 1 ? 'conversation' : 'conversations'}${elsewhere === 0 ? '' : `, ${conversations.length - elsewhere} in this folder`} · ${
+        // "all readable" said nothing on every healthy list (declutter, 0.723); a damaged record still says so.
+        meta={`${conversations.length} ${conversations.length === 1 ? 'conversation' : 'conversations'}${elsewhere === 0 ? '' : `, ${conversations.length - elsewhere} in this folder`}${
           ledgerUnreadable
-            ? 'the records could not be read'
+            ? ' · the records could not be read'
             : damaged === 0
-              ? 'all readable'
-              : ledgerDamageWords(withIssues, unreadableLedgers)
+              ? ''
+              : ` · ${ledgerDamageWords(withIssues, unreadableLedgers)}`
         }${total === undefined || total.word !== 'priced' ? '' : ` · ${total.line} across ${String(total.runs)} priced`}${
           totalMissions === undefined || listedMissions === undefined ? '' : ` · only the newest ${listedMissions.toLocaleString('en-US')} of ${totalMissions.toLocaleString('en-US')} turns are listed`
         }`}
@@ -542,7 +543,7 @@ export function MissionsScreen({
                         : `${String(mission.checkpoints.length)} checkpoint${mission.checkpoints.length === 1 ? '' : 's'} · ${elapsed}`}
                   </span>
                   <span className="lc-missionrow__cost lc-mono" title="What the runtime reported this run cost">
-                    {costCell(sumCosts(entry.members.map((turn) => missionCost(turn))), mission.model)}
+                    {costGlanceCell(sumCosts(entry.members.map((turn) => missionCost(turn))), mission.model)}
                   </span>
                   <span className={`lc-missionrow__tag lc-mono lc-tone-${listTone(view)}`}>{view.tag}</span>
                 </button>
@@ -704,19 +705,16 @@ export function TeammatesScreen({
           * is the fact this product exists to keep legible -- so it
           * gets a full-width row and wraps rather than ever being cut.
           */}
-        <div className="lc-rostercard__route lc-mono">
-          {teammate.route === undefined ? (
-            <span>runs on the model you pick</span>
-          ) : (
-            <>
-              <span className="lc-rostercard__model">
-                {!isOwnRoute(teammate.route.model) && <RuntimeMark runtime={teammate.route.runtime} size={12} className="is-inline" />}
-                {routeChrome(teammate.route.runtime, teammate.route.model, routeModelName(teammate.route.runtime, teammate.route.model))}
-              </span>
-              <span>{modeLabel(teammate.route.mode)}</span>
-            </>
-          )}
-        </div>
+        {/* No fixed model: no row. A row saying so sat on every such card and said nothing (declutter, 0.723). */}
+        {teammate.route !== undefined && (
+          <div className="lc-rostercard__route lc-mono">
+            <span className="lc-rostercard__model">
+              {!isOwnRoute(teammate.route.model) && <RuntimeMark runtime={teammate.route.runtime} size={12} className="is-inline" />}
+              {routeChrome(teammate.route.runtime, teammate.route.model, routeModelName(teammate.route.runtime, teammate.route.model))}
+            </span>
+            <span>{modeLabel(teammate.route.mode)}</span>
+          </div>
+        )}
         <dl className="lc-rostercard__stats">
           <div className="lc-rostercard__stat">
             <dt>Runs</dt>
@@ -843,7 +841,7 @@ export function TeammatesScreen({
     <div className="lc-screen">
       <ScreenHeader
         title="Team"
-        meta={`${teammates.length} teammate${teammates.length === 1 ? '' : 's'} · avatars and roles are yours to set`}
+        meta={`${teammates.length} teammate${teammates.length === 1 ? '' : 's'}`}
         actions={
           /* The team as a picture of itself, out and in (0.398; TeamCard.tsx). */
           <>

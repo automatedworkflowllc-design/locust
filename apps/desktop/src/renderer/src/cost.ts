@@ -310,6 +310,15 @@ export function costCell(cost: RunCost | undefined, model: string): string {
 }
 
 /**
+ * The same cell on a list read at a glance (the conversation list, 0.723): what a person PAYS -- money or
+ * Copilot's premium requests -- or "free" for a free model, else nothing. "9.0k in · 870 out" on every row was
+ * an engineer's unit, as it was on the header (headerCostTail); the counts stay in Details.
+ */
+export function costGlanceCell(cost: RunCost | undefined, model: string): string {
+  return moneyLine(cost) ?? (/-free$/i.test(model) ? 'free' : '')
+}
+
+/**
  * The cost part of the mission header line.
  *
  * Every other part of that line is a fact about ONE mission -- its id, its

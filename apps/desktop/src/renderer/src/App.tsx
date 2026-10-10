@@ -8219,8 +8219,9 @@ export default function App(): ReactElement {
                          * exists to keep legible.
                          */
                         : `${
-                            liveRun.data.model === undefined
-                              ? 'Account default'
+                            // The account's own default says nothing the runtime beside the name does not (declutter, 0.723).
+                            liveRun.data.model === undefined || liveRun.data.model === 'account-default'
+                              ? ''
                               : // The same name the chip gives it: "Sonnet 5.5", not the alias's bare "Sonnet" (0.447).
                                 routeModelName(liveRun.data.runtime, liveRun.data.model, resolvedModels.get(`${liveRun.data.runtime}:${liveRun.data.model}`))
                           }${
@@ -8236,7 +8237,7 @@ export default function App(): ReactElement {
                             // the context ring's hover, the surface that was
                             // already conversation-scoped.
                             shownCostTail
-                          }`}
+                          }`.replace(/^ · /, '')}
                       {/*
                         * The context ring is NOT here.
                         *

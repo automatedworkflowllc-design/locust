@@ -28,9 +28,10 @@ describe('the suggested name', () => {
 
 describe('a teammate with no model yet', () => {
   it('is said the same way on Home and the Team screen', () => {
-    expect(home).toContain("'runs on the model you pick'")
+    // Said the same way: not at all (0.723). "runs on the model you pick" sat on every card and said nothing.
+    expect(home).not.toContain('runs on the model you pick')
+    expect(screens).not.toContain('runs on the model you pick')
     // No "not run yet" (0.524): the card beside it can say "last run 5 minutes ago".
-    expect(screens).toContain('<span>runs on the model you pick</span>')
     expect(screens).not.toContain('not run yet · runs on')
     expect(screens).not.toContain('route set by their first mission')
   })

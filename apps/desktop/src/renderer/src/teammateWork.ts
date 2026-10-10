@@ -1,6 +1,7 @@
 import type { PublicRecoveredMission } from '../../shared/ipc.js'
 import type { RunCost } from './cost.js'
 import { missionCost, sumCosts } from './cost.js'
+import { rootMission } from './missionView.js'
 
 /**
  * What a teammate has actually done, for their card to say.
@@ -16,7 +17,7 @@ export interface TeammateWork {
   readonly lastRunAt: string | undefined
   /** What their work has cost, in whatever units the runtimes reported. */
   readonly cost: RunCost | undefined
-  /** Their newest missions, newest first. */
+  /** Their newest conversations, newest first: each its newest turn, named by its first. */
   readonly recent: readonly {
     readonly missionId: string
     readonly title: string
@@ -60,13 +61,30 @@ export function teammateWork(
     // Undefined, not zero: a runtime that reported no usage has not told us
     // the work was free, and a card must not say it was.
     cost: sumCosts(theirs.map((mission) => missionCost(mission))),
-    recent: theirs.slice(0, RECENT_MISSION_LIMIT).map((mission) => ({
-      missionId: mission.missionId,
-      title: titleOf(mission),
-      phase: mission.phase,
-      hasIntegrityIssues: mission.integrityIssueCount > 0,
-      at: mission.lastUpdatedAt
-    }))
+    /*
+     * One row per CONVERSATION, named as the conversation list names it: by its first turn's words. It was one
+     * row per turn, so a three-turn conversation filled the card with its own follow-ups -- "Good, ship it",
+     * "Also check the signup ..." -- and no other work (the declutter pass, 0.723).
+     */
+    recent: (() => {
+      const byId = new Map(missions.map((mission) => [mission.missionId, mission]))
+      const seen = new Set<string>()
+      const rows: TeammateWork['recent'][number][] = []
+      for (const mission of theirs) {
+        const root = rootMission(mission, byId)
+        if (seen.has(root.missionId)) continue
+        seen.add(root.missionId)
+        rows.push({
+          missionId: mission.missionId,
+          title: titleOf(root),
+          phase: mission.phase,
+          hasIntegrityIssues: mission.integrityIssueCount > 0,
+          at: mission.lastUpdatedAt
+        })
+        if (rows.length === RECENT_MISSION_LIMIT) break
+      }
+      return rows
+    })()
   }
 }
 

@@ -106,9 +106,11 @@ describe("Home's teammate card", () => {
     expect(html).toContain('aria-label="Message Robin, Finance Bro, on Cursor · Grok 4.7 Medium"')
   })
 
-  it('before a first run, says so, with no mark', () => {
+  it('with no model of its own, draws no route line and no mark', () => {
     const html = card({ teammateId: 'tm_new', name: 'Newt', hue: 'teal', avatar: seedAvatar('tm_new'), role: 'Docs & QA', working: false })
-    expect(html).toContain('runs on the model you pick')
+    // 0.723: no line rather than "runs on the model you pick" on every such card.
+    expect(html).not.toContain('lc-hometeam__route')
+    expect(html).not.toContain('runs on the model you pick')
     expect(html).not.toContain('lc-runtimemark')
   })
 })
