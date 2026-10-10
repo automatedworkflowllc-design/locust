@@ -278,6 +278,7 @@ import {
   TEAMMATE_ASSIGN_CHANNEL,
   TEAMMATE_RENAME_MISSION_CHANNEL,
   TEAMMATE_PIN_MISSION_CHANNEL,
+  TEAMMATE_SETTLE_MISSION_CHANNEL,
   GROUP_LIST_CHANNEL,
   GROUP_CREATE_CHANNEL,
   GROUP_RENAME_CHANNEL,
@@ -5350,13 +5351,14 @@ if (!ownsSingleInstanceLock) {
 
     const listTeammates = async () => {
       try {
-        const [list, missionOwners, missionTitles, missionPins] = await Promise.all([
+        const [list, missionOwners, missionTitles, missionPins, missionSettled] = await Promise.all([
           teammates.list(),
           teammates.missionOwners(),
           teammates.missionTitles(),
-          teammates.missionPins()
+          teammates.missionPins(),
+          teammates.missionSettled()
         ])
-        return { ok: true, data: { teammates: list, missionOwners, missionTitles, missionPins } } as const
+        return { ok: true, data: { teammates: list, missionOwners, missionTitles, missionPins, missionSettled } } as const
       } catch {
         return teammatesUnavailable
       }
@@ -5556,6 +5558,20 @@ if (!ownsSingleInstanceLock) {
         return { ok: true, data: {} } as const
       } catch {
         return teammateRejected('That conversation could not be renamed.')
+      }
+    })
+    // Settled out of the sidebar, snoozed until a time, or brought back (0.730).
+    ipcMain.handle(TEAMMATE_SETTLE_MISSION_CHANNEL, async (event, request: unknown) => {
+      if (!fromOwnWindow(event)) return teammateRejected('The conversation could not be put away.')
+      const input = (typeof request === 'object' && request !== null ? request : {}) as Record<string, unknown>
+      try {
+        await teammates.settleMission(
+          String(input.missionId ?? ''),
+          input.back === true ? undefined : typeof input.until === 'string' ? { until: input.until } : {}
+        )
+        return { ok: true, data: {} } as const
+      } catch {
+        return teammateRejected('That conversation could not be put away.')
       }
     })
     // Pinned to the top of the sidebar, or not (0.729).

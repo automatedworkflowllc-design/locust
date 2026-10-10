@@ -579,6 +579,8 @@ export const TEAMMATE_ASSIGN_CHANNEL = 'teammates:assign'
 export const TEAMMATE_RENAME_MISSION_CHANNEL = 'teammates:renameMission'
 /** Pin a conversation to the top of the sidebar, or unpin it (0.729). */
 export const TEAMMATE_PIN_MISSION_CHANNEL = 'teammates:pinMission'
+/** Settle a conversation out of the sidebar, snooze it until a time, or bring it back (0.730). */
+export const TEAMMATE_SETTLE_MISSION_CHANNEL = 'teammates:settleMission'
 export const ROUTINE_LIST_CHANNEL = 'routines:list'
 export const ROUTINE_CREATE_CHANNEL = 'routines:create'
 export const ROUTINE_UPDATE_CHANNEL = 'routines:update'
@@ -1716,6 +1718,8 @@ export type TeammateListResponse =
         readonly missionTitles: Readonly<Record<string, string>>
         /** Conversations pinned to the sidebar's top, newest pin first (0.729). */
         readonly missionPins?: readonly string[]
+        /** Conversations settled or snoozed out of the sidebar: when, and until when (0.730). */
+        readonly missionSettled?: Readonly<Record<string, { readonly at: string; readonly until?: string }>>
       }
     }
   | { readonly ok: false; readonly error: { readonly code: 'TEAMMATES_UNAVAILABLE'; readonly message: string } }
@@ -3614,6 +3618,8 @@ export interface DesktopApi {
   renameMission(missionId: string, title: string): Promise<TeammateMutationResponse>
   /** Pin a conversation (its key) to the top of the sidebar, or unpin it (0.729). */
   pinMission(missionId: string, pinned: boolean): Promise<TeammateMutationResponse>
+  /** Settle (no `until`), snooze until a time, or bring back (`undefined`) a conversation (0.730). */
+  settleMission(missionId: string, settled: { readonly until?: string } | undefined): Promise<TeammateMutationResponse>
   listGroups(): Promise<GroupListResponse>
   createGroup(name: string): Promise<GroupMutationResponse>
   renameGroup(groupId: string, name: string): Promise<GroupMutationResponse>

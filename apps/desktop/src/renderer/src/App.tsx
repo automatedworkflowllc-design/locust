@@ -209,6 +209,8 @@ import { splitAttachments, withAttachments } from '../../shared/attachments.js'
 // Only `heldFor`: this file has its own `ownerOf` for live runs, which is a
 // different question from who owns a recorded mission.
 import { conversationKeys, heldFor, routineOf } from './conversationList.js'
+import { snoozeChoices } from './settled.js'
+import type { SettledEntry } from './settled.js'
 import { collapseConversations, staleChecking, defaultEffort, defaultRoute, effortAfterRouteChange, routeAfterKeep, effortIsInModelId, modelFamily, listedAsMission, modeFacts, modeRunsOn, modesFor, modeUnavailableReason, ownerToSelect, facePresenceFor, keepWhatWasKnown, runtimeOfTeammate, runtimeIsUsable, runtimeReach, teammateStatusView, startRoute, freeStartStillFree, freeStartModel, nextFreeModel, integrationOf, ACCOUNT_DEFAULT_MODEL} from './status.js'
 import { homeRouteOf, isOwnRoute, modelDisplayName, rememberOwnModels, routeChrome, routeModelName } from './routeName.js'
 import { restoreNoticeLine } from './backupWords.js'
@@ -1100,6 +1102,16 @@ export default function App(): ReactElement {
           shortcut: 'p',
           onSelect: () => pinConversation(missionId, !missionPinsRef.current.includes(conversationKeyOf(missionId)))
         },
+        // Out of the way, or out of the way until a time; back from the same menu (0.730, settled.ts).
+        ...(missionSettledRef.current[conversationKeyOf(missionId)] !== undefined
+          ? [{ label: 'Bring back', shortcut: 'k', onSelect: () => settleConversation(missionId, undefined) }]
+          : [
+              { label: 'Settle', shortcut: 't', onSelect: () => settleConversation(missionId, {}) },
+              {
+                label: 'Snooze',
+                submenu: snoozeChoices(new Date()).map((choice) => ({ label: choice.label, onSelect: () => settleConversation(missionId, { until: choice.until }) }))
+              }
+            ]),
         /*
          * ONE row that opens the list, not one row per group.
          *
@@ -1419,6 +1431,10 @@ export default function App(): ReactElement {
   const [missionTitles, setMissionTitles] = useState<Readonly<Record<string, string>>>({})
   /** Conversations pinned to the sidebar's top, by conversation key, newest pin first (0.729). */
   const [missionPins, setMissionPins] = useState<readonly string[]>([])
+  /** Conversations settled or snoozed out of the sidebar, by conversation key (0.730). */
+  const [missionSettled, setMissionSettled] = useState<Readonly<Record<string, SettledEntry>>>({})
+  const missionSettledRef = useRef<Readonly<Record<string, SettledEntry>>>({})
+  missionSettledRef.current = missionSettled
   /** What the roster says about conversations: their typed names, and which are pinned. */
   const missionPinsRef = useRef<readonly string[]>([])
   missionPinsRef.current = missionPins
@@ -1437,9 +1453,30 @@ export default function App(): ReactElement {
       })
       .catch(() => setMissionPins(before))
   }
-  const rememberRosterNames = (data: { readonly missionTitles: Readonly<Record<string, string>>; readonly missionPins?: readonly string[] }): void => {
+  const rememberRosterNames = (data: {
+    readonly missionTitles: Readonly<Record<string, string>>
+    readonly missionPins?: readonly string[]
+    readonly missionSettled?: Readonly<Record<string, SettledEntry>>
+  }): void => {
     setMissionTitles(data.missionTitles)
     setMissionPins(data.missionPins ?? [])
+    setMissionSettled(data.missionSettled ?? {})
+  }
+  /** Settle a conversation, snooze it until a time, or bring it back: shown at once, put back if refused (0.730). */
+  const settleConversation = (missionId: string, settled: { readonly until?: string } | undefined): void => {
+    const key = conversationKeyOf(missionId)
+    const before = missionSettledRef.current
+    const { [key]: _was, ...rest } = before
+    setMissionSettled(settled === undefined ? rest : { ...rest, [key]: settled.until === undefined ? { at: new Date().toISOString() } : { at: new Date().toISOString(), until: settled.until } })
+    void window.desktop
+      ?.settleMission(key, settled)
+      .then((answer) => {
+        if (!answer.ok) {
+          setMissionSettled(before)
+          setTeammateError(answer.error.message)
+        }
+      })
+      .catch(() => setMissionSettled(before))
   }
   const [groups, setGroups] = useState<readonly PublicGroup[]>([])
   const [groupMembers, setGroupMembers] = useState<Readonly<Record<string, GroupMembership>>>({})
@@ -7501,6 +7538,7 @@ export default function App(): ReactElement {
           }}
           onMissionMenu={openMissionMenu}
           pinnedKeys={missionPins}
+          settled={missionSettled}
           groups={groups}
           groupMembers={groupMembers}
           unreadableConversations={unreadableLedgers}

@@ -65,6 +65,14 @@ export const MAX_MISSION_TITLES = 1_000
 export const MAX_MISSION_TITLE_LENGTH = 120
 /** Pinned conversations a sidebar keeps at its top (0.729): enough for any list, few enough to read. */
 export const MAX_MISSION_PINS = 50
+/** Settled or snoozed conversations kept out of the sidebar (0.730). */
+export const MAX_MISSION_SETTLED = 1_000
+
+/** A conversation put out of the way: when, and until when for a snooze (both ISO). */
+export interface MissionSettled {
+  readonly at: string
+  readonly until?: string
+}
 const MAX_FILE_BYTES = 1_000_000
 /**
  * What a caller sees when the roster file exists and cannot be read.
@@ -126,6 +134,10 @@ export interface TeammateStore {
   /** Conversations pinned to the top of the sidebar, newest pin first, by conversation key (0.729). */
   missionPins(): Promise<readonly string[]>
   pinMission(missionId: string, pinned: boolean): Promise<void>
+  /** Conversations settled or snoozed out of the sidebar, by conversation key (0.730). */
+  missionSettled(): Promise<Readonly<Record<string, MissionSettled>>>
+  /** Settle it (no `until`), snooze it until a time, or bring it back (`undefined`). */
+  settleMission(missionId: string, settled: { readonly until?: string } | undefined): Promise<void>
   /**
    * Record the newest turn of this teammate's hub -- the conversation their
    * replies to other teammates continue. Unknown teammate or bad id: nothing
@@ -144,6 +156,8 @@ interface StoredFile {
   readonly missionTitles: Readonly<Record<string, string>>
   /** Conversations pinned to the top of the sidebar, newest pin first (0.729). */
   readonly missionPins: readonly string[]
+  /** Conversations settled or snoozed out of the sidebar (0.730). */
+  readonly missionSettled: Readonly<Record<string, MissionSettled>>
   readonly settings: WorkspaceSettings
 }
 
@@ -603,7 +617,21 @@ function parsedFile(text: string): StoredFile {
     }
   }
 
-  return { schemaVersion: SCHEMA_VERSION, teammates, missionOwners: owners, missionTitles: titles, missionPins: pins, settings }
+  // Settled and snoozed, read as untrusted as the rest: ids, real times, no more than the cap (0.730).
+  const settled: Record<string, MissionSettled> = {}
+  if (typeof record.missionSettled === 'object' && record.missionSettled !== null) {
+    let kept = 0
+    for (const [missionId, entry] of Object.entries(record.missionSettled as Record<string, unknown>)) {
+      if (kept >= MAX_MISSION_SETTLED) break
+      if (!safeId(missionId) || typeof entry !== 'object' || entry === null) continue
+      const { at, until } = entry as { at?: unknown; until?: unknown }
+      if (typeof at !== 'string' || Number.isNaN(Date.parse(at))) continue
+      kept += 1
+      settled[missionId] = typeof until === 'string' && !Number.isNaN(Date.parse(until)) ? { at, until } : { at }
+    }
+  }
+
+  return { schemaVersion: SCHEMA_VERSION, teammates, missionOwners: owners, missionTitles: titles, missionPins: pins, missionSettled: settled, settings }
 }
 
 export function createTeammateStore(options: { readonly rootDirectory: string }): TeammateStore {
@@ -629,7 +657,7 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
       text = await readFile(path, 'utf8')
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        return { schemaVersion: SCHEMA_VERSION, teammates: [], missionOwners: {}, missionTitles: {}, missionPins: [], settings: DEFAULT_SETTINGS }
+        return { schemaVersion: SCHEMA_VERSION, teammates: [], missionOwners: {}, missionTitles: {}, missionPins: [], missionSettled: {}, settings: DEFAULT_SETTINGS }
       }
       throw new Error(TEAMMATES_UNREADABLE)
     }
@@ -937,6 +965,27 @@ export function createTeammateStore(options: { readonly rootDirectory: string })
         }
         if (others.length >= MAX_MISSION_PINS) throw new Error(`At most ${String(MAX_MISSION_PINS)} conversations can be pinned`)
         await write({ ...file, missionPins: [missionId, ...others] })
+      })
+    },
+
+    missionSettled(): Promise<Readonly<Record<string, MissionSettled>>> {
+      return serialize(async () => (await read()).missionSettled)
+    },
+
+    settleMission(missionId, settled): Promise<void> {
+      return serialize(async () => {
+        if (!safeId(missionId)) throw new Error('Mission id is invalid')
+        const file = await read()
+        const { [missionId]: _before, ...others } = file.missionSettled
+        if (settled === undefined) {
+          if (_before === undefined) return
+          await write({ ...file, missionSettled: others })
+          return
+        }
+        if (settled.until !== undefined && Number.isNaN(Date.parse(settled.until))) throw new Error('Snooze time is invalid')
+        if (_before === undefined && Object.keys(others).length >= MAX_MISSION_SETTLED) throw new Error('Too many settled conversations')
+        const entry: MissionSettled = settled.until === undefined ? { at: new Date().toISOString() } : { at: new Date().toISOString(), until: settled.until }
+        await write({ ...file, missionSettled: { ...others, [missionId]: entry } })
       })
     },
 

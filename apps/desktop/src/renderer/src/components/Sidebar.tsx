@@ -8,6 +8,8 @@ import type { LiveActivity } from '../faceState.js'
 import { glancesAmong } from '../glances.js'
 import type { Handoff } from '../glances.js'
 import { isOwnRoute, routeChrome, routeModelName } from '../routeName.js'
+import { isPutAway } from '../settled.js'
+import type { SettledEntry } from '../settled.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
 import { branchNameFor } from '../../../shared/worktree-name.js'
 import mark from '../assets/locust-mark.svg'
@@ -173,6 +175,8 @@ function SidebarSection({
 
 /** No conversation pinned. */
 const NO_PINS: readonly string[] = []
+/** Nothing settled or snoozed. */
+const NOTHING_SETTLED: Readonly<Record<string, SettledEntry>> = {}
 
 export function Sidebar({
   runtimes,
@@ -188,6 +192,7 @@ export function Sidebar({
   onMissionMenu,
   renamingMissionId,
   pinnedKeys = NO_PINS,
+  settled = NOTHING_SETTLED,
   onRenameMission,
   onRenameDone,
   groups = [],
@@ -254,6 +259,8 @@ export function Sidebar({
   readonly renamingMissionId?: string
   /** Conversations pinned to the top, by conversation key, newest pin first (0.729). */
   readonly pinnedKeys?: readonly string[]
+  /** Conversations settled or snoozed out of the list, by conversation key (0.730, settled.ts). */
+  readonly settled?: Readonly<Record<string, SettledEntry>>
   /** Commit a new name. An empty string clears it back to what was typed. */
   readonly onRenameMission?: (missionId: string, title: string) => void
   readonly onRenameDone?: () => void
@@ -514,8 +521,22 @@ export function Sidebar({
     const owner = ownerOf(mission, missionOwners)
     return owner === undefined ? undefined : teammates.find((entry) => entry.teammateId === owner)?.name
   }
+  /*
+   * Settled and snoozed conversations are out of the list (0.730) -- unless it is the one open, or a search is
+   * looking for it, which is how a person finds one to bring back. A snooze's end redraws the list then.
+   */
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const ends = Object.values(settled).map((entry) => (entry.until === undefined ? NaN : Date.parse(entry.until))).filter((end) => end > Date.now())
+    if (ends.length === 0) return
+    const timer = setTimeout(() => setNow(new Date()), Math.min(Math.min(...ends) - Date.now() + 500, 2_147_000_000))
+    return () => clearTimeout(timer)
+  }, [settled, now])
+  const searching = query.trim().length > 0
   const shownConversations = conversationRows(missionsMatching(missions, query, ownerName)).filter(
-    (mission) => faceFilter === undefined || ownerOf(mission, missionOwners) === faceFilter
+    (mission) =>
+      (faceFilter === undefined || ownerOf(mission, missionOwners) === faceFilter)
+      && (searching || isShown(mission, selectedMissionId) || !isPutAway(mission.lastAt, settled[mission.rootId ?? mission.missionId], now))
   )
   /*
    * Everything not in a group, keyed by the CONVERSATION rather than the
