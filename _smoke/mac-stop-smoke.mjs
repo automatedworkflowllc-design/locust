@@ -120,84 +120,101 @@ try {
   })()`)
   check("Ash's conversation opens", opened === 'opened', String(opened))
 
-  const sent = await evaluate(`(async () => {
-    // The exact command (0.715): asked for 'a command that prints 1 to 300', the steadiest free model answered
-    // without running one, its OpenCode exited within seconds, and there was no run left to stop (0.714's Mac run).
-    const WORDS = 'Run this exact shell command and wait for it to finish, then tell me the last number it printed: for i in $(seq 1 300); do echo $i; sleep 1; done'
-    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
-    // The box is found again every time: the window can draw a new one as the
-    // conversation opens, and a held reference then reads the old, detached box
-    // (0.504's first run: "never ran: start enabled" after the re-press).
-    const box = () => document.querySelector('form.command-dock textarea')
-    const fill = () => {
-      const field = box()
-      if (field === null || field.value.length > 0) return
-      setter.call(field, WORDS)
-      field.dispatchEvent(new Event('input', { bubbles: true }))
-    }
-    if (box() === null) return 'no box'
-    fill()
-    // Pressed again if the words are still in the box: on a runner that has just
-    // started, a press can land before the window is listening (0.497, run 36696510212).
-    let presses = 0
-    let sent = false
-    for (let i = 0; i < 80 && presses < 3 && !sent; i += 1) {
-      fill()
-      const button = document.querySelector('button[aria-label="Send"]')
-      if (button && !button.disabled && (box()?.value.length ?? 0) > 0) {
-        button.click()
-        presses += 1
-        for (let wait = 0; wait < 16 && (box()?.value.length ?? 0) > 0; wait += 1) await new Promise((r) => setTimeout(r, 500))
-        // Emptied, and a turn on screen: it went. Emptied with nothing on screen: the box was redrawn.
-        if ((box()?.value.length ?? 0) === 0 && document.querySelector('.lc-thread .lc-bubble')) sent = true
-      }
-      await new Promise((r) => setTimeout(r, 250))
-    }
-    window.__presses = presses
-    window.__box = box()?.value ?? '(no box)'
-    for (let i = 0; i < 180; i += 1) {
-      await new Promise((r) => setTimeout(r, 1000))
-      if (document.querySelector('button[aria-label="Stop the running reply"]') && document.querySelector('.lc-livestep')) return window.__presses > 1 ? 'running (Start pressed ' + window.__presses + ' times)' : 'running'
-    }
-    const start = document.querySelector('button[aria-label="Send"]')
-    return 'never ran: pressed ' + window.__presses + ' times, box held "' + String(window.__box).slice(0, 40) + '" | start ' + (start === null ? 'missing' : start.disabled ? 'disabled (' + (start.getAttribute('title') ?? '') + ')' : 'enabled')
-      + ' | notice: ' + ([...document.querySelectorAll('.lc-notice')].map((el) => el.innerText).join(' / ') || 'none')
-      + ' | runtimes: ' + (document.querySelector('.lc-connected')?.getAttribute('title') ?? '?')
-      + ' | thread: ' + (document.querySelector('.lc-thread')?.innerText ?? '').replace(/\\s+/g, ' ').slice(-400)
-  })()`)
-  const running = String(sent).startsWith('running')
-  check('a turn on the free model starts running', running, String(sent))
-  if (!running) {
-    // What the window showed, as a picture the workflow keeps.
-    const id = nextId++
-    const shot = await new Promise((resolve) => {
-      waiting.set(id, { resolve: () => undefined, reject: () => undefined })
-      const listener = (event) => {
-        const message = JSON.parse(String(event.data))
-        if (message.id !== id) return
-        socket.removeEventListener('message', listener)
-        resolve(message.result?.data)
-      }
-      socket.addEventListener('message', listener)
-      socket.send(JSON.stringify({ id, method: 'Page.captureScreenshot', params: { format: 'png' } }))
-    })
-    if (typeof shot === 'string') await writeFile('mac-smoke.png', Buffer.from(shot, 'base64'))
-  }
-  // Let the runtime get going: the Stop that matters ends a process tree already doing work.
-  // Waited for, not assumed: on a runner just started, OpenCode can take a while to appear.
+  // Up to three turns (0.720): on 0.720's first Mac run OpenCode appeared and was gone 3 s later, the turn over
+  // on its own, and Stop had nothing to stop (run 38045981686). A turn that ends before Stop proves nothing
+  // either way, so another is sent once the window says the last one is over; Stop is still pressed on a run
+  // whose process group is alive, or the check fails as before.
+  let sent
   let during = []
-  const waitedFrom = Date.now()
-  for (let second = 0; second < 45 && during.length === 0; second += 1) {
+  let aliveAtStop = []
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    sent = await evaluate(`(async () => {
+      // The exact command (0.715): asked for 'a command that prints 1 to 300', the steadiest free model answered
+      // without running one, its OpenCode exited within seconds, and there was no run left to stop (0.714's Mac run).
+      const WORDS = 'Run this exact shell command and wait for it to finish, then tell me the last number it printed: for i in $(seq 1 300); do echo $i; sleep 1; done'
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set
+      // The box is found again every time: the window can draw a new one as the
+      // conversation opens, and a held reference then reads the old, detached box
+      // (0.504's first run: "never ran: start enabled" after the re-press).
+      const box = () => document.querySelector('form.command-dock textarea')
+      const fill = () => {
+        const field = box()
+        if (field === null || field.value.length > 0) return
+        setter.call(field, WORDS)
+        field.dispatchEvent(new Event('input', { bubbles: true }))
+      }
+      if (box() === null) return 'no box'
+      fill()
+      // Pressed again if the words are still in the box: on a runner that has just
+      // started, a press can land before the window is listening (0.497, run 36696510212).
+      let presses = 0
+      let sent = false
+      for (let i = 0; i < 80 && presses < 3 && !sent; i += 1) {
+        fill()
+        const button = document.querySelector('button[aria-label="Send"]')
+        if (button && !button.disabled && (box()?.value.length ?? 0) > 0) {
+          button.click()
+          presses += 1
+          for (let wait = 0; wait < 16 && (box()?.value.length ?? 0) > 0; wait += 1) await new Promise((r) => setTimeout(r, 500))
+          // Emptied, and a turn on screen: it went. Emptied with nothing on screen: the box was redrawn.
+          if ((box()?.value.length ?? 0) === 0 && document.querySelector('.lc-thread .lc-bubble')) sent = true
+        }
+        await new Promise((r) => setTimeout(r, 250))
+      }
+      window.__presses = presses
+      window.__box = box()?.value ?? '(no box)'
+      for (let i = 0; i < 180; i += 1) {
+        await new Promise((r) => setTimeout(r, 1000))
+        if (document.querySelector('button[aria-label="Stop the running reply"]') && document.querySelector('.lc-livestep')) return window.__presses > 1 ? 'running (Start pressed ' + window.__presses + ' times)' : 'running'
+      }
+      const start = document.querySelector('button[aria-label="Send"]')
+      return 'never ran: pressed ' + window.__presses + ' times, box held "' + String(window.__box).slice(0, 40) + '" | start ' + (start === null ? 'missing' : start.disabled ? 'disabled (' + (start.getAttribute('title') ?? '') + ')' : 'enabled')
+        + ' | notice: ' + ([...document.querySelectorAll('.lc-notice')].map((el) => el.innerText).join(' / ') || 'none')
+        + ' | runtimes: ' + (document.querySelector('.lc-connected')?.getAttribute('title') ?? '?')
+        + ' | thread: ' + (document.querySelector('.lc-thread')?.innerText ?? '').replace(/\\s+/g, ' ').slice(-400)
+    })()`)
+    const running = String(sent).startsWith('running')
+    if (!running) {
+      // What the window showed, as a picture the workflow keeps.
+      const id = nextId++
+      const shot = await new Promise((resolve) => {
+        waiting.set(id, { resolve: () => undefined, reject: () => undefined })
+        const listener = (event) => {
+          const message = JSON.parse(String(event.data))
+          if (message.id !== id) return
+          socket.removeEventListener('message', listener)
+          resolve(message.result?.data)
+        }
+        socket.addEventListener('message', listener)
+        socket.send(JSON.stringify({ id, method: 'Page.captureScreenshot', params: { format: 'png' } }))
+      })
+      if (typeof shot === 'string') await writeFile('mac-smoke.png', Buffer.from(shot, 'base64'))
+    }
+    // Let the runtime get going: the Stop that matters ends a process tree already doing work.
+    // Waited for, not assumed: on a runner just started, OpenCode can take a while to appear.
+    if (!running) break
+    const seenBefore = during
+    const waitedFrom = Date.now()
+    let fresh = []
+    for (let second = 0; second < 45 && fresh.length === 0; second += 1) {
+      await sleep(1_000)
+      fresh = opencodes().filter((pid) => !before.has(pid) && !seenBefore.includes(pid))
+    }
+    // Every process seen is kept (0.715): read again after the wait, a run that had already ended
+    // wiped what was seen, and the check below reported nothing ran when something had.
+    if (fresh.length > 0) await sleep(3_000)
+    during = [...new Set([...seenBefore, ...fresh, ...opencodes().filter((pid) => !before.has(pid))])]
+    aliveAtStop = opencodes().filter((pid) => during.includes(pid))
+    console.log(`  turn ${String(attempt)}: opencode processes during the run: ${String(during.length)}, still running when Stop is pressed: ${String(aliveAtStop.length)} (${String(Math.round((Date.now() - waitedFrom) / 1000))} s after the turn started)`)
+    if (during.length === 0) console.log(`  every process now: ${execFileSync('ps', ['-axo', 'pid,command'], { encoding: 'utf8' }).split('\n').filter((line) => /opencode|Locust/i.test(line)).join(' | ').slice(0, 1200)}`)
+    if (aliveAtStop.length > 0 || attempt === 3) break
+    // Over on its own: wait for the window to say so, then send the next.
+    await evaluate(`(async () => {
+      for (let i = 0; i < 120 && document.querySelector('button[aria-label="Stop the running reply"]'); i += 1) await new Promise((r) => setTimeout(r, 500))
+    })()`)
     await sleep(1_000)
-    during = opencodes().filter((pid) => !before.has(pid))
   }
-  // Every process seen is kept (0.715): read again after the wait, a run that had already ended
-  // wiped what was seen, and the check below reported nothing ran when something had.
-  if (during.length > 0) await sleep(3_000)
-  during = [...new Set([...during, ...opencodes().filter((pid) => !before.has(pid))])]
-  const aliveAtStop = opencodes().filter((pid) => during.includes(pid))
-  console.log(`  opencode processes during the run: ${String(during.length)}, still running when Stop is pressed: ${String(aliveAtStop.length)} (${String(Math.round((Date.now() - waitedFrom) / 1000))} s after the turn started)`)
-  if (during.length === 0) console.log(`  every process now: ${execFileSync('ps', ['-axo', 'pid,command'], { encoding: 'utf8' }).split('\n').filter((line) => /opencode|Locust/i.test(line)).join(' | ').slice(0, 1200)}`)
+  check('a turn on the free model starts running', String(sent).startsWith('running'), String(sent))
 
   const stopped = await evaluate(`(async () => {
     document.querySelector('button[aria-label="Stop the running reply"]')?.click()
