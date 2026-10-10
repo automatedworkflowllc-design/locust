@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.713.0 - 2026-10-09
+
+### Improved
+
+- **An attached PDF can be read by every agent.** Locust now opens the PDF itself as soon as you attach it: its text goes into one file, and each page becomes a picture, both in Locust's own folder beside the attachment. Your teammate is told where they are, so it no longer needs a PDF tool of its own. On Windows, Codex could not open a PDF without Python packages most machines do not have, and its sandbox stops it from installing them, so it spent minutes and several failed commands decoding the file by hand. The page pictures keep what text cannot, such as equations, tables and charts.
+
+### Fixed
+
+- **A quote in a reply is drawn as a quote again, and the math inside it is drawn.** Since 0.233, a reply's quoted lines (`> `) were shown as a plain paragraph. So an equation inside a quote, which is where Codex puts "a version you could write down", came out as raw `\begin{bmatrix}` and `\sum` line by line. Quotes now have their margin rule back, and what they hold is drawn like the rest of the reply: equations, lists and code. An equation written in the middle of a line, as `\[ ... \]` or `$$ ... $$`, is drawn too.
+
 ## 0.712.0 - 2026-10-09
 
 ### Improved
