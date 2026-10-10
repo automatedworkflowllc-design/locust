@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.728.0 - 2026-10-10
+
+### Improved
+
+- **A teammate's tracker reads at a glance.** When a reply has a table with a Status column, each status is a coloured chip: done in green, in progress in blue, waiting in amber, blocked in red, not started in grey. Anything else in the table reads as before.
+
 ## 0.727.0 - 2026-10-10
 
 ### New
