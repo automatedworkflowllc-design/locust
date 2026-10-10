@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.730.0 - 2026-10-10
+
+### New
+
+- **Settle or snooze a conversation.** Right-click a finished conversation and choose Settle to move it out of the sidebar, or Snooze to hide it for an hour, until this evening, until tomorrow morning or until Monday. It comes back by itself when something new happens in it or the snooze ends. A search still finds it, and Bring back on its menu returns it to the list. Nothing is deleted.
+
 ## 0.729.0 - 2026-10-10
 
 ### New
