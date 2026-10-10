@@ -60,6 +60,31 @@ const feed = (lines: readonly string[]) => {
 };
 const payloadOf = <T>(event: NormalizedRuntimeEvent | undefined): T => (event as unknown as { payload: T }).payload;
 
+describe("a timer Antigravity sets on a task (the 2026-10-10 sweep)", () => {
+  const schedule = (step: number) => at({
+    step_index: step,
+    type: "PLANNER_RESPONSE",
+    tool_calls: [{ name: "schedule", args: { TimerCondition: JSON.stringify(`${CONV}/task-10`), Prompt: JSON.stringify("Check if task-10 finished") } }],
+  });
+  const timerRunning = (step: number) => at({
+    step_index: step,
+    type: "GENERIC",
+    status: "RUNNING",
+    content: `Created At: 2026-09-21T16:23:30-04:00\nTool is running as a background task with task id: ${CONV}/task-${String(step)}\nTask Description: timer`,
+  });
+
+  it("set on a task that already ended, holds nothing open", () => {
+    const { states } = feed([user, planner, running, finished, schedule(14), timerRunning(15)]);
+    expect(states.at(-1)?.pending).toBe(0);
+  });
+
+  it("set while the task runs, settles when the task ends", () => {
+    const { states } = feed([user, planner, running, schedule(11), timerRunning(12), finished.replace('"step_index":12', '"step_index":13')]);
+    expect(states[4]?.pending).toBe(2);
+    expect(states.at(-1)?.pending).toBe(0);
+  });
+});
+
 describe("a command Antigravity puts in the background", () => {
   it("closes the call as backgrounded and opens a background step, not 'did not report'", () => {
     const { events } = feed([user, planner, running]);

@@ -462,10 +462,11 @@ export function createFileWorkroom(options: FileWorkroomOptions): Workroom {
           ...(input.observed === undefined
             ? {}
             : {
-                observed: [
-                  ...input.observed.filter(isObservedPath).slice(0, MAX_OBSERVED_PATHS),
-                  ...(input.observed.length > MAX_OBSERVED_PATHS ? [`+${String(input.observed.length - MAX_OBSERVED_PATHS)} more`] : [])
-                ]
+                // Counted from the paths that are paths, not the raw list (2026-10-10 sweep).
+                observed: ((valid) => [
+                  ...valid.slice(0, MAX_OBSERVED_PATHS),
+                  ...(valid.length > MAX_OBSERVED_PATHS ? [`+${String(valid.length - MAX_OBSERVED_PATHS)} more`] : [])
+                ])(input.observed.filter(isObservedPath))
               })
         }
         let sequence = 0

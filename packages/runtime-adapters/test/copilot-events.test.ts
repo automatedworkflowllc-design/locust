@@ -287,6 +287,12 @@ describe("what a completed Copilot tool call means", () => {
     data: { toolCallId: "t1", toolName: "powershell", arguments: { command: "ls" } },
   });
 
+  it("keeps a long failure message within what the ledger keeps (2026-10-10 sweep)", () => {
+    const { events } = run([auto, start, JSON.stringify({ type: "tool.execution_complete", data: { toolCallId: "t1", success: false, error: { message: "x".repeat(600) } } })]);
+    const failed = events.find((event) => event.type === "tool.failed");
+    expect(String((failed?.payload as { status?: string }).status).length).toBe(512);
+  });
+
   it("is a failure unless the CLI said success in so many words", () => {
     // Measured, `success` is always present. A field that could go missing
     // and be read as success is the failure that matters.

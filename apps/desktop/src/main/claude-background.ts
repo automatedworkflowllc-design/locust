@@ -175,10 +175,14 @@ export function createBackgroundWatch(options: {
   const setTimer = options.setTimer ?? ((run, ms) => setTimeout(run, ms))
   const clearTimer = options.clearTimer ?? ((handle) => clearTimeout(handle as ReturnType<typeof setTimeout>))
   let timer: unknown
+  // A tick in flight reschedules itself: a watch() then must not start a second loop (2026-10-10 sweep).
+  let ticking = false
   let last = ''
   const tick = async (): Promise<void> => {
     timer = undefined
+    ticking = true
     const all = await options.list().catch(() => undefined)
+    ticking = false
     if (all !== undefined) {
       const ours = all.filter((agent) => watched.has(agent.id))
       // One Claude Code no longer lists is over: it was removed, or its supervisor went with the machine.
@@ -197,7 +201,7 @@ export function createBackgroundWatch(options: {
     /** Start (or keep) watching these ids. */
     watch(ids: readonly string[]): void {
       for (const id of ids) watched.add(id)
-      if (watched.size > 0 && timer === undefined) timer = setTimer(() => void tick(), 0)
+      if (watched.size > 0 && timer === undefined && !ticking) timer = setTimer(() => void tick(), 0)
     },
     watching(): readonly string[] {
       return [...watched]

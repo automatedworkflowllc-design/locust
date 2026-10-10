@@ -558,7 +558,25 @@ export function missionRecordMarkdown(source: RecordSource): string {
   })
   out.push('')
   turns.forEach((turn) => out.push(turn, ''))
-  return `${out.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd()}\n`
+  return `${collapseOutsideFences(out.join('\n')).trimEnd()}\n`
+}
+
+/** Runs of blank lines become one -- outside fenced blocks only: a command's output is kept as recorded (2026-10-10 sweep). */
+export function collapseOutsideFences(text: string): string {
+  const kept: string[] = []
+  let fence: string | undefined
+  let blanks = 0
+  for (const line of text.split('\n')) {
+    const marker = /^(`{3,}|~{3,})/.exec(line)?.[1]
+    if (fence === undefined && marker !== undefined) fence = marker
+    else if (fence !== undefined && marker !== undefined && line.startsWith(fence) && line.trim() === line.trim().slice(0, marker.length)) fence = undefined
+    if (fence === undefined && marker === undefined && line.trim().length === 0) {
+      blanks += 1
+      if (blanks > 1) continue
+    } else blanks = 0
+    kept.push(line)
+  }
+  return kept.join('\n')
 }
 
 /** The events exactly as the ledger holds them, for the person who wants to check the Markdown against them. */

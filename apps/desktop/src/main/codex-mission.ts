@@ -2031,7 +2031,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
             // The prompt and the session travel over the protocol, not the argv.
             return createCopilotAcpCommand(executable, {
               workspacePath: runCwd,
-              ...(chosenModel === undefined || chosenModel === 'auto' ? {} : { model: chosenModel })
+              ...(chosenModel === undefined || chosenModel === 'auto' ? {} : { model: chosenModel }),
+              ...(chosenEffort === undefined ? {} : { effort: chosenEffort })
             })
           }
           if (runtime === 'copilot') {
@@ -2040,6 +2041,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               sandbox: effectiveSandbox,
               prompt: promptText,
               ...(chosenModel === undefined || chosenModel === 'auto' ? {} : { model: chosenModel }),
+              ...(chosenEffort === undefined ? {} : { effort: chosenEffort }),
               ...(resumeThreadId === undefined ? { sessionId: copilotSessionId } : { resumeThreadId })
             })
           }

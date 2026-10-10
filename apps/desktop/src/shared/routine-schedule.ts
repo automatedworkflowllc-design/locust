@@ -182,7 +182,8 @@ export function slotPassedDuring(schedule: RoutineSchedule, startedAt: string, e
   if (schedule.kind === 'every' || schedule.kind === 'files') return undefined
   const start = new Date(startedAt)
   if (Number.isNaN(start.getTime())) return undefined
-  const next = nextRunAfter(schedule, startedAt, endedAt)
+  // Asked from the START: from the end, "today" is the end's day, and a slot before midnight vanished (2026-10-10 sweep).
+  const next = nextRunAfter(schedule, startedAt, start)
   if (next === undefined || next.getTime() <= start.getTime() || next.getTime() > endedAt.getTime()) return undefined
   return next
 }

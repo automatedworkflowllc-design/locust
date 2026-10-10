@@ -178,7 +178,21 @@ export function compareVersions(left: string, right: string): number {
   if (a.pre === b.pre) return 0
   if (a.pre === undefined) return 1
   if (b.pre === undefined) return -1
-  return a.pre < b.pre ? -1 : 1
+  // Prerelease identifiers one by one, numbers as numbers: alpha.10 is after alpha.9 (2026-10-10 sweep).
+  const ap = a.pre.split('.')
+  const bp = b.pre.split('.')
+  for (let index = 0; index < Math.max(ap.length, bp.length); index += 1) {
+    const x = ap[index]
+    const y = bp[index]
+    if (x === undefined) return -1
+    if (y === undefined) return 1
+    const xn = /^\d+$/.test(x)
+    const yn = /^\d+$/.test(y)
+    if (xn && yn && Number(x) !== Number(y)) return Math.sign(Number(x) - Number(y))
+    if (xn !== yn) return xn ? -1 : 1
+    if (!xn && x !== y) return x < y ? -1 : 1
+  }
+  return 0
 }
 
 /**

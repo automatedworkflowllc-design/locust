@@ -57,6 +57,15 @@ const REACHES: readonly (readonly [string, string, string])[] = [
   ['Stop-Computer', 'whole-machine', 'shut down'],
   ['sudo reboot', 'whole-machine', 'restart'],
   ['systemctl poweroff', 'whole-machine', 'shut down'],
+  // The 2026-10-10 sweep: a group, a substitution, a loop body, and timeout or nice in front.
+  ['(cd build && pkill node)', 'every-process-named', 'node'],
+  ['echo $(pkill vite)', 'every-process-named', 'vite'],
+  ['echo `killall Electron`', 'every-process-named', 'electron'],
+  ['for i in 1 2; do pkill python; done', 'every-process-named', 'python'],
+  ['if true; then killall node; fi', 'every-process-named', 'node'],
+  ['timeout 5 pkill node', 'every-process-named', 'node'],
+  ['timeout -s KILL 10s killall vite', 'every-process-named', 'vite'],
+  ['nice -n 10 pkill python', 'every-process-named', 'python'],
   // The shapes the runtimes really send: wrappers and chains.
   ['"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command \'Stop-Process -Name node -Force\'', 'every-process-named', 'node'],
   ['powershell -NoProfile -Command "Get-Process python | Stop-Process"', 'every-process-named', 'python'],

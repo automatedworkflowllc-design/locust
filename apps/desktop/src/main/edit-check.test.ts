@@ -43,6 +43,14 @@ describe('the check after an edit', () => {
   })
 })
 
+describe('a check the shell cannot be handed (2026-10-10 sweep)', () => {
+  it('says it could not run, rather than throwing', async () => {
+    const run = await runCheckCommand('npm test\u0000', tmpdir())
+    expect(run.exitCode).toBeNull()
+    expect(run.error).toBeDefined()
+  })
+})
+
 describe('running the command', () => {
   const roots: string[] = []
   afterEach(async () => {

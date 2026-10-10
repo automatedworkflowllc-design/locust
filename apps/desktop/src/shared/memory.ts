@@ -595,7 +595,8 @@ export function citedPaths(text: string): readonly string[] {
   for (const raw of text.split(/[\s,;()[\]{}<>"'`]+/)) {
     // Only trailing punctuation: a leading dot is a dotfile's name (.env).
     const token = raw.replace(/^[:!?]+/, '').replace(/[.:!?]+$/, '')
-    if (token.length === 0 || token.length > 200 || /:\/\//.test(token) || /^[a-z]+:/i.test(token)) continue
+    // A scheme is two letters or more: `C:\...` is a Windows path, not a scheme (2026-10-10 sweep).
+    if (token.length === 0 || token.length > 200 || /:\/\//.test(token) || /^[a-z]{2,}:/i.test(token)) continue
     const extension = /\.([A-Za-z0-9]{1,10})$/.exec(token)?.[1]?.toLowerCase()
     const pathLike = /[\\/]/.test(token) && /[A-Za-z]/.test(token)
     const named = extension !== undefined && FILE_EXTENSIONS.has(extension) && /[A-Za-z_]/.test(token.slice(0, -(extension.length + 1)))

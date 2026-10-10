@@ -92,4 +92,23 @@ describe('claude background sessions', () => {
     expect(timers.length).toBe(0)
     expect(watch.watching()).toEqual([])
   })
+
+  it('keeps one poll loop when a second watch comes while a look is in flight (2026-10-10 sweep)', async () => {
+    const timers: (() => void)[] = []
+    let answer: (agents: { id: string; state: string }[]) => void = () => undefined
+    const watch = createBackgroundWatch({
+      list: () => new Promise((resolve) => { answer = resolve as never }),
+      onChange: () => undefined,
+      setTimer: (run) => { timers.push(run); return timers.length },
+      clearTimer: () => undefined
+    })
+    watch.watch(['a'])
+    timers.shift()?.()
+    // The look is out; a second id arrives.
+    watch.watch(['b'])
+    expect(timers.length).toBe(0)
+    answer([{ id: 'a', state: 'working' }, { id: 'b', state: 'working' }])
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(timers.length).toBe(1)
+  })
 })

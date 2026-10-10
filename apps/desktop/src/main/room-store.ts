@@ -248,7 +248,9 @@ export function parsedRoom(value: unknown): PublicRoom | undefined {
   const posts: RoomPost[] = []
   for (const entry of record.posts) {
     const post = parsedPost(entry)
-    if (post === undefined) return undefined
+    // One record this build cannot read is skipped, not the room: the next write would have dropped the
+    // whole room from the file (2026-10-10 sweep).
+    if (post === undefined) continue
     posts.push(post)
     if (posts.length >= MAX_ROOM_POSTS) break
   }
@@ -258,7 +260,7 @@ export function parsedRoom(value: unknown): PublicRoom | undefined {
     if (!Array.isArray(record.tasks)) return undefined
     for (const entry of record.tasks) {
       const task = parsedTask(entry)
-      if (task === undefined) return undefined
+      if (task === undefined) continue
       tasks.push(task)
       if (tasks.length >= MAX_ROOM_TASKS) break
     }

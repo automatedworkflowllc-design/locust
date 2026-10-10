@@ -334,6 +334,22 @@ describe("an ACP run", () => {
     await expect(acp.steer("too late")).resolves.toBe(false);
   });
 
+  it("still sends what it was handed when the turn stops at a limit (2026-10-10 sweep)", async () => {
+    let acpRun: AcpRun | undefined;
+    const prompts: string[] = [];
+    const { acp } = run(agentWith((prompt, agent) => {
+      prompts.push(((prompt.params?.prompt as Array<{ text: string }>)[0]!).text);
+      if (prompts.length === 1) {
+        void acpRun!.steer("Then do the rest.").then(() => ended(agent, prompt, "max_turn_requests"));
+        return;
+      }
+      ended(agent, prompt);
+    }));
+    acpRun = acp;
+    await recordsOf(acp);
+    expect(prompts).toEqual(["Change the port to 3001.", "Then do the rest."]);
+  });
+
   it("an agent that dies mid-turn leaves a run that did not finish, saying so", async () => {
     const { acp } = run(agentWith((_prompt, agent) => setTimeout(() => agent.exit(), 1)));
     await expect(acp.completion).resolves.toMatchObject({ exitCode: null, cancelled: false, stderr: "The agent exited before its turn finished." });
@@ -443,6 +459,8 @@ describe("what Copilot is started with, to ask", () => {
     expect(spec.stdin).toBe("protocol");
     expect(spec.cwd).toBe("C:\\work");
     expect(createCopilotAcpCommand(copilot, { workspacePath: "C:\\work", model: "gpt-5.6-luna" }).args).toEqual(["--acp", "--excluded-tools=session_store_sql", "--model", "gpt-5.6-luna"]);
+    // The effort the person chose rides on this route too (the 2026-10-10 sweep: it never did).
+    expect(createCopilotAcpCommand(copilot, { workspacePath: "C:\\work", model: "gpt-5.6-luna", effort: "high" }).args).toEqual(["--acp", "--excluded-tools=session_store_sql", "--model", "gpt-5.6-luna", "--effort", "high"]);
   });
 
   it("holds the session to the mode that asks, with allow-all off -- by Copilot's own ids", () => {

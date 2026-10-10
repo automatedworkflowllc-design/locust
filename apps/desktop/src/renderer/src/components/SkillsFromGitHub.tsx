@@ -214,7 +214,7 @@ export function SkillsFromGitHub(): ReactElement {
                 setBusy('keeping')
                 setSaid(undefined)
                 void window.desktop
-                  ?.installSkillLibrary({ source: preview.source, ref: preview.ref, sha: preview.sha, names: chosen.map((skill) => skill.name) })
+                  ?.installSkillLibrary({ source: preview.source, ref: preview.ref, sha: preview.sha, names: chosen.map((skill) => skill.name), ...(preview.path === undefined ? {} : { path: preview.path }) })
                   .then((response) => {
                     if (!response.ok) {
                       setSaid({ text: response.error.message, good: false })

@@ -48,7 +48,8 @@ function wordChildren(xml: string): { readonly kind: 'p' | 'tbl'; readonly xml: 
 function wordParagraphText(paragraph: string): string {
   const runs = paragraph.replace(/<w:pPr\b[\s\S]*?<\/w:pPr>/g, '')
   let text = ''
-  for (const match of runs.matchAll(/<w:t\b[^>]*>([\s\S]*?)<\/w:t>|<w:t\b[^>]*\/>|<w:(tab|br|cr)\b[^>]*\/>/g)) {
+  // The empty run `<w:t/>` first: read as an opening tag it swallowed the XML up to the next `</w:t>` (2026-10-10 sweep).
+  for (const match of runs.matchAll(/<w:t\b[^>]*\/>|<w:t\b[^>]*>([\s\S]*?)<\/w:t>|<w:(tab|br|cr)\b[^>]*\/>/g)) {
     if (match[2] === 'tab') text += '\t'
     else if (match[2] !== undefined) text += '\n'
     else text += decodeXml(match[1] ?? '')
@@ -123,8 +124,8 @@ export function readDocx(bytes: Buffer): OfficeDocument {
 /** A PowerPoint paragraph's words: runs and line breaks. */
 function slideParagraphText(paragraph: string): string {
   let text = ''
-  for (const match of paragraph.matchAll(/<a:t\b[^>]*>([\s\S]*?)<\/a:t>|<a:br\b[^>]*\/?>/g)) {
-    text += match[1] === undefined ? ' ' : decodeXml(match[1])
+  for (const match of paragraph.matchAll(/<a:t\b[^>]*\/>|<a:t\b[^>]*>([\s\S]*?)<\/a:t>|<a:br\b[^>]*\/?>/g)) {
+    text += match[0].startsWith('<a:t') ? decodeXml(match[1] ?? '') : ' '
   }
   return text.replace(/\s+/g, ' ').trim()
 }

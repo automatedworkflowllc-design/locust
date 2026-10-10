@@ -1267,6 +1267,14 @@ describe('runtime selection', () => {
     expect(recorded[0]?.runtimeThreadId).toBe('cursor-session-1')
   })
 
+  it('sends a Copilot teammate the effort it was given (the 2026-10-10 sweep: neither route sent it)', async () => {
+    const { service, start } = serviceWith([{ ...codexRuntime(), id: 'copilot', displayName: 'Copilot CLI', optional: true }])
+    await service.start('Say hi.', 'copilot', 'ask', { effort: 'high' }, () => undefined)
+    const spec = start.mock.calls[0]?.[0]
+    const at = spec?.args.indexOf('--effort') ?? -1
+    expect(spec?.args.slice(at, at + 2)).toEqual(['--effort', 'high'])
+  })
+
   it('lets a Cursor mission edit when asked, and never forces its commands', async () => {
     const { service, start } = serviceWith([{ ...codexRuntime(), id: 'cursor', displayName: 'Cursor Agent', optional: true }])
     await service.start('Do work.', 'cursor', 'accept-edits', {}, () => undefined)

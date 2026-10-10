@@ -1364,6 +1364,14 @@ export const OPENCODE_READ_ONLY_CONFIG = JSON.stringify({
  * a file pointing there; it does not need the parent's working tree, and
  * being able to reach it is the whole bug.
  */
+/**
+ * The parent repository's `.git`, as a pattern in the root's own spelling: backslashes for a Windows path,
+ * slashes otherwise. It was backslashes everywhere, which names no path on a Mac (2026-10-10 sweep).
+ */
+export function gitDirPattern(repositoryRoot: string): string {
+  return /^[A-Za-z]:[\\/]|\\/.test(repositoryRoot) ? `${repositoryRoot}\\.git\\*` : `${repositoryRoot.replace(/\/+$/, "")}/.git/*`;
+}
+
 export function opencodeWorktreeConfig(repositoryRoot: string, readOnly: boolean): string {
   return JSON.stringify({
     permission: {
@@ -1373,7 +1381,7 @@ export function opencodeWorktreeConfig(repositoryRoot: string, readOnly: boolean
       // "deny" until 2026-09-22, and it cost every read-only worktree run
       // on the free model -- three defaults at once.
       ...(readOnly ? OPENCODE_READ_ONLY_PERMISSIONS : {}),
-      external_directory: { [`${repositoryRoot}\\.git\\*`]: "allow", "*": "deny" },
+      external_directory: { [gitDirPattern(repositoryRoot)]: "allow", "*": "deny" },
     },
     ...(readOnly ? { experimental: OPENCODE_KEEP_GOING } : {}),
   });
@@ -1759,7 +1767,7 @@ export function createOpenCodeServeCommand(
       webfetch: "ask",
       external_directory: options.repositoryRoot === undefined
         ? "ask"
-        : { [`${options.repositoryRoot}\\.git\\*`]: "allow", "*": "ask" },
+        : { [gitDirPattern(options.repositoryRoot)]: "allow", "*": "ask" },
     },
   });
   return baseSpec("opencode", executable, options.workspacePath, ["serve", "--port", "0", "--hostname", "127.0.0.1"], {
@@ -1862,6 +1870,11 @@ export function createCopilotAcpCommand(
   const args = ["--acp", COPILOT_EXCLUDED];
   if (options.model !== undefined) {
     args.push("--model", requireText(options.model, "Model"));
+  }
+  // The effort the person chose, as the print route sends it (the 2026-10-10 sweep: it never reached either route).
+  // MEASURED on 1.0.95: `--effort` is still taken beside `--reasoning-effort`, and a value it does not know stops it.
+  if (options.effort !== undefined) {
+    args.push("--effort", requireEffort(options.effort));
   }
   return baseSpec("copilot", executable, options.workspacePath, args, { stdin: "protocol", sandbox: "workspace-write" });
 }

@@ -40,6 +40,11 @@ describe('which row a post is about', () => {
     ).toBe('t1')
   })
 
+  it('claims a row whose own words carry punctuation the post carries too (2026-10-10 sweep)', () => {
+    expect(rowNamedByPost('Wren, start Fix the sign-in bug', [open('t1', 'Fix the sign-in bug')])).toBe('t1')
+    expect(rowNamedByPost("start Update Colin's notes, please", [open('t1', "Update Colin's notes")])).toBe('t1')
+  })
+
   it('claims NOTHING when the post names no row -- the case Grok drove', () => {
     // The exact post: it refers to the board without naming a row. The app
     // does not get to decide which one somebody meant.

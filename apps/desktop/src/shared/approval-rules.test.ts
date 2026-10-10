@@ -56,6 +56,13 @@ describe('a path', () => {
   const rules = [rule('allow', 'edit', 'src/**'), rule('allow', 'read', 'docs/*.md'), rule('deny', 'edit', 'src/secrets/**')]
   const edit = (...paths: string[]): RuledAction => ({ kind: 'edit', paths })
 
+  it('is matched case-blind only in a Windows folder (2026-10-10 sweep)', () => {
+    expect(decideByRules(edit('SRC/app.ts'), rules, context).decision).toBe('allow')
+    const posix = { teammateId: 'tm_wren', folder: '/work' }
+    expect(decideByRules(edit('/work/src/x.ts'), rules, posix).decision).toBe('allow')
+    expect(decideByRules(edit('/work/SRC/x.ts'), rules, posix).decision).toBe('ask')
+  })
+
   it('is allowed when every path is inside the folder and matches', () => {
     expect(decideByRules(edit('src/app.ts'), rules, context).decision).toBe('allow')
     expect(decideByRules(edit(`${FOLDER}\\src\\deep\\x.ts`), rules, context).decision).toBe('allow')

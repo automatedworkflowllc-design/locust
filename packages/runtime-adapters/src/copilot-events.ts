@@ -522,7 +522,7 @@ export function createCopilotEventNormalizer(
       const failed = data.success !== true;
       const error = isObject(data.error) ? data.error : {};
       const status = failed
-        ? stringValue(error.code) ?? stringValue(error.message) ?? "unknown"
+        ? (stringValue(error.code) ?? stringValue(error.message) ?? "unknown").slice(0, 512) // the ledger's bound (2026-10-10 sweep)
         : undefined;
       const result = isObject(data.result) ? data.result : {};
       const detailed = stringValue(result.detailedContent);

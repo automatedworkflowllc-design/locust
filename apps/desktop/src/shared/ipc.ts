@@ -1336,6 +1336,8 @@ export interface SkillLibraryPreview {
   readonly skills: readonly SkillLibrarySkill[]
   /** True when GitHub listed only part of a very large repository. */
   readonly partial: boolean
+  /** The folder inside the repository the link named, when it named one: Keep takes the skills from there. */
+  readonly path?: string
 }
 
 export type SkillLibraryPreviewResponse =
@@ -1347,6 +1349,8 @@ export interface SkillLibraryInstallRequest {
   readonly ref: string
   readonly sha: string
   readonly names: readonly string[]
+  /** The previewed folder (SkillLibraryPreview.path). */
+  readonly path?: string
 }
 
 export interface SkillLibraryKept {

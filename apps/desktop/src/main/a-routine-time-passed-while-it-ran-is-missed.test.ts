@@ -32,6 +32,10 @@ describe('a clock time that passed during a run', () => {
     expect(slotPassedDuring(daily, at(8, 0).toISOString(), at(8, 40))).toBeUndefined()
     // Ended before the time came.
     expect(slotPassedDuring(daily, at(7, 10).toISOString(), at(7, 40))).toBeUndefined()
+
+    // Across midnight: a 23:30 that came while a 23:00 run went past 00:00 (2026-10-10 sweep).
+    const late = { kind: 'daily', at: '23:30' } as const
+    expect(slotPassedDuring(late, at(23, 0).toISOString(), at(0, 30, 8))?.toISOString()).toBe(at(23, 30).toISOString())
   })
 
   it('is a weekly time on its day, and never an interval or a file', () => {

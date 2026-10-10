@@ -195,6 +195,18 @@ async function withConversation(runtime: 'claude' | 'codex', transcript: string)
 }
 
 describe('catching up', () => {
+  it('takes a prompt longer than the ledger keeps, bounded, and the exchanges after it too (2026-10-10 sweep)', async () => {
+    const long = [
+      typed('x'.repeat(9_000), '2026-09-27T10:05:00.000Z', 'cli'),
+      answer('Read it.', '2026-09-27T10:05:30.000Z'),
+      typed('And this one.', '2026-09-27T10:06:00.000Z', 'cli'),
+      answer('Done.', '2026-09-27T10:06:30.000Z')
+    ].join('\n')
+    const { facts } = await withConversation('claude', long)
+    const result = await catchUpTerminal('mission_first', facts)
+    expect(result.imported).toBe(2)
+  })
+
   it('records each terminal exchange as the next turn of the conversation, owned by its teammate, readable by the ledger', async () => {
     const { ledger, facts, assigned } = await withConversation('claude', CLAUDE_SESSION)
     const result = await catchUpTerminal('mission_first', facts)

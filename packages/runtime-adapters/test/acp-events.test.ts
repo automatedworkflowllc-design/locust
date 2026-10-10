@@ -251,6 +251,14 @@ describe("how a turn ends", () => {
     expect(payload(ended([result("refusal")]))).toMatchObject({ kind: "safety-blocked" });
   });
 
+  it("cut off at a limit says so, beside the completion (2026-10-10 sweep)", () => {
+    const events = normalize([result("max_tokens")], "copilot", COMPLETION);
+    const warned = events.find((event) => event.type === "adapter.diagnostic");
+    expect(payload(warned)).toMatchObject({ level: "warning", code: "acp.stopped_at_limit" });
+    expect(events.at(-1)?.type).toBe("run.completed");
+    expect(normalize([result("end_turn")], "copilot", COMPLETION).some((event) => event.type === "adapter.diagnostic")).toBe(false);
+  });
+
   it("a run lost during a later prompt did not finish, though an earlier one did", () => {
     expect(payload(ended([result("end_turn")], { exitCode: null, stderr: "The agent exited before its turn finished." }))).toMatchObject({ kind: "process-failed" });
   });

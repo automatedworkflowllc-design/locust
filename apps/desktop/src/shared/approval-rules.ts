@@ -125,7 +125,7 @@ export function insideFolder(path: string, folder: string): string | undefined {
   return rest.slice(1)
 }
 
-function globToRegExp(pattern: string): RegExp {
+function globToRegExp(pattern: string, caseBlind = true): RegExp {
   let out = ''
   const text = slashes(pattern).replace(/^\.\//, '')
   for (let index = 0; index < text.length; index += 1) {
@@ -149,11 +149,11 @@ function globToRegExp(pattern: string): RegExp {
       out += character.replace(/[.+^${}()|[\]\\]/g, '\\$&')
     }
   }
-  return new RegExp(`^${out}$`, 'i')
+  return new RegExp(`^${out}$`, caseBlind ? 'i' : '')
 }
 
-function pathMatches(pattern: string, relative: string): boolean {
-  return globToRegExp(pattern).test(relative)
+function pathMatches(pattern: string, relative: string, caseBlind = true): boolean {
+  return globToRegExp(pattern, caseBlind).test(relative)
 }
 
 function scoped(rule: ApprovalRule, context: RuleContext): boolean {
@@ -178,7 +178,10 @@ function matches(rule: ApprovalRule, action: RuledAction, context: RuleContext):
     const relative = action.paths.map((path) => insideFolder(path, folder))
     // Deny: any path it names. Allow: every path inside the folder, and every one matching.
     if (rule.effect === 'deny') return relative.some((path) => path !== undefined && pathMatches(rule.pattern, path)) || action.paths.some((path) => pathMatches(rule.pattern, slashes(path)))
-    return relative.every((path) => path !== undefined && path.length > 0 && pathMatches(rule.pattern, path))
+    // An ALLOW matches case-blind only where the folder is (Windows): off it SRC is not src (2026-10-10 sweep).
+    // A deny stays case-blind: the safe direction.
+    const caseBlind = /^[A-Za-z]:/.test(folder)
+    return relative.every((path) => path !== undefined && path.length > 0 && pathMatches(rule.pattern, path, caseBlind))
   }
   if (action.kind === 'connector') {
     const [server, tool] = rule.pattern.split('/')

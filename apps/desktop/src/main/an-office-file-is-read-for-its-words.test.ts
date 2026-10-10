@@ -114,6 +114,11 @@ describe('what is not drawn, and what is refused', () => {
     ])
   })
 
+  it('reads an empty run as nothing, not as the XML after it (2026-10-10 sweep)', () => {
+    const xml = `<w:document ${W}><w:body><w:p><w:r><w:t/></w:r><w:r><w:t>Hello</w:t></w:r></w:p></w:body></w:document>`
+    expect(readDocx(zipOf({ 'word/document.xml': xml })).blocks).toEqual([{ kind: 'paragraph', text: 'Hello' }])
+  })
+
   it('reads a table inside a table cell without losing the paragraphs after it', () => {
     const cell = (text: string): string => `<w:tc><w:p><w:r><w:t>${text}</w:t></w:r></w:p></w:tc>`
     const inner = `<w:tbl><w:tr>${cell('inner')}</w:tr></w:tbl>`

@@ -532,6 +532,10 @@ describe("the project file's parser, without the file", () => {
   it("normalizes a workspace to forward slashes, a lower-case drive and no trailing slash", () => {
     expect(normalizeAntigravityWorkspace("file:///C%3A%5Cwork%5Cpebble%5C")).toBe("c:/work/pebble");
     expect(normalizeAntigravityWorkspace("D:\\work\\pebble")).toBe("d:/work/pebble");
+    // A POSIX file URI keeps its leading slash, so both spellings are one key (2026-10-10 sweep).
+    expect(normalizeAntigravityWorkspace("file:///home/x/proj")).toBe("/home/x/proj");
+    expect(normalizeAntigravityWorkspace("/home/x/proj")).toBe("/home/x/proj");
+    expect(normalizeAntigravityWorkspace("file:///C:/work/pebble")).toBe("c:/work/pebble");
   });
 });
 

@@ -306,7 +306,8 @@ export function rowNamedByPost(
   postText: string,
   tasks: readonly { readonly taskId: string; readonly text: string; readonly state: string; readonly ownerId?: string }[]
 ): string | undefined {
-  const said = postText.toLowerCase();
+  // Flattened as the row is, so "sign-in" in the post meets "sign in" in the row (2026-10-10 sweep).
+  const said = postText.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ");
   const open = tasks.filter((task) => task.state === "open" && task.ownerId === undefined);
   const named = open.filter((task) => {
     const words = task.text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();

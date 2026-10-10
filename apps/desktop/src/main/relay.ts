@@ -663,6 +663,13 @@ export function createRelay(options: RelayOptions): Relay {
    * own chat, we never got the reply in booty's chat".
    */
   const exchanges = new Map<string, OpenExchange>()
+  /*
+   * The OTHER threads waiting on one held reply (2026-10-10 sweep): the first held share wins the reply, and a
+   * second share to the same busy teammate used to be dropped there, so its thread heard nothing ever after.
+   * Kept by recipient while held, then by the held run's mission once it starts, and told how it ended.
+   */
+  const heldAlso = new Map<string, OpenExchange[]>()
+  const alsoWaiting = new Map<string, OpenExchange[]>()
   /** Which meeting a relayed run is answering, by that run's mission id. */
   const answering = new Map<string, Meeting>()
   /**
@@ -1025,7 +1032,10 @@ export function createRelay(options: RelayOptions): Relay {
    */
   const defer = (entry: DeferredReply, pool = false): void => {
     const teammateId = entry.recipient.self.teammateId
-    if (deferred.has(teammateId)) return
+    if (deferred.has(teammateId)) {
+      if (entry.exchange !== undefined) heldAlso.set(teammateId, [...(heldAlso.get(teammateId) ?? []), entry.exchange])
+      return
+    }
     deferred.set(teammateId, entry)
     entry.notice(
       pool
@@ -1071,6 +1081,8 @@ export function createRelay(options: RelayOptions): Relay {
     })
     if (!decision.start) {
       entry.notice(decision.reason)
+      for (const other of heldAlso.get(teammateId) ?? []) notifyAndKeep(other.askerRunId, other.askerMissionId, decision.reason)
+      heldAlso.delete(teammateId)
       return
     }
     reserve(root)
@@ -1085,6 +1097,7 @@ export function createRelay(options: RelayOptions): Relay {
       }
       if (!waiting) {
         release(root)
+        heldAlso.delete(teammateId)
         return
       }
     }
@@ -1104,6 +1117,11 @@ export function createRelay(options: RelayOptions): Relay {
       return
     }
     if (outcome.kind === 'started' && entry.exchange !== undefined) exchanges.set(outcome.missionId, entry.exchange)
+    if (outcome.kind === 'started') {
+      const others = heldAlso.get(teammateId)
+      if (others !== undefined) alsoWaiting.set(outcome.missionId, others)
+    }
+    heldAlso.delete(teammateId)
   }
 
   /** The asker's next turn, once, briefed with everyone's reply. */
@@ -1235,6 +1253,12 @@ export function createRelay(options: RelayOptions): Relay {
       const waiting = exchanges.get(mission.missionId)
       if (waiting !== undefined && posted.some((message) => message.to.teammateId === waiting.askerId)) {
         exchanges.delete(mission.missionId)
+      }
+      const others = alsoWaiting.get(mission.missionId)
+      if (others !== undefined) {
+        const still = others.filter((other) => !posted.some((message) => message.to.teammateId === other.askerId))
+        if (still.length === 0) alsoWaiting.delete(mission.missionId)
+        else alsoWaiting.set(mission.missionId, still)
       }
 
       const seen = new Set<string>()
@@ -1398,17 +1422,19 @@ export function createRelay(options: RelayOptions): Relay {
       // rather than being left to conclude the message never arrived.
       const exchange = exchanges.get(mission.missionId)
       exchanges.delete(mission.missionId)
+      const others = alsoWaiting.get(mission.missionId) ?? []
+      alsoWaiting.delete(mission.missionId)
       const ended = options.howEnded === undefined ? undefined : await options.howEnded(mission.missionId).catch(() => undefined)
-      if (exchange !== undefined) {
+      for (const open of [...(exchange === undefined ? [] : [exchange]), ...others]) {
         // Only a run that completed has an answer to bring back (0.572).
-        const returned = ended === undefined && exchange.wantsAnswer === true && (await returnAnswer(exchange, mission).catch(() => false))
+        const returned = ended === undefined && open.wantsAnswer === true && (await returnAnswer(open, mission).catch(() => false))
         if (!returned) {
           notifyAndKeep(
-            exchange.askerRunId,
-            exchange.askerMissionId,
+            open.askerRunId,
+            open.askerMissionId,
             ended === undefined
-              ? `${exchange.recipientName} finished without writing back. Anything they said is in their own conversation.`
-              : `${exchange.recipientName} stopped before writing back: ${ended}. Anything they said is in their own conversation.`
+              ? `${open.recipientName} finished without writing back. Anything they said is in their own conversation.`
+              : `${open.recipientName} stopped before writing back: ${ended}. Anything they said is in their own conversation.`
           )
         }
       }

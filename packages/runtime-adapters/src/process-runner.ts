@@ -845,7 +845,8 @@ export function createNodeRuntimeProcessRunner(
         if (stdoutRemainder.endsWith("\r")) {
           stdoutRemainder = stdoutRemainder.slice(0, -1);
         }
-        emitRecord(stdoutRemainder);
+        // The tail of a line whose head was dropped as oversized is not a record of its own (2026-10-10 sweep).
+        if (!skippingOversizedLine) emitRecord(stdoutRemainder);
         stdoutRemainder = "";
         records.close();
         const capturedStderr = Buffer.concat(stderr.chunks, stderr.keptBytes).toString("utf8");

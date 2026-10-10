@@ -35,6 +35,17 @@ function postFromAtlas(workroom: Workroom, text: string, missionId = 'mission_a1
   return workroom.post({ from: { ...ATLAS, missionId }, to: WREN, text })
 }
 
+describe('the paths a message says were observed (2026-10-10 sweep)', () => {
+  it('counts "+N more" from the paths that are paths', async () => {
+    const workroom = workroomAt(await temporaryRoot())
+    const valid = Array.from({ length: 45 }, (_, at) => `src/file${String(at)}.ts`)
+    const tooLong = Array.from({ length: 10 }, () => 'x'.repeat(5_000))
+    const posted = await workroom.post({ from: { ...ATLAS, missionId: 'mission_a1' }, to: WREN, text: 'Changed these.', observed: [...valid, ...tooLong] })
+    expect(posted.observed?.length).toBe(41)
+    expect(posted.observed?.at(-1)).toBe('+5 more')
+  })
+})
+
 describe('the workroom channel', () => {
   it('records an attributed, routed message and reads it back', async () => {
     const root = await temporaryRoot()

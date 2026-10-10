@@ -32,6 +32,22 @@ const BOOTY = { teammateId: 'tm_booty', name: 'Booty', missionId: 'mission_b' }
 const ASH = { teammateId: 'tm_ash', name: 'Ash', missionId: 'mission_a' }
 const TASK = 'Check the version string'
 
+describe('a room with a task this build cannot read (2026-10-10 sweep)', () => {
+  it('keeps the room and its other tasks through the next write', async () => {
+    const rooms = await store()
+    const room = await rooms.create({ name: 'Release', teammateIds: ['tm_wren', 'tm_booty'] })
+    await rooms.applyTaskOps(room.roomId, [{ kind: 'new', text: TASK }, { kind: 'new', text: 'Sign the installer' }], WREN, ROSTER)
+    const { readFile, writeFile } = await import('node:fs/promises')
+    const file = JSON.parse(await readFile(join(root, 'rooms.json'), 'utf8'))
+    // A state a newer Locust writes, or a hand edit.
+    file.rooms[0].tasks[0].state = 'parked'
+    await writeFile(join(root, 'rooms.json'), JSON.stringify(file), 'utf8')
+    await rooms.create({ name: 'Second', teammateIds: ['tm_wren'] })
+    const kept = (await rooms.list()).find((one) => one.roomId === room.roomId)
+    expect(kept?.tasks.map((task) => task.text)).toEqual(['Sign the installer'])
+  })
+})
+
 describe('a handed task', () => {
   it('cannot be handed straight back to the teammate who handed it over', async () => {
     const rooms = await store()

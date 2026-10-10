@@ -22,6 +22,9 @@ describe('the files a memory names', () => {
     expect(citedPaths('The retry logic lives in src/net/fetch.ts, see also `README.md` and .env.')).toEqual(['src/net/fetch.ts', 'README.md', '.env'])
     expect(citedPaths('Docs are at https://example.com/a.md; we pin v1.2.3, e.g. for tests.')).toEqual([])
     expect(citedPaths('Tests run with pnpm test.')).toEqual([])
+    // A Windows path is a path (2026-10-10 sweep); a scheme still is not.
+    expect(citedPaths('see C:\\proj\\src\\net.ts for the fix')).toEqual(['C:\\proj\\src\\net.ts'])
+    expect(citedPaths('open mailto:someone or file:x')).toEqual([])
     expect(citedPaths('Windows paths too: apps\\desktop\\src\\main.ts')).toEqual(['apps\\desktop\\src\\main.ts'])
   })
 

@@ -217,6 +217,16 @@ describe("a Muse task that is not Muse's own machinery", () => {
       (events.find((event) => event.type === "tool.failed")!.payload as { status?: string }).status,
     ).toBe("permission denied");
   });
+
+  it("keeps a long failure reason within what the ledger keeps (2026-10-10 sweep)", () => {
+    const muse = normalizer();
+    const events = [
+      ...muse.accept(lifecycle("proposed", { task_kind: "tool.file.write" }, 1)),
+      ...muse.accept(lifecycle("started", {}, 2)),
+      ...muse.accept(lifecycle("failed", { reason: "y".repeat(600) }, 3)),
+    ];
+    expect(String((events.find((event) => event.type === "tool.failed")!.payload as { status?: string }).status).length).toBe(512);
+  });
 });
 
 describe("a Muse run that did not finish", () => {

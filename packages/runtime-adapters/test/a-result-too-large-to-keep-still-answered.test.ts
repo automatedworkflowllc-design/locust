@@ -45,6 +45,20 @@ const bigResult = JSON.stringify({
 });
 
 describe("a dropped record, for a runtime that asked", () => {
+  it("hands nothing on from an oversized line the process ended in the middle of (2026-10-10 sweep)", async () => {
+    const child = fakeChild();
+    const runner = createNodeRuntimeProcessRunner({ maxRecordBytes: 256, spawnProcess: () => child.process });
+    const run = runner.start(
+      { runtime: "claude", executablePath: resolve("fake-claude"), args: ["-p"], cwd: resolve("fake-workspace"), stdin: "prompt", stdout: "jsonl" },
+      "prompt",
+    );
+    child.stdout.emit("data", `{"type":"user","content":"${"x".repeat(2_000)}`);
+    child.stdout.emit("data", 'tail of the same line"}');
+    child.close();
+    await run.completion;
+    expect(run.records.drainAvailable().map((record) => record.raw)).toEqual([]);
+  });
+
   it("leaves its size, its type and the call it answered -- and none of its content", async () => {
     const raws = await recordsFor(true, [bigResult, '{"type":"next"}']);
     expect(raws).toHaveLength(2);

@@ -406,10 +406,13 @@ export function createAntigravityEventNormalizer(
       // draws them: "in the background", then done / failed / stopped.
       background.set(task.taskId, open);
       const watched = timerConditions.get(open.itemId);
+      // Already over? Then this timer will never fire either: settled at once, not left holding the turn
+      // open to the idle limit (2026-10-10 sweep).
+      let moot = false;
       if (watched !== undefined) {
         timerConditions.delete(open.itemId);
-        // Already over? Then this timer will never fire either.
         if (background.has(watched)) timerWaitsOn.set(task.taskId, watched);
+        else moot = true;
       }
       return [
         emit("tool.completed", { ...open, background: true, phase: "completed", evidence }),
@@ -421,6 +424,7 @@ export function createAntigravityEventNormalizer(
           ...(task.doing === undefined ? {} : { message: boundedMessageText(task.doing) }),
           evidence,
         }),
+        ...(moot ? settle(task.taskId, "completed", "no longer needed: what it waited on had already finished", evidence) : []),
       ];
     }
     return [

@@ -369,7 +369,7 @@ export function createSkillLibrary(options: { readonly root: string; readonly fe
           ...(keptHere ? { keptAt: keeper.sha } : {})
         }
       })
-      return { source, ref, sha, skills, partial }
+      return { source, ref, sha, skills, partial, ...(parsed.path === undefined ? {} : { path: parsed.path }) }
     },
 
     install(asked) {
@@ -385,7 +385,10 @@ export function createSkillLibrary(options: { readonly root: string; readonly fe
         }
         // The tree again, at the same commit: a commit never changes, so this is the list the person saw.
         const { tree } = await treeAt(owner, repo, sha)
-        const found = skillsInTree(tree, repo)
+        // The folder the link named, as the preview listed it: over the whole tree, a same-named folder elsewhere
+        // was kept instead, and a root SKILL.md hid every folder's (2026-10-10 sweep).
+        const under = typeof asked?.path === 'string' && asked.path.length > 0 && asked.path.length <= 1000 && !asked.path.split('/').includes('..') ? asked.path : undefined
+        const found = skillsInTree(tree, repo, under)
         const record = await readRecord()
         const others = record.sources.filter((kept) => !sameSource(kept.source, source))
         const chosen = names.map((name) => {

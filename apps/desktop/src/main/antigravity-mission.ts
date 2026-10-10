@@ -618,7 +618,8 @@ export function createAntigravityMissionService(options: AntigravityMissionOptio
       const info = await statTranscript(run.transcriptPath)
       const unmoved = info !== undefined && run.seen !== undefined && info.size === run.seen.size && info.mtimeMs === run.seen.mtimeMs
       const text = unmoved ? undefined : await readTranscript(run.transcriptPath)
-      if (!unmoved) run.seen = info
+      // Only a read that came back marks the file seen: one that failed is tried again next tick (2026-10-10 sweep).
+      if (!unmoved && text !== undefined) run.seen = info
       const lines = text === undefined ? [] : text.split('\n').filter((line) => line.trim().length > 0)
       let fresh: readonly NormalizedRuntimeEvent[] = []
       const read: NormalizedRuntimeEvent[] = []

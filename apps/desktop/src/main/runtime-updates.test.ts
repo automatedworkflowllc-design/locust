@@ -63,6 +63,10 @@ describe('versions', () => {
     expect(compareVersions('0.156.1', '0.153.0')).toBe(1)
     expect(compareVersions('0.153.0', '0.156.1')).toBe(-1)
     expect(compareVersions('0.10.0', '0.9.9')).toBe(1)
+    // Prereleases by their numbers (2026-10-10 sweep).
+    expect(compareVersions('0.158.0-alpha.10', '0.158.0-alpha.9')).toBe(1)
+    expect(compareVersions('0.158.0-alpha.9', '0.158.0-beta.1')).toBe(-1)
+    expect(compareVersions('0.158.0-alpha', '0.158.0-alpha.1')).toBe(-1)
     expect(compareVersions('0.158.0-alpha.4', '0.158.0')).toBe(-1)
     expect(compareVersions('1.0.88', '1.0.88')).toBe(0)
   })

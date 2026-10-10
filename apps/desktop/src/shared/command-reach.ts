@@ -42,6 +42,11 @@ function reachIn(command: string, depth: number): CommandReach | undefined {
   if (depth > 4) return undefined
   const parts = splitChain(command)
   for (let i = 0; i < parts.length; i += 1) {
+    // A group, a substitution or a backtick runs the commands inside it: read those too (2026-10-10 sweep).
+    for (const inner of innerCommands(parts[i]!.text)) {
+      const found = reachIn(inner, depth + 1)
+      if (found !== undefined) return found
+    }
     const words = commandWords(tokens(parts[i]!.text))
     if (words.length === 0) continue
     const inner = wrapped(words)
@@ -386,16 +391,52 @@ export function tokens(text: string): string[] {
   return words
 }
 
-/** Drops what runs the command rather than being it: `sudo`, `&`, `env X=1`. */
+/** The text inside `( ... )` wrapping a whole part, each `$( ... )`, and each backtick span: commands that run. */
+function innerCommands(text: string): string[] {
+  const found: string[] = []
+  const trimmed = text.trim()
+  const close = (from: number): number => {
+    let depth = 0
+    for (let at = from; at < trimmed.length; at += 1) {
+      if (trimmed[at] === '(') depth += 1
+      else if (trimmed[at] === ')') {
+        depth -= 1
+        if (depth === 0) return at
+      }
+    }
+    return -1
+  }
+  if (trimmed.startsWith('(') && close(0) === trimmed.length - 1) found.push(trimmed.slice(1, -1))
+  for (let at = trimmed.indexOf('$('); at >= 0; at = trimmed.indexOf('$(', at + 2)) {
+    const end = close(at + 1)
+    if (end > at) found.push(trimmed.slice(at + 2, end))
+  }
+  for (const match of trimmed.matchAll(/`([^`]+)`/g)) found.push(match[1]!)
+  return found
+}
+
+/** Drops what runs the command rather than being it: `sudo`, `&`, `env X=1`, `timeout 10`, `nice -n 5`, `do`. */
 function commandWords(words: readonly string[]): string[] {
   let at = 0
   while (at < words.length) {
     const word = words[at]!
     const name = programName(word)
-    if (word === '&' || word === '.' || ['sudo', 'doas', 'nohup', 'time', 'exec', 'command', 'env'].includes(name)) {
+    // A loop's or a branch's body is a command like any other (2026-10-10 sweep).
+    if (['do', 'then', 'else', 'elif', '{', '!'].includes(word)) {
       at += 1
-      // `sudo -u x`, `env -i`
-      while (at < words.length && words[at]!.startsWith('-')) at += words[at] === '-u' ? 2 : 1
+      continue
+    }
+    if (word === '&' || word === '.' || ['sudo', 'doas', 'nohup', 'time', 'exec', 'command', 'env', 'nice', 'ionice', 'stdbuf'].includes(name)) {
+      at += 1
+      // `sudo -u x`, `env -i`, `nice -n 5`
+      while (at < words.length && words[at]!.startsWith('-')) at += words[at] === '-u' || words[at] === '-n' ? 2 : 1
+      continue
+    }
+    // `timeout [-s SIGNAL] 10 <command>`: its flags and its duration.
+    if (name === 'timeout') {
+      at += 1
+      while (at < words.length && words[at]!.startsWith('-')) at += words[at] === '-s' || words[at] === '-k' ? 2 : 1
+      if (at < words.length && /^\d+(?:\.\d+)?[smhd]?$/.test(words[at]!)) at += 1
       continue
     }
     if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(word)) {

@@ -48,7 +48,7 @@ function fakeLedger(): MissionLedger {
   } as unknown as MissionLedger
 }
 
-function harness(cascade: CascadeApi, transcriptLines: string[]) {
+function harness(cascade: CascadeApi, transcriptLines: string[], extra: Record<string, unknown> = {}) {
   const recorded: NormalizedRuntimeEvent[] = []
   let ids = 0
   const service = createAntigravityMissionService({
@@ -72,7 +72,8 @@ function harness(cascade: CascadeApi, transcriptLines: string[]) {
     notify: () => undefined,
     emitApproval: () => undefined,
     withdrawApproval: () => undefined,
-    cascadeApi: () => cascade
+    cascadeApi: () => cascade,
+    ...extra
   } as never)
   return { service, recorded }
 }
@@ -124,6 +125,24 @@ describe('a long Antigravity answer', () => {
     await service.start('Who takes what?', undefined, {})
     await vi.waitFor(() => {
       expect(answerText(recorded)).toBe(`${BEFORE}\n<truncated 1066 bytes>\n${AFTER}`)
+    })
+    await service.dispose()
+  })
+
+  it('is read again after a read of the transcript fails once (2026-10-10 sweep)', async () => {
+    const { cascade } = cascadeWith(async () => [])
+    let reads = 0
+    const { service, recorded } = harness(cascade, [], {
+      // The file reads the same size and time throughout: only the read itself fails, once.
+      statTranscript: async () => ({ size: 100, mtimeMs: 1 }),
+      readTranscript: async () => {
+        reads += 1
+        return reads === 1 ? undefined : [USER, answer('Read on the second try.')].join('\n')
+      }
+    })
+    await service.start('Who takes what?', undefined, {})
+    await vi.waitFor(() => {
+      expect(answerText(recorded)).toBe('Read on the second try.')
     })
     await service.dispose()
   })

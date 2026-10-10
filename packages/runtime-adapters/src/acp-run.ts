@@ -401,7 +401,8 @@ export function startAcpRun(options: AcpRunOptions): AcpRun {
       const ended = objectOf(await client.request("session/prompt", { sessionId: sessionId!, prompt: [{ type: "text", text: next }] }));
       prompting = false;
       push(ACP_PROMPT_RESULT, { stopReason: text(ended.stopReason) ?? null, ...(isObject(ended.usage) ? { usage: ended.usage } : {}) });
-      if (cancelled || ended.stopReason !== "end_turn") break;
+      // A turn cut off at a limit still sends what was queued during it: steer() said it would (2026-10-10 sweep).
+      if (cancelled || (ended.stopReason !== "end_turn" && ended.stopReason !== "max_tokens" && ended.stopReason !== "max_turn_requests")) break;
       next = queued.length === 0 ? undefined : queued.splice(0).join("\n\n");
     }
     finish();

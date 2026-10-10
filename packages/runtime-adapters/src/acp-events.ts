@@ -372,7 +372,13 @@ export function createAcpEventNormalizer(context: AcpInvocationContext): AcpEven
       // The message the prompt ended on, marked final: what a teammate SAID
       // is its last final message (the transcript tracker), and the chunks
       // alone never say they were the last.
-      return [...closeReasoning(evidence), ...closeMessage(evidence)];
+      // Cut off at a limit is not finished: said, so the turn does not read as done (2026-10-10 sweep).
+      const limit = stopReason === "max_tokens"
+        ? "The agent stopped this turn at its length limit, so the answer may be cut short."
+        : stopReason === "max_turn_requests"
+          ? "The agent stopped this turn at its limit of steps, so the work may be unfinished."
+          : undefined;
+      return [...closeReasoning(evidence), ...closeMessage(evidence), ...(limit === undefined ? [] : [diagnostic("warning", "acp.stopped_at_limit", limit, evidence)])];
     }
     if (method === "session/update") {
       const update = isObject(params.update) ? params.update : undefined;

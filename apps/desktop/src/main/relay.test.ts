@@ -570,6 +570,19 @@ describe('relaying a share', () => {
       expect(starts).toHaveLength(3)
     })
 
+    it('tells every thread that waited on the held reply how it ended (2026-10-10 sweep)', async () => {
+      const { relay, starts, notices } = harness({ startResults: [BUSY, BUSY] })
+      await relay.onShared(sharing(), [message(BOOTY, 'first')])
+      await relay.onShared(sharing({ runId: 'run_wren2', missionId: 'mission_wren2' }), [message(BOOTY, 'second')])
+      await relay.onRunEnded(ended('mission_booty'))
+      expect(starts).toHaveLength(3)
+      // The held reply ran, as mission_3, and wrote to nobody.
+      await relay.onRunEnded(ended('mission_3'))
+      const told = notices.flatMap((update) => (update.kind === 'relay-notice' && update.message.includes('finished without writing back') ? [update.missionId] : []))
+      expect(told).toContain('mission_wren2')
+      expect(told).toHaveLength(2)
+    })
+
     it('waits again when the teammate was taken by something else in between', async () => {
       const { relay, starts } = harness({ startResults: [BUSY, BUSY] })
       await relay.onShared(sharing(), [message(BOOTY)])

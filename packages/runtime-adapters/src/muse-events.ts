@@ -270,7 +270,8 @@ export function createMuseEventNormalizer(
       return [
         emit("tool.failed", {
           ...toolRow(taskId),
-          ...(reason === undefined ? {} : { status: reason }),
+          // The ledger keeps a status of 512 at most; longer, it refused the event and the run ended (2026-10-10 sweep).
+          ...(reason === undefined ? {} : { status: reason.slice(0, 512) }),
           phase: "completed",
           evidence,
         }),

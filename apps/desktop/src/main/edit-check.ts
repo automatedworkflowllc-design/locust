@@ -45,10 +45,12 @@ export function runCheckCommand(command: string, cwd: string, timeoutMs = CHECK_
     let output = ''
     let timedOut = false
     let settled = false
+    // Declared before done(): a spawn that throws at once reaches done() before the timer exists (2026-10-10 sweep).
+    let timer: ReturnType<typeof setTimeout> | undefined
     const done = (run: CheckRun): void => {
       if (settled) return
       settled = true
-      clearTimeout(timer)
+      if (timer !== undefined) clearTimeout(timer)
       resolve(run)
     }
     let child: ReturnType<typeof spawn>
@@ -66,7 +68,7 @@ export function runCheckCommand(command: string, cwd: string, timeoutMs = CHECK_
     child.stderr?.on('data', take)
     child.on('error', (error) => done({ exitCode: null, output, timedOut, error: error.message }))
     child.on('close', (code) => done({ exitCode: code, output, timedOut }))
-    const timer = setTimeout(() => {
+    timer = setTimeout(() => {
       timedOut = true
       // The whole tree: a test runner's workers outlive its shell.
       void releaseProcessTree(child.pid).then((released) => {

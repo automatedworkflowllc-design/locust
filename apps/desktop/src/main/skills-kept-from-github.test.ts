@@ -173,6 +173,21 @@ describe('skills from a GitHub repository', () => {
     expect(github.asked.some((url) => url.includes(SHA_B))).toBe(false)
   })
 
+  it('keeps the folder the link named, not a same-named one elsewhere, nor nothing for a root skill (2026-10-10 sweep)', async () => {
+    const root = await scratch()
+    const twins: Record<string, FakeFile> = {
+      'SKILL.md': { text: '---\ndescription: The root one.\n---\nRoot.\n' },
+      'a/foo/SKILL.md': { text: '---\ndescription: The A foo.\n---\nThe A foo.\n' },
+      'b/foo/SKILL.md': { text: '---\ndescription: The B foo.\n---\nThe B foo.\n' }
+    }
+    const repos = { 'acme/kit': { commits: { [SHA_A]: twins } as Record<string, Record<string, FakeFile>> } }
+    const library = createSkillLibrary({ root, fetch: fakeGitHub(repos).fetch })
+    const preview = await library.preview('https://github.com/acme/kit/tree/main/b')
+    expect(preview.skills.map((skill) => skill.name)).toEqual(['foo'])
+    await library.install({ source: preview.source, ref: preview.ref, sha: preview.sha, names: ['foo'], ...(preview.path === undefined ? {} : { path: preview.path }) })
+    expect(await readFile(join(library.skillsFolder, 'foo', 'SKILL.md'), 'utf8')).toContain('The B foo.')
+  })
+
   it('looking again shows what is kept, and keeping again replaces it with the new commit', async () => {
     const root = await scratch()
     const repos = { 'acme/kit': { commits: { [SHA_A]: repoAtA } as Record<string, Record<string, FakeFile>> } }

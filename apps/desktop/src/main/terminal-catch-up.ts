@@ -327,7 +327,9 @@ export interface CatchUpResult {
   readonly owners?: Readonly<Record<string, string>>
 }
 
-const MAX_PROMPT = 16_000
+// The ledger's own bound on a mission's prompt (mission-store MAX_PROMPT_LENGTH), as session-import.ts has it:
+// at 16,000 one long typed prompt was refused there, and every catch-up after it stopped at it (2026-10-10 sweep).
+const MAX_PROMPT = 8_000
 const MAX_ANSWER = 16_000
 const bounded = (text: string, max: number): string => (text.length <= max ? text : `${text.slice(0, max - 1)}…`)
 

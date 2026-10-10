@@ -66,14 +66,15 @@ const decoder = new TextDecoder("utf-8", { fatal: false });
  */
 export function normalizeAntigravityWorkspace(value: string): string {
   let path = value;
-  if (path.startsWith("file:///")) path = path.slice("file:///".length);
-  else if (path.startsWith("file://")) path = path.slice("file://".length);
+  if (path.startsWith("file://")) path = path.slice("file://".length);
   try {
     path = decodeURIComponent(path);
   } catch {
     // A stray `%` that is not an escape. The undecoded text is still a better
     // key than nothing, and it simply will not match a caller's path.
   }
+  // `file:///C:/x` leaves `/C:/x`: the slash goes only before a drive. A POSIX path keeps its own (2026-10-10 sweep).
+  if (/^\/[A-Za-z]:/.test(path)) path = path.slice(1);
   path = path.replace(/\\/g, "/");
   while (path.length > 1 && path.endsWith("/")) path = path.slice(0, -1);
   return /^[A-Za-z]:/.test(path) ? path[0]!.toLowerCase() + path.slice(1) : path;
