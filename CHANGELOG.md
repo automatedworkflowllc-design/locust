@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.731.0 - 2026-10-10
+
+### New
+
+- **Watch a pull request.** Press Watch beside the pull request in a conversation's header. Every few minutes Locust checks it and tells you when a check fails, someone requests changes or approves, the branch conflicts, or it's merged. The news appears above the message box, or as a notification while Locust is in the background. When there's something to fix, one press writes the request to your teammate in the message box. You still press Send, so nothing runs or costs anything until you do.
+
+### Improved
+
+- **The pull request shows for a branch you checked out from someone's fork**, such as one you're reviewing.
+
 ## 0.730.0 - 2026-10-10
 
 ### New
