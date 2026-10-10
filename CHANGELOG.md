@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.725.0 - 2026-10-10
+
+### Improved
+
+- **Changes are in colour too.** A file a teammate changed now shows its code coloured by language, like code in a reply. Keywords, strings, functions and comments each have their own colour, on both the added and removed lines, and the words that changed are still marked.
+
 ## 0.724.0 - 2026-10-10
 
 ### Improved
