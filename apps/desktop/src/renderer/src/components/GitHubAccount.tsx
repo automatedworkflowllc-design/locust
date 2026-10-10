@@ -35,6 +35,7 @@ export function GitHubAccount(): ReactElement {
   const [signingIn, setSigningIn] = useState(false)
   const [copied, setCopied] = useState(false)
   const [said, setSaid] = useState<string | undefined>(undefined)
+  const [installing, setInstalling] = useState(false)
 
   const read = (): void => {
     const bridge = window.desktop
@@ -71,6 +72,21 @@ export function GitHubAccount(): ReactElement {
       })
   }
 
+  const install = (): void => {
+    const bridge = window.desktop
+    if (bridge === undefined) return
+    setSaid(undefined)
+    setInstalling(true)
+    void bridge
+      .githubInstall()
+      .then((result) => {
+        if (result.ok) setAccount(result.account)
+        else setSaid(result.message)
+      })
+      .catch(() => setSaid('The install could not be started. Nothing was installed.'))
+      .finally(() => setInstalling(false))
+  }
+
   const open = (url: string): void => {
     void window.desktop
       ?.openLink(url)
@@ -87,6 +103,8 @@ export function GitHubAccount(): ReactElement {
       code={code}
       copied={copied}
       said={said}
+      installing={installing}
+      onInstall={install}
       onRead={read}
       onSignIn={signIn}
       onStop={() => void window.desktop?.githubSignInCancel()}
@@ -103,6 +121,9 @@ export interface GitHubCardProps {
   readonly code: GithubSignInCode | undefined
   readonly copied: boolean
   readonly said: string | undefined
+  /** The GitHub CLI being installed from the card (0.724). */
+  readonly installing?: boolean
+  readonly onInstall?: () => void
   readonly onRead: () => void
   readonly onSignIn: () => void
   readonly onStop: () => void
@@ -111,10 +132,11 @@ export interface GitHubCardProps {
 }
 
 /** The card itself, from its state: what a test draws. */
-export function GitHubCard({ account, signingIn, code, copied, said, onRead, onSignIn, onStop, onOpen, onCopied }: GitHubCardProps): ReactElement {
+export function GitHubCard({ account, signingIn, code, copied, said, installing = false, onInstall, onRead, onSignIn, onStop, onOpen, onCopied }: GitHubCardProps): ReactElement {
   const signedIn = account?.kind === 'signed-in'
+  const busy = signingIn || installing
   return (
-    <div className="lc-github" data-state={signingIn ? 'signing-in' : (account?.kind ?? 'reading')}>
+    <div className="lc-github" data-state={signingIn ? 'signing-in' : installing ? 'installing' : (account?.kind ?? 'reading')}>
       <div className="lc-github__head">
         <span className={`lc-github__mark${signedIn ? ' is-on' : ''}`}>
           <GitHubMark size={20} />
@@ -122,26 +144,38 @@ export function GitHubCard({ account, signingIn, code, copied, said, onRead, onS
         <span className="lc-github__who">
           <span className="lc-github__name">{signedIn ? account.login : 'GitHub'}</span>
           <span className="lc-github__line">
-            {signingIn ? 'Waiting for GitHub to say yes.' : account === undefined ? 'Asking the GitHub CLI.' : githubAccountLine(account)}
+            {signingIn
+              ? 'Waiting for GitHub to say yes.'
+              : installing
+                ? 'Installing the GitHub CLI. Your computer may ask you to allow it.'
+                : account === undefined
+                  ? 'Asking the GitHub CLI.'
+                  : githubAccountLine(account)}
           </span>
         </span>
         <span className="lc-github__actions">
-          {!signingIn && account?.kind === 'no-cli' && (
-            <button type="button" className="lc-primarybutton" onClick={() => onOpen(GITHUB_CLI_PAGE)}>
-              Get the GitHub CLI
+          {/* Installed with the computer's own package manager (0.724); GitHub's page stays one press away. */}
+          {!busy && account?.kind === 'no-cli' && onInstall !== undefined && (
+            <button type="button" className="lc-primarybutton" onClick={onInstall}>
+              Install the GitHub CLI
             </button>
           )}
-          {!signingIn && (account?.kind === 'signed-out' || account?.kind === 'expired' || account?.kind === 'unknown') && (
+          {!busy && account?.kind === 'no-cli' && (
+            <button type="button" className={onInstall === undefined ? 'lc-primarybutton' : 'lc-button'} onClick={() => onOpen(GITHUB_CLI_PAGE)}>
+              Get it from GitHub
+            </button>
+          )}
+          {!busy && (account?.kind === 'signed-out' || account?.kind === 'expired' || account?.kind === 'unknown') && (
             <button type="button" className="lc-primarybutton" onClick={onSignIn}>
               <GitHubMark size={14} /> Sign in with GitHub
             </button>
           )}
-          {!signingIn && signedIn && (
+          {!busy && signedIn && (
             <button type="button" className="lc-button" onClick={() => onOpen(`https://github.com/${account.login}`)}>
               Open on GitHub
             </button>
           )}
-          {!signingIn && account !== undefined && (
+          {!busy && account !== undefined && (
             <button type="button" className="lc-button" onClick={onRead}>
               Check again
             </button>

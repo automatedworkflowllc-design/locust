@@ -46,6 +46,13 @@ export type GithubSignInResult =
   | { readonly ok: true; readonly account: GithubAccount }
   | { readonly ok: false; readonly message: string }
 
+/** Install from the card (0.724). `getItYourself`: the card then offers GitHub's own download page. */
+export type GithubInstallResult =
+  | { readonly ok: true; readonly account: GithubAccount }
+  | { readonly ok: false; readonly message: string; readonly getItYourself: boolean }
+
+export const GITHUB_INSTALL_CHANNEL = 'locust:github-install'
+
 /** A GitHub login: letters, digits and single hyphens, as GitHub allows. */
 const LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$/
 
@@ -90,7 +97,7 @@ export function githubSignInCodeOf(text: string): GithubSignInCode | undefined {
 export function githubAccountLine(account: GithubAccount): string {
   switch (account.kind) {
     case 'no-cli':
-      return 'The GitHub CLI is not on this computer. Install it, then sign in here.'
+      return 'The GitHub CLI is not on this computer. Install it here, then sign in.'
     case 'signed-out':
       return 'Not signed in. Sign in so teammates can push and open pull requests as you.'
     case 'expired':

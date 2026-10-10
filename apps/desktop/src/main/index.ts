@@ -126,7 +126,7 @@ import { readPdfPages } from './pdf-pages.js'
 import { addConnector, removeConnector } from './connector-add.js'
 import { createGithubAccount } from './github-account.js'
 import { FOLDER_PULL_REQUEST_CHANNEL } from '../shared/pull-request.js'
-import { GITHUB_ACCOUNT_CHANNEL, GITHUB_SIGN_IN_CANCEL_CHANNEL, GITHUB_SIGN_IN_CHANNEL, GITHUB_SIGN_IN_CODE_CHANNEL } from '../shared/github-account.js'
+import { GITHUB_ACCOUNT_CHANNEL, GITHUB_INSTALL_CHANNEL, GITHUB_SIGN_IN_CANCEL_CHANNEL, GITHUB_SIGN_IN_CHANNEL, GITHUB_SIGN_IN_CODE_CHANNEL } from '../shared/github-account.js'
 import type { AgentLaunch } from './connector-add.js'
 import { CONNECTOR_ADD_CHANNEL, CONNECTOR_REMOVE_CHANNEL, isConnectorAgent } from '../shared/connector-add.js'
 import type { ConnectorAgent } from '../shared/connector-add.js'
@@ -4873,6 +4873,15 @@ if (!ownsSingleInstanceLock) {
     })
     ipcMain.handle(GITHUB_SIGN_IN_CANCEL_CHANNEL, (event) => {
       if (fromOwnWindow(event)) githubAccount.cancel()
+    })
+    // Install the GitHub CLI from the card (0.724): winget, or Homebrew on a Mac that has it.
+    ipcMain.handle(GITHUB_INSTALL_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.', getItYourself: false } as const
+      const result = await githubAccount
+        .install()
+        .catch(() => ({ ok: false, message: 'The install could not be started. Nothing was installed.', getItYourself: true }) as const)
+      folderCommits.forgetSignIn()
+      return result
     })
 
     // An attached PDF's page pictures, for its card in the chat and the viewer (0.714, pdf-pages.ts).

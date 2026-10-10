@@ -40,9 +40,15 @@ describe('your GitHub on the Connectors page', () => {
   it('offers a sign-in when nobody is signed in, and the CLI when it is missing', () => {
     expect(card({ account: { kind: 'signed-out' } })).toContain('Sign in with GitHub')
     expect(card({ account: { kind: 'expired', login: 'octo-cat' } })).toContain('Sign in with GitHub')
-    const missing = card({ account: { kind: 'no-cli' } })
-    expect(missing).toContain('Get the GitHub CLI')
+    // 0.724: installed from the card where the app can, with GitHub's own page beside it.
+    const missing = card({ account: { kind: 'no-cli' }, onInstall: nothing })
+    expect(missing).toContain('Install the GitHub CLI')
+    expect(missing).toContain('Get it from GitHub')
     expect(missing).not.toContain('Sign in with GitHub')
+    const installing = card({ account: { kind: 'no-cli' }, onInstall: nothing, installing: true })
+    expect(installing).toContain('Installing the GitHub CLI.')
+    expect(installing).not.toContain('Install the GitHub CLI<')
+    expect(installing).not.toContain('Check again')
     expect(card({})).toContain('Asking the GitHub CLI.')
   })
 

@@ -1,10 +1,13 @@
 import { execFile, spawn } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import { posix, win32 } from 'node:path'
 
 import {
   githubAccountOf,
   githubAccountOfText,
   githubSignInCodeOf,
   type GithubAccount,
+  type GithubInstallResult,
   type GithubSignInCode,
   type GithubSignInResult
 } from '../shared/github-account.js'
@@ -32,13 +35,59 @@ export interface GithubAccountOptions {
   readonly startLogin?: (args: readonly string[]) => GhLogin
   /** A device code lasts fifteen minutes on GitHub; the wait stops there too. */
   readonly signInTimeoutMs?: number
+  /** Runs a package manager for Install (0.724): its exit, or `missing` when it is not there. */
+  readonly runInstaller?: (command: string, args: readonly string[]) => Promise<GhAnswer>
+  readonly platform?: NodeJS.Platform
+  readonly exists?: (path: string) => boolean
+}
+
+/**
+ * INSTALL THE GITHUB CLI FROM THE CARD (0.724), with the computer's own package manager -- winget on Windows,
+ * Homebrew on a Mac that has it -- so Connect GitHub needs no terminal from the very start. Pressing Install is
+ * the person's say-so for GitHub's MIT-licensed package; Windows still asks them to allow the installer.
+ * MEASURED 2026-10-10 (read only): `winget show --id GitHub.cli --exact --source winget` finds "GitHub CLI
+ * [GitHub.cli]", GitHub, Inc., MIT, a wix installer. The install itself was not run on this machine: its gh was
+ * already there, and Locust does not reinstall or upgrade what a person has.
+ */
+export const WINGET_GH_ARGS = ['install', '--id', 'GitHub.cli', '--exact', '--source', 'winget', '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity'] as const
+/** winget's "already installed" and "no newer version" exits: gh is there either way. */
+const WINGET_ALREADY = new Set([-1978335135, -1978335189])
+
+function defaultRunInstaller(command: string, args: readonly string[]): Promise<GhAnswer> {
+  return new Promise((resolvePromise) => {
+    execFile(command, [...args], { windowsHide: true, timeout: 15 * 60_000, maxBuffer: 4 * 1024 * 1024 }, (error, stdout, stderr) => {
+      const code = (error as { code?: unknown } | null)?.code
+      if (code === 'ENOENT') resolvePromise({ code: 'missing', stdout: '', stderr: '' })
+      else resolvePromise({ code: error === null ? 0 : typeof code === 'number' ? code : 1, stdout: String(stdout), stderr: String(stderr) })
+    })
+  })
 }
 
 const QUIET_ENV = (): NodeJS.ProcessEnv => ({ ...process.env, GH_PROMPT_DISABLED: '1', GH_NO_UPDATE_NOTIFIER: '1', NO_COLOR: '1' })
 
+/**
+ * Where gh is, PATH first. A gh installed while Locust runs is not on the PATH Locust started with, so the
+ * places its installers put it are looked at too: winget's machine-wide and per-user GitHub CLI folders, and
+ * Homebrew's two prefixes (0.724).
+ */
+export function ghCommand(platform: NodeJS.Platform = process.platform, env: NodeJS.ProcessEnv = process.env, exists: (path: string) => boolean = existsSync): string {
+  const { delimiter, join } = platform === 'win32' ? win32 : posix
+  const onPath = (env.PATH ?? env.Path ?? '').split(delimiter).filter((dir) => dir.length > 0)
+  const names = platform === 'win32' ? ['gh.exe'] : ['gh']
+  for (const dir of onPath) for (const name of names) if (exists(join(dir, name))) return 'gh'
+  const known =
+    platform === 'win32'
+      ? [
+          ...(env.ProgramFiles === undefined ? [] : [join(env.ProgramFiles, 'GitHub CLI', 'gh.exe')]),
+          ...(env.LOCALAPPDATA === undefined ? [] : [join(env.LOCALAPPDATA, 'Programs', 'GitHub CLI', 'gh.exe')])
+        ]
+      : ['/opt/homebrew/bin/gh', '/usr/local/bin/gh']
+  return known.find((path) => exists(path)) ?? 'gh'
+}
+
 function defaultRunGh(args: readonly string[]): Promise<GhAnswer> {
   return new Promise((resolvePromise) => {
-    execFile('gh', [...args], { windowsHide: true, timeout: 20_000, maxBuffer: 1024 * 1024, env: QUIET_ENV() }, (error, stdout, stderr) => {
+    execFile(ghCommand(), [...args], { windowsHide: true, timeout: 20_000, maxBuffer: 1024 * 1024, env: QUIET_ENV() }, (error, stdout, stderr) => {
       // An exit is a number; a gh that is not there is ENOENT.
       const code = (error as { code?: unknown } | null)?.code
       if (code === 'ENOENT') resolvePromise({ code: 'missing', stdout: '', stderr: '' })
@@ -48,7 +97,7 @@ function defaultRunGh(args: readonly string[]): Promise<GhAnswer> {
 }
 
 function defaultStartLogin(args: readonly string[]): GhLogin {
-  const child = spawn('gh', [...args], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], env: QUIET_ENV() })
+  const child = spawn(ghCommand(), [...args], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], env: QUIET_ENV() })
   const listeners: ((text: string) => void)[] = []
   const say = (chunk: Buffer): void => {
     for (const listener of listeners) listener(chunk.toString('utf8'))
@@ -131,5 +180,31 @@ export function createGithubAccount(options: GithubAccountOptions = {}) {
     login?.stop()
   }
 
-  return { read, signIn, cancel }
+  const runInstaller = options.runInstaller ?? defaultRunInstaller
+  const platform = options.platform ?? process.platform
+  const exists = options.exists ?? existsSync
+  let installing = false
+  /** One install at a time; then gh is asked again, from wherever the installer put it. */
+  const install = async (): Promise<GithubInstallResult> => {
+    if (installing) return { ok: false, message: 'The GitHub CLI is already being installed.', getItYourself: false }
+    installing = true
+    try {
+      const brew = ['/opt/homebrew/bin/brew', '/usr/local/bin/brew'].find((path) => exists(path))
+      const how = platform === 'win32' ? { command: 'winget', args: WINGET_GH_ARGS } : platform === 'darwin' && brew !== undefined ? { command: brew, args: ['install', 'gh'] as const } : undefined
+      if (how === undefined) return { ok: false, message: 'This computer has no package manager Locust can install it with.', getItYourself: true }
+      const ran = await runInstaller(how.command, how.args)
+      if (ran.code === 'missing') return { ok: false, message: `${platform === 'win32' ? 'winget' : 'Homebrew'} is not on this computer, so Locust cannot install it for you.`, getItYourself: true }
+      if (ran.code !== 0 && !(platform === 'win32' && WINGET_ALREADY.has(ran.code))) {
+        const said = `${ran.stdout}\n${ran.stderr}`.split('\n').map((line) => line.trim()).filter((line) => line.length > 0).pop()
+        return { ok: false, message: `The GitHub CLI was not installed${said === undefined ? '.' : `: ${said.slice(0, 200)}`}`, getItYourself: true }
+      }
+      const account = await read()
+      if (account.kind === 'no-cli') return { ok: false, message: 'It installed, but Locust cannot find it yet. Restart Locust and it will.', getItYourself: false }
+      return { ok: true, account }
+    } finally {
+      installing = false
+    }
+  }
+
+  return { read, signIn, cancel, install }
 }
