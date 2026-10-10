@@ -203,9 +203,11 @@ export const SETTINGS_PAGES: readonly SettingsPage[] = [
     label: 'Connectors',
     group: 'Agents',
     icon: 'plug',
-    headings: ['Connectors'],
+    headings: ['Connectors', 'Add a connector'],
     alsoKnownAs: {
-      Connectors: ['mcp', 'tools', 'server']
+      Connectors: ['mcp', 'tools', 'server'],
+      // 0.716: one connector, to every agent at once.
+      'Add a connector': ['add mcp', 'mcp server', 'every agent', 'all agents']
     }
   },
   {

@@ -8,11 +8,13 @@ import { VoiceSettings } from './VoiceSettings.js'
 import { LocustMcpSettings } from './LocustMcpSettings.js'
 import { SETTINGS_PAGES, matchedHeadings, pageMatches } from '../settingsPages.js'
 import { agentCapabilityHeading, agentCapabilityLines } from '../agentCapabilities.js'
+import { AddConnector } from './AddConnector.js'
 import { ConnectorHealth } from './ConnectorHealth.js'
 import type { SettingsPageId } from '../settingsPages.js'
 import type { LoginItemState, RuntimeUpdatesState, MetalMotion, MetalPreset, MetalStrength, ProfileBackupResponse, ProfileRestorePreview, ProfileRestoreResponse } from '../../../shared/ipc.js'
 import { backedUpLine, countsLine, folderName } from '../backupWords.js'
 import { SUPPORT_ADDRESS } from '../../../shared/support.js'
+import { isConnectorAgent } from '../../../shared/connector-add.js'
 import type { Spend } from '../../../shared/spend.js'
 import { isOwnRoute, modelDisplayName, routeChrome, routeModelName } from '../routeName.js'
 import type { ReactElement, ReactNode } from 'react'
@@ -1720,6 +1722,8 @@ export function SettingsScreen({
 }): ReactElement {
   const [page, setPage] = useState<SettingsPageId>(initialPage ?? 'app')
   const [query, setQuery] = useState('')
+  // Bumped when a connector was added or taken back, so the list above reads again (0.716).
+  const [connectorsRead, setConnectorsRead] = useState(0)
   const asked = query.trim()
   // A page earns its place in the list when its name or one of its settings
   // matches. With no search every page is there, which is the ordinary state.
@@ -2308,8 +2312,35 @@ export function SettingsScreen({
             </div>
           </div>
           {/* W8 (0.567): each connector's state, what to do, when it last worked, and a report to copy. */}
-          <ConnectorHealth />
+          <ConnectorHealth key={connectorsRead} />
         </section>
+        )}
+        {/*
+          * ONE CONNECTOR TO EVERY AGENT (0.716). Colin, 2026-10-09, of REA, an
+          * MCP server: "sure you can run connectors, or however you see fit."
+          * Each agent's own command adds it (shared/connector-add.ts).
+          */}
+        {shownPage === 'connectors' && (
+          <section className="lc-settings__section">
+            <h2 className="lc-settings__heading">Add a connector</h2>
+            <p className="lc-settings__lede">One MCP server, given to each AI agent you choose through that agent&rsquo;s own command.</p>
+            <More>
+              <p>
+                Claude Code, Codex, Gemini CLI, Copilot, OpenCode and Antigravity each keep their own list of connectors,
+                in their own file, and each has a command that adds one. Locust runs that command for you, the way you
+                would type it, and never edits their files itself. The list above is Claude Code&rsquo;s.
+              </p>
+              <p>
+                An agent that already has a connector by that name keeps its own, untouched: it may hold a key Locust
+                never saw. One that cannot say whether it has one is left alone. Undo takes it back out with each
+                agent&rsquo;s own command; OpenCode has none, so it says where its copy is kept.
+              </p>
+            </More>
+            <AddConnector
+              installed={runtimes.filter((runtime) => runtime.installed).map((runtime) => runtime.id).filter(isConnectorAgent)}
+              onChanged={() => setConnectorsRead((read) => read + 1)}
+            />
+          </section>
         )}
         {shownPage === 'runtimes' && (
         <section className="lc-settings__section">

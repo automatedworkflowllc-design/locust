@@ -17,6 +17,8 @@ import { QUEUED_MESSAGES_READ_CHANNEL, QUEUED_MESSAGES_WRITE_CHANNEL } from '../
 import type { QueuedMessagesResponse, SavedQueuedMessage } from '../shared/queued-messages.js'
 import type { CompareSlotId } from '../shared/compare.js'
 import type { UsageRange } from '../shared/usage.js'
+import { CONNECTOR_ADD_CHANNEL, CONNECTOR_REMOVE_CHANNEL } from '../shared/connector-add.js'
+import type { ConnectorAddRequest, ConnectorAddResponse, ConnectorAgent } from '../shared/connector-add.js'
 import {
   CODEX_MISSION_CANCEL_CHANNEL,
   CODEX_MISSION_START_CHANNEL,
@@ -631,6 +633,8 @@ const desktopApi: DesktopApi = {
   workspaceFiles: () => ipcRenderer.invoke(WORKSPACE_FILES_CHANNEL) as Promise<WorkspaceFilesResponse>,
   readUsage: (range: UsageRange) => ipcRenderer.invoke(USAGE_READ_CHANNEL, range) as Promise<UsageReadResponse>,
   pdfPages: (path: string, folder?: string) => ipcRenderer.invoke(PDF_PAGES_CHANNEL, path, folder) as Promise<PdfPagesResponse>,
+  addConnector: (request: ConnectorAddRequest) => ipcRenderer.invoke(CONNECTOR_ADD_CHANNEL, request) as Promise<ConnectorAddResponse>,
+  removeConnector: (name: string, agents: readonly ConnectorAgent[]) => ipcRenderer.invoke(CONNECTOR_REMOVE_CHANNEL, name, agents) as Promise<ConnectorAddResponse>,
   attachPasted: (name: string, bytes: Uint8Array) =>
     ipcRenderer.invoke(WORKSPACE_PASTE_CHANNEL, { name, bytes }) as Promise<AttachFilesResponse>,
   pickInPage: (request: PagePickRequest) => ipcRenderer.invoke(PAGE_PICK_CHANNEL, request) as Promise<PagePickResponse>,

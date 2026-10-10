@@ -123,6 +123,10 @@ import { relative } from 'node:path'
 import { decideReveal, insideOnDisk } from './reveal-file.js'
 import { readWorkspaceImage } from './workspace-image.js'
 import { readPdfPages } from './pdf-pages.js'
+import { addConnector, removeConnector } from './connector-add.js'
+import type { AgentLaunch } from './connector-add.js'
+import { CONNECTOR_ADD_CHANNEL, CONNECTOR_REMOVE_CHANNEL, isConnectorAgent } from '../shared/connector-add.js'
+import type { ConnectorAgent } from '../shared/connector-add.js'
 import { MAX_ATTACHMENTS } from '../shared/attachments.js'
 import { ATTACHMENT_DIR, attachmentDestination, excludeWith } from './attach-outside.js'
 import { extensionOf, isViewableText, MAX_TEXT_BYTES, viewerMode } from '../shared/text-files.js'
@@ -4761,6 +4765,47 @@ if (!ownsSingleInstanceLock) {
     ipcMain.handle(WORKSPACE_IMAGE_CHANNEL, async (event, requested: unknown, folder: unknown) => {
       if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
       return readWorkspaceImage(requested, folder ?? workspacePath, [...(await workedInFolders()), ...(await teammateFolders()), compareRoot()])
+    })
+
+    /*
+     * ONE CONNECTOR, ADDED TO EVERY AGENT CHOSEN (0.716, connector-add.ts):
+     * each agent's own `mcp add`, run as discovery found that agent, after
+     * asking it whether it already has one of that name. Listings can take
+     * OpenCode 20 s (it connects to each server), so these have a runner of
+     * their own with a longer ceiling than the health reading's.
+     */
+    const connectorChangeRunner = createNodeProbeRunner({ maximumTimeoutMs: 60_000 })
+    const connectorLaunches = async (): Promise<(agent: ConnectorAgent) => AgentLaunch | undefined> => {
+      const found = await discoverForWork()
+      return (agent) => found.find((entry) => entry.id === agent)?.executable
+    }
+    ipcMain.handle(CONNECTOR_ADD_CHANNEL, async (event, requested: unknown) => {
+      if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
+      const asked = typeof requested === 'object' && requested !== null ? (requested as Record<string, unknown>) : {}
+      const agents = Array.isArray(asked.agents) ? asked.agents.filter(isConnectorAgent) : []
+      if (typeof asked.name !== 'string' || typeof asked.value !== 'string' || (asked.kind !== 'command' && asked.kind !== 'url') || agents.length === 0) {
+        return { ok: false, message: 'Name the connector, say how it runs, and choose at least one agent.' } as const
+      }
+      try {
+        const result = await addConnector({ name: asked.name, kind: asked.kind, value: asked.value, agents }, await connectorLaunches(), connectorChangeRunner)
+        // The Connectors list reads Claude Code's own listing again when it is next asked.
+        if (result.ok && result.results.some((one) => one.agent === 'claude' && one.outcome === 'added')) connectorReader.forget()
+        return result
+      } catch {
+        return { ok: false, message: 'The connector could not be added. Nothing was changed in any agent that did not say so.' } as const
+      }
+    })
+    ipcMain.handle(CONNECTOR_REMOVE_CHANNEL, async (event, name: unknown, agents: unknown) => {
+      if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
+      const chosen = Array.isArray(agents) ? agents.filter(isConnectorAgent) : []
+      if (typeof name !== 'string' || name.trim().length === 0 || chosen.length === 0) return { ok: false, message: 'Nothing to take back.' } as const
+      try {
+        const results = await removeConnector(name.trim(), chosen, await connectorLaunches(), connectorChangeRunner)
+        if (results.some((one) => one.agent === 'claude' && one.outcome === 'removed')) connectorReader.forget()
+        return { ok: true, results } as const
+      } catch {
+        return { ok: false, message: 'It could not be taken back. Check each agent’s connectors.' } as const
+      }
     })
 
     // An attached PDF's page pictures, for its card in the chat and the viewer (0.714, pdf-pages.ts).

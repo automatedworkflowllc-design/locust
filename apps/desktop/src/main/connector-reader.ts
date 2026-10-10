@@ -49,6 +49,12 @@ export interface ConnectorReader {
   current(): readonly ReadConnector[]
   /** Take a reading if the held one is stale. Returns when that one settles. */
   refresh(): Promise<readonly ReadConnector[]>
+  /**
+   * Count the held reading as stale (0.716): a connector was just added or
+   * taken back, so the next look reads again -- and a read already under way
+   * began before the change, so its answer is not taken as the new one.
+   */
+  forget(): void
 }
 
 export function createConnectorReader(options: {
@@ -66,6 +72,8 @@ export function createConnectorReader(options: {
   let held: readonly ClaudeConnector[] = []
   let takenAt: number | undefined
   let inFlight: Promise<readonly ReadConnector[]> | undefined
+  // Bumped by forget(): a read begun before it answers for a list that has since changed.
+  let generation = 0
   let lastCheck: { readonly ms: number; readonly timedOut: boolean } | undefined
   const lastConnected = new Map<string, number>()
 
@@ -82,8 +90,10 @@ export function createConnectorReader(options: {
 
   const take = async (): Promise<readonly ReadConnector[]> => {
     const began = now()
+    const asked = generation
     try {
       const text = await options.read(CONNECTOR_READ_TIMEOUT_MS)
+      if (asked !== generation) return view()
       // A read that could not run leaves the last good reading alone. A
       // Claude Code that is briefly busy should not empty the list and
       // silently take everyone's connectors away mid-session.
@@ -102,7 +112,7 @@ export function createConnectorReader(options: {
     } catch {
       return view()
     } finally {
-      inFlight = undefined
+      if (asked === generation) inFlight = undefined
     }
   }
 
@@ -119,6 +129,11 @@ export function createConnectorReader(options: {
       if (takenAt !== undefined && now() - takenAt < ttl) return Promise.resolve(view())
       inFlight ??= take()
       return inFlight
+    },
+    forget() {
+      generation += 1
+      takenAt = undefined
+      inFlight = undefined
     }
   }
 }

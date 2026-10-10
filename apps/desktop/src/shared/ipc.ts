@@ -17,6 +17,7 @@ import type { MemoryScope } from './memory.js'
 export type { MemoryScope } from './memory.js'
 import type { Spend } from './spend.js'
 import type { UsageRange, UsageSummary } from './usage.js'
+import type { ConnectorAddRequest, ConnectorAddResponse, ConnectorAgent } from './connector-add.js'
 import type { OfficeDocument } from './office-document.js'
 import type { Workbook } from './sheet.js'
 import type { AboutYouSuggestion } from './about-you.js'
@@ -3752,6 +3753,10 @@ export interface DesktopApi {
   readUsage(range: UsageRange): Promise<UsageReadResponse>
   /** An attached PDF's page pictures, folder-relative (0.714); read on the way when it has none yet. */
   pdfPages(path: string, folder?: string): Promise<PdfPagesResponse>
+  /** One connector added to every agent chosen, each through its own `mcp add` (0.716). */
+  addConnector(request: ConnectorAddRequest): Promise<ConnectorAddResponse>
+  /** Undo an add: each agent's own `mcp remove` (0.716). */
+  removeConnector(name: string, agents: readonly ConnectorAgent[]): Promise<ConnectorAddResponse>
   /**
    * Attach one thing from the clipboard. `bytes` is the file's contents; the
    * name is a suggestion the host sanitises and may change to avoid a

@@ -90,4 +90,24 @@ describe('the connectors this machine has', () => {
     await Promise.all(all)
     expect(reads).toBe(1)
   })
+
+  it('read again after a connector is added, even when a reading was already under way (0.716)', async () => {
+    const answers: ((text: string) => void)[] = []
+    const reader = createConnectorReader({ read: () => new Promise<string>((resolve) => answers.push(resolve)) })
+    const before = reader.refresh()
+    // Settings > Connectors > Add a connector added `rea` while that reading ran.
+    reader.forget()
+    const after = reader.refresh()
+    expect(answers).toHaveLength(2)
+    answers[0]!(OUTPUT)
+    await before
+    // The older answer is not taken as the new list...
+    expect(reader.current()).toEqual([])
+    answers[1]!(`${OUTPUT}\nrea: node server.mjs - ✔ Connected`)
+    await after
+    expect(reader.names()).toEqual(['claude.ai Robinhood', 'rea'])
+    // ...and the new one is held as usual.
+    await reader.refresh()
+    expect(answers).toHaveLength(2)
+  })
 })
