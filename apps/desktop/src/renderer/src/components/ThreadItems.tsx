@@ -17,6 +17,7 @@ import type { FaceActivity } from '../faceState.js'
 import { Icon } from './Icon.js'
 import { ThreadImage } from './ThreadImage.js'
 import { ReplyPage } from './ReplyPage.js'
+import { statusColumnOf, statusToneOf } from '../statusChips.js'
 import { isWholePage } from '../../../shared/reply-page.js'
 
 /**
@@ -382,6 +383,7 @@ export function AgentText({
            * whole thing sits in its own scroller: a wide table must scroll
            * itself rather than make the conversation scroll sideways.
            */
+          const statusAt = statusColumnOf(block.header)
           return (
             <div className="lc-tablewrap" key={`b${String(index)}`}>
               <table className="lc-table">
@@ -397,11 +399,15 @@ export function AgentText({
                 <tbody>
                   {block.rows.map((row, rowIndex) => (
                     <tr key={`r${String(rowIndex)}`}>
-                      {row.map((cell, cellIndex) => (
-                        <td key={`c${String(cellIndex)}`} className={alignClass(block.align[cellIndex])}>
-                          {inline(cell)}
-                        </td>
-                      ))}
+                      {row.map((cell, cellIndex) => {
+                        // The Status column's values it knows, as chips in their tone (0.728, statusChips.ts).
+                        const tone = cellIndex === statusAt ? statusToneOf(cell) : undefined
+                        return (
+                          <td key={`c${String(cellIndex)}`} className={alignClass(block.align[cellIndex])}>
+                            {tone === undefined ? inline(cell) : <span className={`lc-status lc-status--${tone}`}>{inline(cell)}</span>}
+                          </td>
+                        )
+                      })}
                     </tr>
                   ))}
                 </tbody>

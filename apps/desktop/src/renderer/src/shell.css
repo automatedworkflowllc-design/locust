@@ -7191,6 +7191,41 @@ textarea {
   flex: none;
 }
 
+/* A table's Status column, as chips in their tone (0.728, statusChips.ts). */
+.lc-status {
+  display: inline-block;
+  padding: 1px 8px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: var(--lc-text-description);
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.lc-status--green {
+  color: var(--lc-green-text);
+  background: var(--lc-green-tint);
+  border-color: var(--lc-green-border);
+}
+.lc-status--blue {
+  color: var(--lc-blue-text);
+  background: var(--lc-blue-tint);
+  border-color: var(--lc-blue-border);
+}
+.lc-status--amber {
+  color: var(--lc-amber-text);
+  background: var(--lc-amber-tint);
+  border-color: var(--lc-amber-border);
+}
+.lc-status--red {
+  color: var(--lc-red-text);
+  background: var(--lc-red-tint);
+  border-color: var(--lc-red-border);
+}
+.lc-status--quiet {
+  color: var(--lc-text-muted);
+  border-color: var(--lc-border-hairline);
+}
+
 /* What a reply says a teammate published, as cards under it (0.727, PublishedCards.tsx). */
 .lc-published {
   display: flex;
