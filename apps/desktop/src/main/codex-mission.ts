@@ -622,6 +622,12 @@ interface CodexMissionServiceOptions {
    */
   readonly copilotCommandGuard?: () => Promise<string | undefined>
   /**
+   * The same guard for every OpenCode run and server (0.722,
+   * `writeOpenCodeCommandGuard`): the plugin file's URL its config names;
+   * undefined when it could not be written, and runs go without it.
+   */
+  readonly openCodeCommandGuard?: () => Promise<string | undefined>
+  /**
    * The same guard for a Codex run (0.720, `codexCommandGuardConfig`): the
    * config its thread is started, resumed or forked with, for this folder;
    * undefined when Codex would load some other hook too (`otherCodexHooks`),
@@ -1943,6 +1949,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
           globalThis.process.env.LOCUST_ASK_CONNECTORS === '1' || (await options.askConnectors?.()) === true
         const commandGuardPath = runtime === 'claude' ? await options.commandGuard?.() : undefined
         const copilotGuardPlugin = runtime === 'copilot' ? await options.copilotCommandGuard?.().catch(() => undefined) : undefined
+        const openCodeGuardPlugin = runtime === 'opencode' ? await options.openCodeCommandGuard?.().catch(() => undefined) : undefined
         const codexGuardConfig = runtime === 'codex' ? await options.codexCommandGuard?.(runCwd).catch(() => undefined) : undefined
         const permissionBridge =
           runtime === 'claude' && effectiveSandbox !== 'full-access' && options.permissionHost !== undefined
@@ -2006,7 +2013,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               // Approve each asks for everything; any other mode, what `run` would have been told.
               ...(mode === 'approve-each' ? {} : { sandbox: effectiveSandbox }),
               ...(repositoryRoot === undefined ? {} : { repositoryRoot }),
-              ...(providers === undefined ? {} : { providers })
+              ...(providers === undefined ? {} : { providers }),
+              ...(openCodeGuardPlugin === undefined ? {} : { openCodeGuardPlugin })
             })
           }
           if (runtime === 'opencode') {
@@ -2019,6 +2027,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
               // the folder it stands in is not the repository it belongs to.
               ...(repositoryRoot === undefined ? {} : { repositoryRoot }),
               ...(providers === undefined ? {} : { providers }),
+              ...(openCodeGuardPlugin === undefined ? {} : { openCodeGuardPlugin }),
               ...choice
             })
           }

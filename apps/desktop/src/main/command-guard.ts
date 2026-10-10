@@ -1,5 +1,6 @@
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 /**
  * NO TEAMMATE ENDS YOUR BROWSER (0.717): the settings every Claude Code run
@@ -124,6 +125,92 @@ export function copilotCommandGuardHooks(options: { readonly node: string; reado
     null,
     2
   )
+}
+
+/**
+ * THE SAME GUARD FOR OPENCODE (0.722): a plugin file every OpenCode run is
+ * told to load (`plugin` in OPENCODE_CONFIG_CONTENT, as a file URL), whose
+ * `tool.execute.before` asks the same script about each `bash` command.
+ *
+ * MEASURED 2026-10-10 on OpenCode 1.18.27, nemotron-3-ultra-free, with
+ * Locust's own edit-mode config:
+ * - The plugin is handed `{ tool: "bash" }` and `{ args: { command } }`
+ *   before the command runs; an Error it throws stops the command, and the
+ *   model reads the Error's message as the tool's result.
+ * - A plugin file that is missing is skipped, and one that throws as it loads
+ *   is logged ("failed to load plugin") and skipped: the run goes on either
+ *   way. So this one may fail open too, and does: anything but a refusal
+ *   from the guard lets the command run.
+ * - A `plugin` list in OPENCODE_CONFIG_CONTENT is added to the person's own,
+ *   not put in its place: a plugin named in another config ran beside it.
+ *
+ * It runs inside OpenCode's process, so the guard runs as its own process,
+ * as every runtime's hook does, and without blocking: `opencode serve` holds
+ * other sessions on the same event loop.
+ */
+export function openCodeCommandGuardPlugin(options: { readonly node: string; readonly guardPath: string; readonly parent: number; readonly log?: string }): string {
+  const parent = Number.isInteger(options.parent) && options.parent > 0 ? options.parent : 0
+  const env = { ELECTRON_RUN_AS_NODE: '1', LOCUST_GUARD_PARENT: String(parent), ...(options.log === undefined || options.log.length === 0 ? {} : { LOCUST_GUARD_LOG: options.log }) }
+  return [
+    '// Written by Locust (command-guard.ts): asks Locust\'s command guard before each command a teammate runs.',
+    "import { spawn } from 'node:child_process'",
+    '',
+    `const NODE = ${JSON.stringify(options.node)}`,
+    `const GUARD = ${JSON.stringify(options.guardPath)}`,
+    `const ENV = ${JSON.stringify(env)}`,
+    '',
+    '/** The guard\'s reason for refusing this command, or undefined: anything but a refusal lets it run. */',
+    'const refusal = (command) =>',
+    '  new Promise((resolve) => {',
+    '    let out = \'\'',
+    '    let child',
+    '    try {',
+    "      child = spawn(NODE, [GUARD], { stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true, env: { ...process.env, ...ENV } })",
+    '    } catch {',
+    '      return resolve(undefined)',
+    '    }',
+    '    const timer = setTimeout(() => {',
+    '      child.kill()',
+    '      resolve(undefined)',
+    '    }, 15000)',
+    "    child.on('error', () => resolve(undefined))",
+    "    child.stdout.setEncoding('utf8')",
+    "    child.stdout.on('data', (chunk) => (out += chunk))",
+    "    child.on('close', () => {",
+    '      clearTimeout(timer)',
+    '      try {',
+    '        const answer = JSON.parse(out)?.hookSpecificOutput',
+    "        resolve(answer?.permissionDecision === 'deny' && typeof answer.permissionDecisionReason === 'string' ? answer.permissionDecisionReason : undefined)",
+    '      } catch {',
+    '        resolve(undefined)',
+    '      }',
+    '    })',
+    "    child.stdin.on('error', () => undefined)",
+    "    child.stdin.end(JSON.stringify({ hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command } }))",
+    '  })',
+    '',
+    'export const LocustCommandGuard = async () => ({',
+    "  'tool.execute.before': async (input, output) => {",
+    "    const command = input?.tool === 'bash' ? output?.args?.command : undefined",
+    "    if (typeof command !== 'string') return",
+    '    const reason = await refusal(command)',
+    '    if (reason !== undefined) throw new Error(reason)',
+    '  }',
+    '})',
+    ''
+  ].join('\n')
+}
+
+/** OpenCode's plugin file, written once at start in the profile, as the file URL a config names; undefined if it could not be written. */
+export async function writeOpenCodeCommandGuard(folder: string, options: { readonly node: string; readonly guardPath: string; readonly parent: number; readonly log?: string }): Promise<string | undefined> {
+  try {
+    await mkdir(folder, { recursive: true })
+    const path = join(folder, 'opencode-command-guard.js')
+    await writeFile(path, openCodeCommandGuardPlugin(options), 'utf8')
+    return pathToFileURL(path).href
+  } catch {
+    return undefined
+  }
 }
 
 /** Copilot's plugin folder, written once at start in the profile; undefined if it could not be, and runs go without it. */

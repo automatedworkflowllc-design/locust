@@ -188,7 +188,7 @@ import { createRelay } from './relay.js'
 import { createAttention, finishFrom } from './attention.js'
 import { boundedShutdown } from './bounded-shutdown.js'
 import { createPermissionHost } from './permission-host.js'
-import { codexCommandGuardConfig, otherCodexHooks, writeCommandGuard, writeCopilotCommandGuard } from './command-guard.js'
+import { codexCommandGuardConfig, otherCodexHooks, writeCommandGuard, writeCopilotCommandGuard, writeOpenCodeCommandGuard } from './command-guard.js'
 import { chooseFolderCaution, isInsideDirectory, notATeammateFolder, readRememberedWorkspace, resolveWorkspacePath, WORKSPACE_ARGUMENT, writeRememberedWorkspace, workspaceIdFor } from './workspace.js'
 import { createUnwrittenAnswers } from './approval-record-note.js'
 import { createRaisedApprovals } from './raised-approvals.js'
@@ -2151,6 +2151,13 @@ if (!ownsSingleInstanceLock) {
       // A drive's line per question (the 0.720 seam). Copilot's env is the runner's allowlist, so the hook names it.
       ...(process.env.LOCUST_GUARD_LOG === undefined ? {} : { log: process.env.LOCUST_GUARD_LOG })
     })
+    // And for OpenCode (0.722): a plugin file every run and server is told to load.
+    const openCodeGuardWritten = writeOpenCodeCommandGuard(app.getPath('userData'), {
+      node: process.execPath,
+      guardPath: app.isPackaged ? join(process.resourcesPath, 'locust-command-guard.mjs') : join(__dirname, '../../resources/locust-command-guard.mjs'),
+      parent: process.pid,
+      ...(process.env.LOCUST_GUARD_LOG === undefined ? {} : { log: process.env.LOCUST_GUARD_LOG })
+    })
 
     /*
      * What answers a run that stops to ask. Approve-each used to have a whole
@@ -2276,6 +2283,7 @@ if (!ownsSingleInstanceLock) {
       permissionHost,
       commandGuard: () => commandGuardWritten,
       copilotCommandGuard: () => copilotGuardWritten,
+      openCodeCommandGuard: () => openCodeGuardWritten,
       // The same guard for Codex (0.720), only when it is the one hook Codex would load.
       codexCommandGuard: async (folder) => {
         if ((await otherCodexHooks({ codexHome: process.env.CODEX_HOME ?? join(homedir(), '.codex'), folder })).length > 0) return undefined

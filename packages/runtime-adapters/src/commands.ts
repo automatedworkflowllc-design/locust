@@ -469,6 +469,12 @@ export interface RuntimeCommandOptions {
    */
   readonly guardPlugin?: string;
   /**
+   * The same guard for OpenCode (0.722): the file URL of a plugin whose
+   * `tool.execute.before` asks it, added to the `plugin` list of the config
+   * every run and server is given (`withOpenCodeGuard`). OpenCode only.
+   */
+  readonly openCodeGuardPlugin?: string;
+  /**
    * One of the runtime's own slash commands, typed by the person (0.427):
    * `opencode run --command <name>`, its arguments being what arrives on
    * stdin. MEASURED 2026-09-28 on 1.18.27 with the free Nemotron: `--command
@@ -1445,7 +1451,7 @@ export const OPENCODE_AUTO_CONFIG = JSON.stringify({
  * What OpenCode is told for a mode, as environment: its permission config and, for a read-only run, no plugins.
  * One function for `run` and the server (0.677), so a mode means the same thing on either route.
  */
-export function openCodeModeEnv(options: { readonly sandbox?: RuntimeCommandOptions["sandbox"]; readonly repositoryRoot?: string; readonly providers?: RuntimeCommandOptions["providers"] }): Readonly<Record<string, string>> {
+export function openCodeModeEnv(options: { readonly sandbox?: RuntimeCommandOptions["sandbox"]; readonly repositoryRoot?: string; readonly providers?: RuntimeCommandOptions["providers"]; readonly openCodeGuardPlugin?: string }): Readonly<Record<string, string>> {
   const auto = sandboxArgument(options.sandbox) === "full-access";
   const readOnly = sandboxArgument(options.sandbox) === "read-only";
   // A worktree run needs its parent repository; a read-only one still needs
@@ -1465,7 +1471,7 @@ export function openCodeModeEnv(options: { readonly sandbox?: RuntimeCommandOpti
   // (OPENCODE_PURE, "run without external plugins"; plugin/index.ts:181).
   // Only for read-only runs: a run that may edit is already trusted with
   // the folder, and the person's own plugins are theirs to have there.
-  const configured = withoutOpenCodeQuestionTool(withOpenCodeProviders(config, options.providers));
+  const configured = withOpenCodeGuard(withoutOpenCodeQuestionTool(withOpenCodeProviders(config, options.providers)), options.openCodeGuardPlugin);
   return {
     OPENCODE_CONFIG_CONTENT: configured,
     ...(readOnly ? { OPENCODE_PURE: "1" } : {}),
@@ -1492,6 +1498,19 @@ export function withoutOpenCodeQuestionTool(config: string | undefined): string 
   const parsed = config === undefined ? {} : (JSON.parse(config) as Record<string, unknown>);
   const tools = (parsed.tools as Record<string, unknown> | undefined) ?? {};
   return JSON.stringify({ ...parsed, tools: { ...tools, question: false } });
+}
+
+/**
+ * Locust's command guard, added to a config's `plugin` list (0.722). OpenCode
+ * adds that list to the person's own rather than replacing it (MEASURED
+ * 2026-10-10, 1.18.27), so their plugins still load beside it. A read-only
+ * run is OPENCODE_PURE and loads none, this one included; it runs no commands.
+ */
+export function withOpenCodeGuard(config: string, plugin: string | undefined): string {
+  if (plugin === undefined) return config;
+  const parsed = JSON.parse(config) as Record<string, unknown>;
+  const plugins = Array.isArray(parsed.plugin) ? parsed.plugin : [];
+  return JSON.stringify({ ...parsed, plugin: [...plugins, requireText(plugin, "Command guard plugin")] });
 }
 
 /**
@@ -1757,6 +1776,8 @@ export function createOpenCodeServeCommand(
      * everything that acts.
      */
     readonly sandbox?: RuntimeCommandOptions["sandbox"];
+    /** Locust's command guard, in every mode (0.722, withOpenCodeGuard). */
+    readonly openCodeGuardPlugin?: string;
   },
 ): RuntimeCommandSpec {
   if (options.sandbox !== undefined) {
@@ -1779,7 +1800,7 @@ export function createOpenCodeServeCommand(
   return baseSpec("opencode", executable, options.workspacePath, ["serve", "--port", "0", "--hostname", "127.0.0.1"], {
     stdin: "protocol",
     sandbox: "workspace-write",
-    env: { OPENCODE_CONFIG_CONTENT: withoutOpenCodeQuestionTool(withOpenCodeProviders(config, options.providers) ?? config) },
+    env: { OPENCODE_CONFIG_CONTENT: withOpenCodeGuard(withoutOpenCodeQuestionTool(withOpenCodeProviders(config, options.providers) ?? config), options.openCodeGuardPlugin) },
   });
 }
 
