@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { BOT_SIZE } from '../botSizes.js'
 import type { ReactElement } from 'react'
+import { ColouredCode } from './ColouredCode.js'
 import { ORB_BOX, Orb } from './Orb.js'
 
 import { seedAvatar } from '../../../shared/avatar.js'
@@ -351,7 +352,7 @@ export function AgentText({
           return (
             <pre className="lc-code" key={`b${String(index)}`}>
               {block.language !== undefined && <span className="lc-code__lang lc-mono">{block.language}</span>}
-              <code>{block.code}</code>
+              <ColouredCode code={block.code} {...(block.language === undefined ? {} : { language: block.language })} live={streaming && last} />
               {streaming && last && <span className="lc-caret" />}
             </pre>
           )

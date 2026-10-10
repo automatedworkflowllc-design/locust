@@ -1339,6 +1339,32 @@ textarea {
  * be able to stretch the thread, which is the one thing that makes every
  * other message on screen harder to read.
  */
+/* Code in a reply, in colour (0.719, codeColors.ts): Shiki's css-variables
+ * theme, its variables set from Locust's own tones so a block follows the
+ * theme. Keywords violet, strings green, numbers and constants amber,
+ * functions blue, comments and punctuation the quiet text. */
+.lc-code {
+  --shiki-foreground: var(--lc-text-secondary);
+  --shiki-background: transparent;
+  --shiki-token-keyword: var(--lc-violet-text);
+  --shiki-token-string: var(--lc-green-text);
+  --shiki-token-string-expression: var(--lc-green-text);
+  --shiki-token-constant: var(--lc-amber-text);
+  --shiki-token-function: var(--lc-blue-text);
+  --shiki-token-parameter: var(--lc-text-primary);
+  --shiki-token-comment: var(--lc-text-muted);
+  --shiki-token-punctuation: var(--lc-text-muted);
+  --shiki-token-link: var(--lc-blue-text);
+  --shiki-token-inserted: var(--lc-green-text);
+  --shiki-token-deleted: var(--lc-red-text);
+  --shiki-token-changed: var(--lc-amber-text);
+}
+
+/* The coloured text keeps the block's own face and size; only spans in it change colour. */
+.lc-code__coloured {
+  font: inherit;
+}
+
 .lc-code {
   position: relative;
   margin: 0;

@@ -25,6 +25,20 @@ the installer. Their MIT notices are kept alongside the downloaded files in
   `apps/desktop/src/renderer/src/pdfReader.ts`). It reads the PDF's text and
   draws its pages as pictures on this machine; nothing is fetched.
 
+## Shiki
+
+- Project: https://github.com/shikijs/shiki
+- Licence: MIT, Copyright (c) 2021 Pine Wu, Copyright (c) 2023 Anthony Fu.
+  https://github.com/shikijs/shiki/blob/main/LICENSE
+- Version: `shiki` 4.4.3, unmodified, with its JavaScript regex engine and
+  the css-variables theme.
+- What Locust uses: the highlighter and 31 of its language grammars, bundled
+  and loaded only when a reply holds code in that language
+  (`apps/desktop/src/renderer/src/codeColors.ts`). The grammars are the
+  TextMate grammars VS Code uses, collected by
+  https://github.com/shikijs/textmate-grammars-themes, each under its own
+  licence as listed there.
+
 ## OpenPets
 
 - Project: https://github.com/OpenPetsHQ/openpets
