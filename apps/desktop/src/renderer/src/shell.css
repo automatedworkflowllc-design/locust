@@ -19370,6 +19370,28 @@ textarea {
   font-size: 1.08em;
 }
 
+/* A displayed equation written mid-line (a list item, a sentence) is a span,
+   since a paragraph may not hold a block; it is drawn as one (0.713). */
+.lc-math--intext {
+  display: block;
+}
+
+/* What a quote holds is drawn as a reply of its own (0.713): its first and
+   last pieces sit flush with the quote's rule, not a paragraph's gap away. */
+.lc-quote > :first-child {
+  margin-top: 0;
+}
+
+.lc-quote > :last-child {
+  margin-bottom: 0;
+}
+
+/* A quote's equations are in the quote's voice: a displayed one took the
+   reply's brighter colour and stood out from the words around it. */
+.lc-quote .lc-math--display {
+  color: inherit;
+}
+
 /* Import a conversation (ImportDialog): a searchable list of sessions, one
    row each -- the runtime's mark, the title over its folder and age, Import. */
 .lc-importdialog {

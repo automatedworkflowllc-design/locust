@@ -251,7 +251,7 @@ function inline(text: string): ReactElement {
           return <em key={`s${String(index)}`}>{nested(span.text)}</em>
         }
         if (span.kind === 'math') {
-          return <MathTex key={`s${String(index)}`} tex={span.text} display={false} />
+          return <MathTex key={`s${String(index)}`} tex={span.text} display={span.display === true} inText />
         }
         return <span key={`s${String(index)}`}>{span.text}</span>
       })}
@@ -413,6 +413,26 @@ export function AgentText({
         }
         if (block.kind === 'math') {
           return <MathTex key={`b${String(index)}`} tex={block.tex} display />
+        }
+        /*
+         * A QUOTE, AND WHAT IS INSIDE IT (0.713).
+         *
+         * Models use `> ` for cautions, and for "the version you could write
+         * down" -- which is where Codex put a tester's homework answer, every
+         * equation in it opened by `\[` on a line of its own. This branch went
+         * in 64fce646 (0.233, 2026-09-21) and every quote became a plain paragraph
+         * after it; a paragraph never looks for a displayed equation, so the
+         * answer arrived as `\begin{bmatrix}` line by line. A quote's lines
+         * are a reply of their own, so they are read as one: its equations,
+         * lists and code are drawn as they would be anywhere else. Each level
+         * is shorter than the one around it by its `>`, so this ends.
+         */
+        if (block.kind === 'quote') {
+          return (
+            <blockquote className="lc-quote" key={`b${String(index)}`}>
+              <AgentText text={block.text} streaming={false} />
+            </blockquote>
+          )
         }
         // Line breaks inside a paragraph are kept (`lc-para` is pre-line):
         // asked for "every file, one per line", Composer answered

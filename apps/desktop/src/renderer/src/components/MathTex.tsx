@@ -11,8 +11,12 @@ import 'katex/dist/katex.min.css'
  * on this machine, with its fonts bundled: no network. `trust: false`, so
  * nothing in a model's TeX can make a link, a class or an image. What KaTeX
  * cannot read is shown as the TeX it is, never dropped.
+ *
+ * `inText`: drawn inside a run of prose -- a paragraph, a list item, a table
+ * cell -- where a block element may not go. A displayed equation there is a
+ * span drawn as a block (0.713), so a `<p>` never holds a `<div>`.
  */
-export function MathTex({ tex, display }: { readonly tex: string; readonly display: boolean }): ReactElement {
+export function MathTex({ tex, display, inText = false }: { readonly tex: string; readonly display: boolean; readonly inText?: boolean }): ReactElement {
   const html = useMemo(() => {
     try {
       return katex.renderToString(tex, { displayMode: display, throwOnError: false, output: 'html', trust: false, strict: 'ignore', maxSize: 20, maxExpand: 500 })
@@ -22,8 +26,9 @@ export function MathTex({ tex, display }: { readonly tex: string; readonly displ
   }, [tex, display])
   if (html === undefined) {
     const written = display ? `$$${tex}$$` : `$${tex}$`
-    return display ? <pre className="lc-math lc-math--display lc-mono">{written}</pre> : <code className="lc-code">{written}</code>
+    return display && !inText ? <pre className="lc-math lc-math--display lc-mono">{written}</pre> : <code className="lc-code">{written}</code>
   }
+  if (display && inText) return <span className="lc-math lc-math--display lc-math--intext" dangerouslySetInnerHTML={{ __html: html }} />
   return display
     ? <div className="lc-math lc-math--display" dangerouslySetInnerHTML={{ __html: html }} />
     : <span className="lc-math" dangerouslySetInnerHTML={{ __html: html }} />

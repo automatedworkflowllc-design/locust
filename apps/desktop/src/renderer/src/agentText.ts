@@ -80,8 +80,12 @@ export type InlineSpan =
   | { readonly kind: 'link'; readonly text: string; readonly href: string }
   | { readonly kind: 'strong'; readonly text: string }
   | { readonly kind: 'em'; readonly text: string }
-  /** Inline math: `$...$` or `\(...\)`, drawn by KaTeX. */
-  | { readonly kind: 'math'; readonly text: string }
+  /**
+   * Inline math: `$...$` or `\(...\)`, drawn by KaTeX. `display` for a
+   * displayed equation written mid-line -- `\[...\]` or `$$...$$` -- which is
+   * where a list item's wrapped lines put one, once they are joined (0.713).
+   */
+  | { readonly kind: 'math'; readonly text: string; readonly display?: true }
 
 /** `- item`, `* item`, `+ item`. */
 /**
@@ -551,6 +555,17 @@ export const TEX_SYMBOLS: Readonly<Record<string, string>> = {
  */
 const INLINE_MATH = /(?<![\\$])\$(?![\s$])([^$\n]*?[^\s\\$])\$(?![\d$])|\\\(([^\n]+?)\\\)/.source
 
+/**
+ * A displayed equation in the middle of a line: `\[...\]` or `$$...$$`.
+ * Groups 11 and 12. A line that OPENS with one is a math block already
+ * (parseAgentText); this is the one a list item's joined lines carry, or a
+ * model that wrote "so \[ x = y \] holds" in a sentence (0.713). Both marks
+ * are required, so "$$ if you upgrade" stays words; and a `\[...\]` must hold
+ * something only math holds -- a backslash, `^`, `_`, `=`, a brace -- because
+ * `\[1\]` is how Markdown escapes a citation's brackets, not an equation.
+ */
+const DISPLAY_MATH = /\\\[((?:(?!\\\])[^\n])*?(?!\\\])[\\^_={}](?:(?!\\\])[^\n])*?)\\\]|(?<![\\$])\$\$(?!\$)([^$\n]*?[^\s$][^$\n]*?)\$\$/.source
+
 /** `$\name$`, spaces allowed inside the dollars, for a name in the table and nothing else. */
 const TEX_MACRO = `\\$[ \\t]*\\\\(${Object.keys(TEX_SYMBOLS)
   .sort((a, b) => b.length - a.length)
@@ -593,7 +608,7 @@ const INLINE = new RegExp(
   `${
     /`([^`\n]+)`|!?\[([^\]\n]*)\]\(([^)\s]+)\)|(?:\*\*|__|\*|_)\[([^\]\n]+)\]\(([^)\s]+)\)(?:\*\*|__|\*|_)|(?:\*\*|(?<![A-Za-z0-9_])__)(?=\S)([^\n]+?\S)(?:\*\*|__(?![A-Za-z0-9_]))|(?<![A-Za-z0-9*_])(?:\*|_)(?=\S)([^\n*_]*?[^\s*_])(?:\*|_)(?![A-Za-z0-9*_])/
       .source
-  }|${TEX_MACRO}|${INLINE_MATH}`,
+  }|${TEX_MACRO}|${INLINE_MATH}|${DISPLAY_MATH}`,
   'g'
 )
 
@@ -623,6 +638,8 @@ export function splitInlineCode(text: string): readonly InlineSpan[] {
       spans.push({ kind: 'em', text: match[7] })
     } else if (match[9] !== undefined || match[10] !== undefined) {
       spans.push({ kind: 'math', text: (match[9] ?? match[10]!).trim() })
+    } else if (match[11] !== undefined || match[12] !== undefined) {
+      spans.push({ kind: 'math', text: (match[11] ?? match[12]!).trim(), display: true })
     } else {
       spans.push({ kind: 'plain', text: TEX_SYMBOLS[match[8]!] ?? match[0] })
     }
