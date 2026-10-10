@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.733.0 - 2026-10-10
+
+### Improved
+
+- **Change a status in a teammate's tracker.** Press a status chip in a table to pick another, such as Done or Blocked. The request to update it appears in the message box, ready for you to send, and your teammate changes the tracker and tells you what that means.
+
 ## 0.732.0 - 2026-10-10
 
 ### New
