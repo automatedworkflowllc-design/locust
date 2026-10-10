@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { stat } from 'node:fs/promises'
+import { readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import { CHECKPOINT_MAX_FILE_BYTES, defaultRunGit, statusEntriesOf } from './worktrees.js'
@@ -66,6 +66,21 @@ function defaultRunNetwork(program: 'git' | 'gh', args: readonly string[], cwd: 
 
 const statusOf = (code: string): ChangeStatus =>
   code === '??' || code.includes('A') ? 'added' : code.includes('D') ? 'deleted' : code.includes('R') ? 'renamed' : 'modified'
+
+/**
+ * A new file's diff as git writes one (`git diff --no-index /dev/null <path>`): every line added, or one line saying a
+ * binary file differs. Its own, so a folder of new files is read at once rather than one git each (0.734).
+ */
+export function newFileDiff(path: string, bytes: Uint8Array): string {
+  const head = `diff --git a/${path} b/${path}\nnew file mode 100644\n`
+  if (bytes.length === 0) return head
+  if (bytes.subarray(0, 8000).includes(0)) return `${head}Binary files /dev/null and b/${path} differ\n`
+  const text = Buffer.from(bytes).toString('utf8')
+  const ends = text.endsWith('\n')
+  const lines = (ends ? text.slice(0, -1) : text).split('\n')
+  const range = lines.length === 1 ? '+1' : `+1,${String(lines.length)}`
+  return `${head}--- /dev/null\n+++ b/${path}\n@@ -0,0 ${range} @@\n${lines.map((line) => `+${line}`).join('\n')}\n${ends ? '' : '\\ No newline at end of file\n'}`
+}
 
 /** `fix the cart total` -> `locust/fix-the-cart-total`: a branch name git takes, from the commit's subject. */
 export function branchFromSubject(subject: string): string {
@@ -319,12 +334,18 @@ export function createFolderCommits(options: FolderCommitOptions = {}) {
         .split('\0')
         .filter((path) => path.length > 0)
         .slice(0, FOLDER_DIFF_MAX_NEW_FILES)
-      for (const path of untracked) {
+      // Read here and written as git writes a new file's diff, all at once: a git per file was 7.7 s for 200
+      // (measured 2026-10-10 on Locust's own checkout, whose records are untracked).
+      const added = await Promise.all(
+        untracked.map(async (path) => {
+          const size = await stat(join(folder, path)).then((info) => info.size, () => Infinity)
+          if (size > FOLDER_DIFF_MAX_NEW_FILE_BYTES) return ''
+          return readFile(join(folder, path)).then((bytes) => newFileDiff(path, bytes), () => '')
+        })
+      )
+      for (const one of added) {
         if (text.length >= FOLDER_DIFF_MAX_BYTES) break
-        const size = await stat(join(folder, path)).then((info) => info.size, () => Infinity)
-        if (size > FOLDER_DIFF_MAX_NEW_FILE_BYTES) continue
-        const added = await printed(['diff', '--no-color', '--no-ext-diff', '--no-index', '--', '/dev/null', path])
-        text += added.endsWith('\n') || added.length === 0 ? added : `${added}\n`
+        text += one
       }
     }
     if (text.trim().length === 0 && commits.length === 0) return { kind: 'none', why: 'clean' }

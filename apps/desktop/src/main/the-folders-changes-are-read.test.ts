@@ -5,7 +5,16 @@ import { join } from 'node:path'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { createFolderCommits } from './folder-commit.js'
+import { createFolderCommits, newFileDiff } from './folder-commit.js'
+
+describe('a new file’s diff, written as git writes it (0.734)', () => {
+  it('adds every line, says when the last has no newline, and calls a binary file binary', () => {
+    expect(newFileDiff('notes.md', Buffer.from('# Notes\nsecond\n'))).toBe('diff --git a/notes.md b/notes.md\nnew file mode 100644\n--- /dev/null\n+++ b/notes.md\n@@ -0,0 +1,2 @@\n+# Notes\n+second\n')
+    expect(newFileDiff('a.txt', Buffer.from('one'))).toBe('diff --git a/a.txt b/a.txt\nnew file mode 100644\n--- /dev/null\n+++ b/a.txt\n@@ -0,0 +1 @@\n+one\n\\ No newline at end of file\n')
+    expect(newFileDiff('empty.txt', Buffer.from(''))).toBe('diff --git a/empty.txt b/empty.txt\nnew file mode 100644\n')
+    expect(newFileDiff('logo.png', Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 1]))).toBe('diff --git a/logo.png b/logo.png\nnew file mode 100644\nBinary files /dev/null and b/logo.png differ\n')
+  })
+})
 
 /*
  * THE FOLDER'S CHANGES, IN ONE PANEL (0.732): the branch against where it left its base, committed and uncommitted

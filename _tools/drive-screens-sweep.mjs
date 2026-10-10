@@ -79,7 +79,7 @@ try {
     return drive.evaluate(READ_CONTROLS)
   })
 
-  for (const tab of ['Team', 'Settings', 'Missions']) {
+  for (const tab of ['Team', 'Settings', 'Conversations']) {
     await drive.capture(`the ${tab} screen`, () => drive.evaluate(openTab(tab)))
     await drive.capture(`  ...its controls`, () => drive.evaluate(READ_CONTROLS))
   }
@@ -100,6 +100,6 @@ try {
   say(`drive failed: ${error instanceof Error ? error.message : String(error)}`)
 } finally {
   await drive.finish({
-    intro: 'Team, Settings and Missions read end to end, plus every disabled control in the app.'
+    intro: 'Team, Settings and Conversations read end to end, plus every disabled control in the app.'
   })
 }

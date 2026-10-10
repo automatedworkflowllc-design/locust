@@ -1253,6 +1253,8 @@ function UpdateControl({
           type="button"
           className="lc-button"
           disabled={busy || phase === 'unsupported' || phase === 'checking'}
+          // Why it cannot be pressed, on the control itself (the screens sweep, 0.734): the line beside it says it too.
+          {...(phase === 'unsupported' ? { title: line } : phase === 'checking' || busy ? { title: 'Checking now.' } : {})}
           onClick={() => {
             setBusy(true)
             setRefusal(undefined)
@@ -3045,6 +3047,9 @@ export function SettingsScreen({
                 aria-checked={loginItem.openAtLogin}
                 aria-label="Start Locust when you sign in to Windows."
                 disabled={loginItem.available !== true}
+                {...(loginItem.available === true
+                  ? {}
+                  : { title: loginItem.why === 'platform' ? 'Windows only for now.' : 'Only the installed app can sign in with Windows. A development copy would register Electron.' })}
                 onClick={() => onLoginItemChange?.(loginItem.openAtLogin !== true)}
               >
                 <span className="lc-switch__knob" />
