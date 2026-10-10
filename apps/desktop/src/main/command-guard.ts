@@ -1,5 +1,5 @@
-import { mkdir, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
+import { dirname, join, resolve } from 'node:path'
 
 /**
  * NO TEAMMATE ENDS YOUR BROWSER (0.717): the settings every Claude Code run
@@ -36,6 +36,117 @@ export function commandGuardSettings(options: { readonly node: string; readonly 
     null,
     2
   )
+}
+
+/**
+ * THE SAME GUARD FOR CODEX (0.720): the config a Codex thread is started,
+ * resumed or forked with (`thread/start`'s `config`), naming the same script
+ * as a PreToolUse hook on its shell tool.
+ *
+ * MEASURED 2026-10-10 on Codex 0.162.1, gpt-6-luna, app-server:
+ * - Codex hands the hook Claude Code's own event (`tool_name: "Bash"`,
+ *   `tool_input.command`) and honours its `permissionDecision: "deny"`: the
+ *   command never ran and the model read the reason.
+ * - On Windows it runs the hook as `powershell.exe -NoProfile -Command`, so
+ *   the POSIX `NAME=value cmd` form and a bare quoted path both did nothing
+ *   there; `$env:NAME='value'; & 'program' 'script'` ran. Elsewhere the
+ *   command is the same as Claude Code's (not measured on a Mac).
+ * - Codex runs only hooks the person has reviewed, and that review is kept in
+ *   their config.toml, which Locust never writes. `bypass_hook_trust` runs
+ *   this thread's hooks without it; without it the hook never ran. It skips
+ *   the review for EVERY hook the thread loads, so it is only ever sent when
+ *   Locust's is the only one there is: see `otherCodexHooks`.
+ */
+export function codexCommandGuardConfig(options: {
+  readonly node: string
+  readonly guardPath: string
+  readonly parent: number
+  readonly platform?: NodeJS.Platform
+}): { readonly bypass_hook_trust: true; readonly hooks: { readonly PreToolUse: readonly unknown[] } } {
+  const parent = Number.isInteger(options.parent) && options.parent > 0 ? options.parent : 0
+  const forward = (path: string): string => path.replace(/\\/g, '/')
+  const command =
+    (options.platform ?? process.platform) === 'win32'
+      ? `$env:ELECTRON_RUN_AS_NODE='1'; $env:LOCUST_GUARD_PARENT='${String(parent)}'; & ${[options.node, options.guardPath].map((path) => `'${forward(path).replace(/'/g, "''")}'`).join(' ')}`
+      : `ELECTRON_RUN_AS_NODE=1 LOCUST_GUARD_PARENT=${String(parent)} ${[options.node, options.guardPath].map((path) => `"${forward(path).replace(/(["$`])/g, '\\$1')}"`).join(' ')}`
+  return {
+    bypass_hook_trust: true,
+    hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command, timeout: 15 }] }] }
+  }
+}
+
+/**
+ * Every hook Codex might load for a run besides Locust's own, by where Codex
+ * keeps them: the person's config (`hooks` in any `.toml` in CODEX_HOME, which
+ * is also where a managed hooks folder is named), a `hooks.json` in CODEX_HOME
+ * or its `hooks/`, an installed plugin that brings hooks, and a project's
+ * `.codex/` in the folder or any folder above it. Any of them, or any that
+ * cannot be read, and the run goes without the guard rather than run
+ * someone's unreviewed hook. Erring toward finding one costs only the guard.
+ *
+ * Except the plugins Codex ships itself (`plugins/cache/openai-bundled`):
+ * MEASURED 2026-10-10, its browser, Chrome and computer-use plugins each
+ * declare hooks (an `mcp_tool` telling its own REPL a turn ended) and are on
+ * by default, so counting them would leave nearly every Codex without the
+ * guard. Only installed plugins are read: dot-folders under `plugins/` are
+ * marketplace copies and half-finished installs, and the rest of CODEX_HOME
+ * (sessions, worktrees: 59,000 folders here, 30 s) holds no hooks.
+ */
+export async function otherCodexHooks(options: { readonly codexHome: string; readonly folder: string }): Promise<readonly string[]> {
+  const found: string[] = []
+  const names = async (folder: string): Promise<readonly import('node:fs').Dirent[] | undefined> => {
+    try {
+      return await readdir(folder, { withFileTypes: true })
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') found.push(`${folder} (could not be read)`)
+      return undefined
+    }
+  }
+  const namesHooks = async (path: string): Promise<boolean> => {
+    try {
+      return /^\s*\[\s*"?hooks\b|^\s*"?hooks"?\s*[.=]/m.test(await readFile(path, 'utf8'))
+    } catch {
+      found.push(`${path} (could not be read)`)
+      return false
+    }
+  }
+  for (const entry of (await names(options.codexHome)) ?? []) {
+    if (entry.isFile() && entry.name.endsWith('.toml') && (await namesHooks(join(options.codexHome, entry.name)))) found.push(join(options.codexHome, entry.name))
+  }
+  for (const folder of [options.codexHome, join(options.codexHome, 'hooks')]) {
+    for (const entry of (await names(folder)) ?? []) if (entry.isFile() && entry.name === 'hooks.json') found.push(join(folder, entry.name))
+  }
+  const plugins = join(options.codexHome, 'plugins')
+  const bundled = join(plugins, 'cache', 'openai-bundled')
+  const walk = async (folder: string, depth: number): Promise<void> => {
+    if (depth > 8 || resolve(folder) === resolve(bundled)) return
+    for (const entry of (await names(folder)) ?? []) {
+      const path = join(folder, entry.name)
+      if (entry.isFile() && entry.name === 'hooks.json') found.push(path)
+      else if (entry.isFile() && entry.name === 'plugin.json') {
+        try {
+          const declared = (JSON.parse(await readFile(path, 'utf8')) as { hooks?: unknown }).hooks
+          if (declared !== undefined && declared !== null && !(typeof declared === 'object' && Object.keys(declared).length === 0)) found.push(path)
+        } catch {
+          found.push(`${path} (could not be read)`)
+        }
+      } else if (entry.isDirectory() && (!entry.name.startsWith('.') || entry.name === '.codex-plugin' || entry.name === '.claude-plugin')) await walk(path, depth + 1)
+    }
+  }
+  await walk(plugins, 0)
+  for (let folder = resolve(options.folder), step = 0; step < 64; step += 1) {
+    const project = join(folder, '.codex')
+    if (resolve(project) !== resolve(options.codexHome)) {
+      for (const entry of (await names(project)) ?? []) {
+        if (entry.isFile() && entry.name === 'hooks.json') found.push(join(project, entry.name))
+        if (entry.isFile() && entry.name.endsWith('.toml') && (await namesHooks(join(project, entry.name)))) found.push(join(project, entry.name))
+      }
+    }
+    const up = dirname(folder)
+    if (up === folder) break
+    folder = up
+  }
+  return found
 }
 
 /** Written once at start, in the profile; undefined if it could not be, and runs go without it. */

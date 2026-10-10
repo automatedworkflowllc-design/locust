@@ -181,6 +181,18 @@ describe("a turn over app-server", () => {
     expect(server.paramsOf("thread/fork")).not.toHaveProperty("ephemeral");
   });
 
+  it("lays the thread's own config over the person's, on a start, a resume and a fork alike (0.720)", async () => {
+    const threadConfig = { bypass_hook_trust: true, hooks: { PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: "guard" }] }] } };
+    expect((await handshaken({ threadConfig })).server.paramsOf("thread/start")).toMatchObject({ config: threadConfig });
+    expect((await handshaken({ threadConfig, resumeThreadId: "thread_earlier" })).server.paramsOf("thread/resume")).toMatchObject({ config: threadConfig });
+    expect((await handshaken({ threadConfig, resumeThreadId: "thread_earlier", forkThread: true })).server.paramsOf("thread/fork")).toMatchObject({ config: threadConfig });
+    // A typed command's effort travels in the same config, and neither drops the other.
+    const typed = (await handshaken({ threadConfig, slashCommand: "compact", model: "gpt-6-luna", effort: "low" })).server.paramsOf("thread/start");
+    expect(typed).toMatchObject({ model: "gpt-6-luna", config: { model_reasoning_effort: "low", ...threadConfig } });
+    // Without one, no config is sent at all, as before.
+    expect((await handshaken()).server.paramsOf("thread/start")).not.toHaveProperty("config");
+  });
+
   it("streams every notification as a record and ends when the turn does", async () => {
     const { server, run } = await handshaken();
     server.notify("item/agentMessage/delta", { itemId: "m1", delta: "Cach" });

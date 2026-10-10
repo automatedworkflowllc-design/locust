@@ -88,6 +88,15 @@ export interface CodexAppServerRunOptions {
    */
   readonly slashCommand?: "review" | "compact";
   /**
+   * Config for THIS thread only, laid over the person's own (0.720: Locust's
+   * command guard). MEASURED 2026-10-10 on Codex 0.162.1 with gpt-6-luna:
+   * `hooks` and `bypass_hook_trust` in the `config` of `thread/start`,
+   * `thread/resume` and `thread/fork` alike ran a PreToolUse hook and honoured
+   * its deny, in a fresh app-server each time; without the bypass the hook
+   * never ran. Nothing is written to the person's config.toml.
+   */
+  readonly threadConfig?: Readonly<Record<string, JsonValue>>;
+  /**
    * What answers the server when it ASKS -- the approval channel. Only a
    * policy that stops for approval (`untrusted`) ever produces a request;
    * without a handler every request is refused, which under `never` is the
@@ -360,7 +369,14 @@ ${said}` : why;
         cwd: options.command.cwd,
         sandbox: options.sandbox,
         approvalPolicy: options.approvalPolicy,
-        ...(options.slashCommand === undefined ? {} : threadRoute(options.model, options.effort)),
+        ...(() => {
+          const route = options.slashCommand === undefined ? {} : threadRoute(options.model, options.effort);
+          const config = {
+            ...(typeof route.config === "object" && route.config !== null && !Array.isArray(route.config) ? route.config : {}),
+            ...(options.threadConfig ?? {}),
+          };
+          return { ...route, ...(Object.keys(config).length === 0 ? {} : { config }) };
+        })(),
       },
     );
     const record = (typeof thread === "object" && thread !== null ? thread : {}) as Record<

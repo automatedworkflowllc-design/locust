@@ -43,6 +43,7 @@
 // Ships beside app.asar via extraResources (electron-builder.yml).
 
 import { spawnSync } from 'node:child_process'
+import { appendFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 
 /** What ending each of these would end besides the teammate's own. */
@@ -399,6 +400,13 @@ async function main() {
     return
   }
   const reason = stoppedBecause(event?.tool_input?.command)
+  // For a drive only (0.720): a line per question, so a live run can show the
+  // guard was asked at all. Codex reports its hooks in no record Locust keeps.
+  if (typeof process.env.LOCUST_GUARD_LOG === 'string' && process.env.LOCUST_GUARD_LOG.length > 0) {
+    try {
+      appendFileSync(process.env.LOCUST_GUARD_LOG, `${JSON.stringify({ tool: event?.tool_name, command: String(event?.tool_input?.command ?? '').slice(0, 200), refused: reason !== undefined })}\n`)
+    } catch {}
+  }
   if (reason === undefined) return
   process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: reason } }))
 }

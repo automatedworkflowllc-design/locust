@@ -3248,6 +3248,33 @@ describe('Codex over app-server', () => {
     expect(JSON.stringify(written)).not.toContain('danger-full-access')
   })
 
+  it('starts every Codex thread with Locust’s command guard, for its own folder, and without it when the guard says so (0.720)', async () => {
+    const guard = { bypass_hook_trust: true, hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'guard', timeout: 15 }] }] } }
+    const askedFor: string[] = []
+    const guarded = fakeAppServer(REPLY)
+    const { service } = scheduledService({ start: vi.fn() }, fakeLedger(), {
+      appServerSpawn: guarded.spawn,
+      codexCommandGuard: async (folder: string) => {
+        askedFor.push(folder)
+        return guard
+      }
+    })
+    await service.start('Just look.', 'codex', 'ask', {}, () => undefined)
+    await vi.waitFor(() => {
+      expect(guarded.written.some((message) => message.method === 'thread/start')).toBe(true)
+    })
+    expect(guarded.written.find((message) => message.method === 'thread/start')?.params).toMatchObject({ config: guard })
+    expect(askedFor).toHaveLength(1)
+    // Another hook Codex would load: no guard, and so no bypass either.
+    const unguarded = fakeAppServer(REPLY)
+    const again = scheduledService({ start: vi.fn() }, fakeLedger(), { appServerSpawn: unguarded.spawn, codexCommandGuard: async () => undefined })
+    await again.service.start('Just look.', 'codex', 'ask', {}, () => undefined)
+    await vi.waitFor(() => {
+      expect(unguarded.written.some((message) => message.method === 'thread/start')).toBe(true)
+    })
+    expect(JSON.stringify(unguarded.written)).not.toContain('bypass_hook_trust')
+  })
+
   it('leaves every other runtime on the transport it already had', async () => {
     const { spawn } = fakeAppServer(REPLY)
     const start = vi.fn((_spec, _prompt, _options): RuntimeProcessRun => ({

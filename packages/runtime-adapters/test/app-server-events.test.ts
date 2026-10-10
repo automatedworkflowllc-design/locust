@@ -340,6 +340,16 @@ describe("errors and noise", () => {
     expect(app.finalized).toBe(true);
   });
 
+  it("keeps quiet about the trust bypass Locust's own command guard asks for, and passes every other warning on (0.720)", () => {
+    // Word for word as Codex 0.162.1 sent them, 2026-10-10: one of each, every turn.
+    const bypass = "`--dangerously-bypass-hook-trust` is enabled. Enabled hooks may run without review for this invocation.";
+    const app = normalizer();
+    expect(app.accept(note("configWarning", { summary: bypass, details: null }))).toEqual([]);
+    expect(app.accept(note("warning", { threadId: "t", message: bypass }))).toEqual([]);
+    const other = app.accept(note("configWarning", { summary: "Codex is ignoring 1 unrecognized configuration setting.", details: null }));
+    expect(other[0]).toMatchObject({ type: "adapter.diagnostic" });
+  });
+
   it("stays silent on the protocol's many unrelated notifications", () => {
     // MCP startup, remote control and realtime audio all stream through here;
     // a diagnostic per unknown method would bury the actual run.

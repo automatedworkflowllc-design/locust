@@ -31,6 +31,7 @@ import type {
   AppServerRunProcess,
   ClaudeEventNormalizer,
   CodexEventNormalizer,
+  JsonValue,
   MissionRuntimeId,
   RuntimeDiscovery,
   RuntimeProcessRun,
@@ -614,6 +615,13 @@ interface CodexMissionServiceOptions {
    * when it could not be written, and runs go without it.
    */
   readonly commandGuard?: () => Promise<string | undefined>
+  /**
+   * The same guard for a Codex run (0.720, `codexCommandGuardConfig`): the
+   * config its thread is started, resumed or forked with, for this folder;
+   * undefined when Codex would load some other hook too (`otherCodexHooks`),
+   * and that run goes without it.
+   */
+  readonly codexCommandGuard?: (folder: string) => Promise<Readonly<Record<string, unknown>> | undefined>
   /**
    * What answers a Codex run that stops to ask -- Approve-each's whole point.
    * Without it that mode has nobody to ask, and every request is refused.
@@ -1928,6 +1936,7 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         const askEveryConnector =
           globalThis.process.env.LOCUST_ASK_CONNECTORS === '1' || (await options.askConnectors?.()) === true
         const commandGuardPath = runtime === 'claude' ? await options.commandGuard?.() : undefined
+        const codexGuardConfig = runtime === 'codex' ? await options.codexCommandGuard?.(runCwd).catch(() => undefined) : undefined
         const permissionBridge =
           runtime === 'claude' && effectiveSandbox !== 'full-access' && options.permissionHost !== undefined
             ? await options.permissionHost.register({ runId, missionId, cwd: runCwd, beforeApproval: flushBeforeApproval })
@@ -2430,6 +2439,8 @@ ${sentPrompt.trim()}`
               ...(resumeThreadId === undefined ? {} : { resumeThreadId }),
               ...(side === undefined ? {} : { forkThread: true }),
               ...(codexCommand === 'review' || codexCommand === 'compact' ? { slashCommand: codexCommand } : {}),
+              // No teammate ends your browser, Codex too (0.720).
+              ...(codexGuardConfig === undefined ? {} : { threadConfig: codexGuardConfig as Readonly<Record<string, JsonValue>> }),
               signal: controller.signal,
               now
             })

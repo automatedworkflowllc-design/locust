@@ -188,7 +188,7 @@ import { createRelay } from './relay.js'
 import { createAttention, finishFrom } from './attention.js'
 import { boundedShutdown } from './bounded-shutdown.js'
 import { createPermissionHost } from './permission-host.js'
-import { writeCommandGuard } from './command-guard.js'
+import { codexCommandGuardConfig, otherCodexHooks, writeCommandGuard } from './command-guard.js'
 import { chooseFolderCaution, isInsideDirectory, notATeammateFolder, readRememberedWorkspace, resolveWorkspacePath, WORKSPACE_ARGUMENT, writeRememberedWorkspace, workspaceIdFor } from './workspace.js'
 import { createUnwrittenAnswers } from './approval-record-note.js'
 import { createRaisedApprovals } from './raised-approvals.js'
@@ -2267,6 +2267,15 @@ if (!ownsSingleInstanceLock) {
       ownProvider: (model) => ownModels.providerFor(model),
       permissionHost,
       commandGuard: () => commandGuardWritten,
+      // The same guard for Codex (0.720), only when it is the one hook Codex would load.
+      codexCommandGuard: async (folder) => {
+        if ((await otherCodexHooks({ codexHome: process.env.CODEX_HOME ?? join(homedir(), '.codex'), folder })).length > 0) return undefined
+        return codexCommandGuardConfig({
+          node: process.execPath,
+          guardPath: app.isPackaged ? join(process.resourcesPath, 'locust-command-guard.mjs') : join(__dirname, '../../resources/locust-command-guard.mjs'),
+          parent: process.pid
+        })
+      },
       approvals,
       // A ledger write that fails mid-run names its reason in locust-errors.log.
       note,

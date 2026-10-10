@@ -706,6 +706,11 @@ export function createAppServerEventNormalizer(
             ? (stringValue(params.summary) ?? stringValue(params.message))
             : stringValue(params.message);
           if (rawMessage === undefined) return [];
+          // Locust's own command guard asks for it (0.720), and only when that
+          // guard is the one hook Codex loads; Codex says so twice a turn
+          // (a configWarning and a warning). Shown, it would read as a danger
+          // the person never chose, in every Codex turn.
+          if (/^`--dangerously-bypass-hook-trust` is enabled\./.test(rawMessage)) return [];
           const details = notification.method === "configWarning" ? stringValue(params.details) : undefined;
           const message = details !== undefined ? `${rawMessage}\n${details}` : rawMessage;
           return [
