@@ -11,6 +11,35 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.719.0 - 2026-10-10
+
+### Fixed
+
+A sweep through Locust's code turned up 24 mistakes; each is fixed and has a test so it stays fixed.
+
+- **Copilot teammates use the effort you pick.** The effort setting was not reaching Copilot, so every Copilot run used its default.
+- **A skill from a folder inside a GitHub repository installs from that folder**, not from the top of the repository.
+- **A message held for a busy teammate is never lost.** When two messages were waiting for the same teammate, only the first one reached it. Now each one does, and the conversation says so if a message cannot be delivered.
+- **Long answers and long waits come back whole.** A long Antigravity answer could stop partway through. A timer Antigravity set on a task that had already ended kept the run open. A Copilot run that reaches its turn or length limit while you work in it now says so and goes on to the messages you queued.
+- **Commands that end every copy of a program are named wherever they hide**: inside brackets, inside `$( )` or backticks, in a loop, or behind `timeout` or `nice`.
+- **Smaller fixes:**
+  - A very long prompt typed in the terminal is still read back.
+  - Very long status lines from Muse and Copilot are cut short.
+  - Teammates can reach a project's parent git folder on every platform.
+  - A task is matched to the room post that names it, even with punctuation in the way.
+  - A routine time that passed during a run across midnight is counted as missed.
+  - One damaged post no longer hides a whole room.
+  - A background Claude turn that is still working is shown as working.
+  - Empty Word and PowerPoint text boxes no longer swallow the words after them.
+  - A final line too large to keep no longer hides the answer before it.
+  - A check that cannot start no longer leaves a timer running.
+  - Allow rules ignore letter case only for Windows folders.
+  - Runtime updates compare beta versions correctly.
+  - A memory that cites a web address is no longer marked out of date.
+  - A saved record keeps code blocks exactly as they were written.
+  - A workroom's "+N more" counts only real entries.
+  - Antigravity projects on Mac and Linux keep their leading slash.
+
 ## 0.718.0 - 2026-10-10
 
 ### Fixed
