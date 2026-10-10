@@ -20481,6 +20481,11 @@ textarea {
   white-space: nowrap;
 }
 
+/* A month's name may be wider than its week: it runs on over the next ones. */
+.lc-heat__month {
+  overflow: visible;
+}
+
 .lc-heat__body {
   display: flex;
   gap: 6px;

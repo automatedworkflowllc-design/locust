@@ -217,7 +217,7 @@ export function UsageDialog({
                             <td className="is-number">{model.turns.toLocaleString('en-US')}</td>
                             <td className="is-number">{tokens === 0 ? '—' : compactCount(tokens)}</td>
                             <td className="is-number">{cachedText(model)}</td>
-                            <td className="lc-usage__paid">{paidBy(model)}</td>
+                            <td>{paidBy(model)}</td>
                           </tr>
                         )
                       })}
