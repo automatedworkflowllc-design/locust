@@ -23,6 +23,7 @@ import { folderName, ranOnLine } from '../ranOn.js'
 import { useFollowBottom } from '../useFollowBottom.js'
 import { JumpToBottom } from './JumpToBottom.js'
 import { CopyButton } from './CopyButton.js'
+import { PublishedCards } from './PublishedCards.js'
 import { TurnUndo } from './TurnUndo.js'
 import { ledgerFailureRows, ledgerFailureSentence } from '../ledgerFailure.js'
 import { runtimeDisplayName } from '../../../shared/runtimes.js'
@@ -274,6 +275,8 @@ export function ThreadItems({
               {face(index)}
               <div className="lc-agentline__body">
                 <AgentText text={item.text} streaming={item.streaming === true} />
+                {/* What it published elsewhere, as cards, once the reply is whole (0.727). */}
+                {item.streaming !== true && <PublishedCards text={item.text} />}
                 {index === lastSpeech && replyText !== undefined && !footTakesCopy && (
                   <div className="lc-agentline__tools">
                     <CopyButton className="lc-agentline__copy" label="this reply" text={item.text} />

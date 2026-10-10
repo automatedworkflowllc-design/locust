@@ -7191,6 +7191,81 @@ textarea {
   flex: none;
 }
 
+/* What a reply says a teammate published, as cards under it (0.727, PublishedCards.tsx). */
+.lc-published {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-2);
+  margin-top: var(--lc-space-3);
+  max-width: 560px;
+}
+
+.lc-published__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lc-space-1);
+}
+
+.lc-published__card {
+  display: flex;
+  align-items: center;
+  gap: var(--lc-space-4);
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--lc-border-hairline);
+  border-radius: var(--lc-radius-control);
+  background: var(--lc-bg-raised);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lc-published__card:hover {
+  border-color: var(--lc-border-strong);
+}
+
+.lc-published__card:focus-visible {
+  outline: 2px solid var(--lc-border-strong);
+  outline-offset: 2px;
+}
+
+.lc-published__mark {
+  display: inline-flex;
+  flex: none;
+  color: var(--lc-text-secondary);
+}
+
+.lc-published__who {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.lc-published__title {
+  font-size: var(--lc-text-body);
+  font-weight: 600;
+  color: var(--lc-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-published__line {
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-published__open {
+  flex: none;
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-secondary);
+}
+
 .lc-github {
   display: flex;
   flex-direction: column;
