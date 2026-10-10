@@ -9,6 +9,7 @@ import { LocustMcpSettings } from './LocustMcpSettings.js'
 import { SETTINGS_PAGES, matchedHeadings, pageMatches } from '../settingsPages.js'
 import { agentCapabilityHeading, agentCapabilityLines } from '../agentCapabilities.js'
 import { AddConnector } from './AddConnector.js'
+import { GitHubAccount } from './GitHubAccount.js'
 import { ConnectorHealth } from './ConnectorHealth.js'
 import type { SettingsPageId } from '../settingsPages.js'
 import type { LoginItemState, RuntimeUpdatesState, MetalMotion, MetalPreset, MetalStrength, ProfileBackupResponse, ProfileRestorePreview, ProfileRestoreResponse } from '../../../shared/ipc.js'
@@ -2269,6 +2270,29 @@ export function SettingsScreen({
               </p>
             </More>
             <OwnModels onChanged={onOwnModelsChanged} />
+          </section>
+        )}
+        {/*
+          * YOUR GITHUB (0.720). Colin, 2026-10-10, of t3code: "a legitimate
+          * github connector and their logo would be very cool". The GitHub
+          * CLI's own account, signed in without a terminal (GitHubAccount.tsx).
+          */}
+        {shownPage === 'connectors' && (
+          <section className="lc-settings__section">
+            <h2 className="lc-settings__heading">GitHub</h2>
+            <p className="lc-settings__lede">Teammates push and open pull requests as you, through your own GitHub CLI.</p>
+            <More>
+              <p>
+                Locust uses the GitHub account the GitHub CLI (gh) is signed in to, the same one you use in a terminal. It
+                keeps no token of its own. Sign in here and Locust starts gh&rsquo;s own sign-in: it shows a one-time code,
+                you enter it on GitHub&rsquo;s page in your browser, and gh keeps the sign-in where it always does.
+              </p>
+              <p>
+                Once signed in, Commit in a conversation can also push and open a pull request. To sign out, run gh auth
+                logout in a terminal.
+              </p>
+            </More>
+            <GitHubAccount />
           </section>
         )}
         {shownPage === 'connectors' && (

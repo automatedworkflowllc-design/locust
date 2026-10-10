@@ -19,6 +19,10 @@ import type { CompareSlotId } from '../shared/compare.js'
 import type { UsageRange } from '../shared/usage.js'
 import { CONNECTOR_ADD_CHANNEL, CONNECTOR_REMOVE_CHANNEL } from '../shared/connector-add.js'
 import type { ConnectorAddRequest, ConnectorAddResponse, ConnectorAgent } from '../shared/connector-add.js'
+import { GITHUB_ACCOUNT_CHANNEL, GITHUB_SIGN_IN_CANCEL_CHANNEL, GITHUB_SIGN_IN_CHANNEL, GITHUB_SIGN_IN_CODE_CHANNEL } from '../shared/github-account.js'
+import type { GithubAccount, GithubSignInCode, GithubSignInResult } from '../shared/github-account.js'
+import { FOLDER_PULL_REQUEST_CHANNEL } from '../shared/pull-request.js'
+import type { FolderPullRequest } from '../shared/pull-request.js'
 import {
   CODEX_MISSION_CANCEL_CHANNEL,
   CODEX_MISSION_START_CHANNEL,
@@ -574,6 +578,7 @@ const desktopApi: DesktopApi = {
     ipcRenderer.invoke(TURN_UNDO_STATE_CHANNEL, [...runIds]) as Promise<Readonly<Record<string, TurnUndoState>>>,
   undoTurn: (runId: string) => ipcRenderer.invoke(TURN_UNDO_CHANNEL, runId) as Promise<TurnUndoState>,
   folderChanges: () => ipcRenderer.invoke(FOLDER_CHANGES_CHANNEL) as Promise<FolderChanges>,
+  folderPullRequest: () => ipcRenderer.invoke(FOLDER_PULL_REQUEST_CHANNEL) as Promise<FolderPullRequest | undefined>,
   commitFolder: (message, then, shown) => ipcRenderer.invoke(FOLDER_COMMIT_CHANNEL, message, then, [...shown]) as Promise<CommitResult>,
   backgroundRuns: () => ipcRenderer.invoke(BACKGROUND_LIST_CHANNEL) as Promise<readonly PublicBackgroundRun[]>,
   startBackground: (request) => ipcRenderer.invoke(BACKGROUND_START_CHANNEL, request) as Promise<BackgroundStartResponse>,
@@ -635,6 +640,16 @@ const desktopApi: DesktopApi = {
   pdfPages: (path: string, folder?: string) => ipcRenderer.invoke(PDF_PAGES_CHANNEL, path, folder) as Promise<PdfPagesResponse>,
   addConnector: (request: ConnectorAddRequest) => ipcRenderer.invoke(CONNECTOR_ADD_CHANNEL, request) as Promise<ConnectorAddResponse>,
   removeConnector: (name: string, agents: readonly ConnectorAgent[]) => ipcRenderer.invoke(CONNECTOR_REMOVE_CHANNEL, name, agents) as Promise<ConnectorAddResponse>,
+  githubAccount: () => ipcRenderer.invoke(GITHUB_ACCOUNT_CHANNEL) as Promise<GithubAccount>,
+  githubSignIn: () => ipcRenderer.invoke(GITHUB_SIGN_IN_CHANNEL) as Promise<GithubSignInResult>,
+  githubSignInCancel: () => ipcRenderer.invoke(GITHUB_SIGN_IN_CANCEL_CHANNEL) as Promise<void>,
+  onGithubSignInCode: (listener: (code: GithubSignInCode) => void) => {
+    const handler = (_event: unknown, code: GithubSignInCode): void => listener(code)
+    ipcRenderer.on(GITHUB_SIGN_IN_CODE_CHANNEL, handler)
+    return () => {
+      ipcRenderer.removeListener(GITHUB_SIGN_IN_CODE_CHANNEL, handler)
+    }
+  },
   attachPasted: (name: string, bytes: Uint8Array) =>
     ipcRenderer.invoke(WORKSPACE_PASTE_CHANNEL, { name, bytes }) as Promise<AttachFilesResponse>,
   pickInPage: (request: PagePickRequest) => ipcRenderer.invoke(PAGE_PICK_CHANNEL, request) as Promise<PagePickResponse>,

@@ -156,6 +156,7 @@ import { BackgroundRuns } from './components/BackgroundRuns.js'
 import type { PublicBackgroundRun } from '../../shared/background.js'
 import { ReviewChanges } from './components/ReviewChanges.js'
 import { CommitChanges } from './components/CommitChanges.js'
+import { PullRequestChip } from './components/PullRequestChip.js'
 import { ShareTeamDialog } from './components/TeamCard.js'
 import { RuntimeMark } from './components/RuntimeMark.js'
 import { OpenInTerminalButton, terminalOffer } from './components/OpenInTerminal.js'
@@ -8309,6 +8310,8 @@ export default function App(): ReactElement {
                       <Icon name="dots" size={13} />
                     </button>
                   )}
+                  {/* The folder's pull request (0.720): only while its branch has one on GitHub. */}
+                  {workspacePath !== undefined && pickedTeammate?.worktree !== true && liveRun !== undefined && <PullRequestChip running={running} />}
                   {/* Commit (0.680): the folder's own changes. A teammate on its own branch has Review and Land instead. */}
                   {workspacePath !== undefined && pickedTeammate?.worktree !== true && liveRun !== undefined && (
                     <CommitChanges

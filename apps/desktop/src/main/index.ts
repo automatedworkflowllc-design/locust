@@ -124,6 +124,9 @@ import { decideReveal, insideOnDisk } from './reveal-file.js'
 import { readWorkspaceImage } from './workspace-image.js'
 import { readPdfPages } from './pdf-pages.js'
 import { addConnector, removeConnector } from './connector-add.js'
+import { createGithubAccount } from './github-account.js'
+import { FOLDER_PULL_REQUEST_CHANNEL } from '../shared/pull-request.js'
+import { GITHUB_ACCOUNT_CHANNEL, GITHUB_SIGN_IN_CANCEL_CHANNEL, GITHUB_SIGN_IN_CHANNEL, GITHUB_SIGN_IN_CODE_CHANNEL } from '../shared/github-account.js'
 import type { AgentLaunch } from './connector-add.js'
 import { CONNECTOR_ADD_CHANNEL, CONNECTOR_REMOVE_CHANNEL, isConnectorAgent } from '../shared/connector-add.js'
 import type { ConnectorAgent } from '../shared/connector-add.js'
@@ -2651,6 +2654,10 @@ if (!ownsSingleInstanceLock) {
         ? folderCommits.changes(workspacePath).catch((): FolderChanges => ({ kind: 'none', why: 'not-a-repository' }))
         : ({ kind: 'none', why: 'not-a-repository' } as FolderChanges)
     )
+    // The folder's pull request, for the header (0.720, shared/pull-request.ts): read with the person's own gh.
+    ipcMain.handle(FOLDER_PULL_REQUEST_CHANNEL, (event) =>
+      fromOwnWindow(event) ? folderCommits.pullRequest(workspacePath).catch(() => undefined) : undefined
+    )
     ipcMain.handle(FOLDER_COMMIT_CHANNEL, (event, message: unknown, then: unknown, shown: unknown) =>
       fromOwnWindow(event) && typeof message === 'string' && message.length <= 20_000 && (then === 'commit' || then === 'push' || then === 'pull-request')
         && Array.isArray(shown) && shown.length <= 100_000 && shown.every((path) => typeof path === 'string' && path.length <= 4_096)
@@ -4815,6 +4822,31 @@ if (!ownsSingleInstanceLock) {
       } catch {
         return { ok: false, message: 'It could not be taken back. Check each agent’s connectors.' } as const
       }
+    })
+
+    /*
+     * YOUR GITHUB (0.720, github-account.ts): the GitHub CLI's own account.
+     * Signing in runs `gh auth login --web`; its one-time code goes to the
+     * window that asked, and the person enters it on GitHub's own page.
+     */
+    const githubAccount = createGithubAccount()
+    // A sign-in still waiting when Locust quits is stopped with it, not left asking GitHub.
+    app.once('will-quit', () => githubAccount.cancel())
+    ipcMain.handle(GITHUB_ACCOUNT_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) return { kind: 'unknown', message: 'That request was rejected.' } as const
+      return githubAccount.read().catch(() => ({ kind: 'unknown', message: 'The GitHub CLI could not be asked. Nothing was changed; Check again asks it once more.' }) as const)
+    })
+    ipcMain.handle(GITHUB_SIGN_IN_CHANNEL, async (event) => {
+      if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
+      const result = await githubAccount.signIn((code) => {
+        if (!event.sender.isDestroyed()) event.sender.send(GITHUB_SIGN_IN_CODE_CHANNEL, code)
+      })
+      // A pull request is offered by whether gh is signed in: ask it afresh.
+      folderCommits.forgetSignIn()
+      return result
+    })
+    ipcMain.handle(GITHUB_SIGN_IN_CANCEL_CHANNEL, (event) => {
+      if (fromOwnWindow(event)) githubAccount.cancel()
     })
 
     // An attached PDF's page pictures, for its card in the chat and the viewer (0.714, pdf-pages.ts).

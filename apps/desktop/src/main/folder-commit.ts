@@ -7,6 +7,7 @@ import { ownGitArgs } from './git-guard.js'
 import type { ChangeStatus, CommitResult, CommitThen, FolderChanges, FolderRemote } from '../shared/folder-commit.js'
 import { blockedSentence } from '../shared/folder-commit.js'
 import { githubRepoOf } from './cloud-tasks.js'
+import { PULL_REQUEST_FIELDS, pullRequestOf, type FolderPullRequest } from '../shared/pull-request.js'
 
 /**
  * COMMIT, PUSH, PULL REQUEST (0.680): the folder's changes, saved in git by
@@ -233,13 +234,43 @@ export function createFolderCommits(options: FolderCommitOptions = {}) {
       // Each value joined to its flag, so none of them can be read as a flag of its own.
       const said = await runNetwork('gh', ['pr', 'create', `--title=${subject}`, `--body=${body.length > 0 ? body : subject}`, `--head=${branch}`, `--base=${now.remote!.defaultBranch}`], folder)
       const url = /https:\/\/\S+\/pull\/\d+/.exec(said)?.[0]
+      // The header asks for the new one at once, not after the minute its last look is kept.
+      pullRequests.delete(folder)
       return { ...done, pushed: true, ...(url === undefined ? {} : { pullRequestUrl: url }) }
     } catch (error) {
       return { ...done, pushed: true, after: `GitHub did not open the pull request: ${error instanceof Error ? error.message : 'no reason given'}` }
     }
   }
 
-  return { changes, commit }
+  /** The last look at each folder's pull request, for a minute: the header asks when it is shown and when the window comes back. */
+  const pullRequests = new Map<string, { readonly at: number; readonly branch: string; readonly found: FolderPullRequest | undefined }>()
+
+  /**
+   * The pull request for the branch the folder is on (shared/pull-request.ts), or undefined: not a GitHub
+   * folder, gh not signed in, on the default branch, or no pull request for this branch.
+   */
+  const pullRequest = async (folder: string): Promise<FolderPullRequest | undefined> => {
+    const branch = (await runGit(['symbolic-ref', '--short', '-q', 'HEAD'], folder).catch(() => '')).trim()
+    if (branch.length === 0 || !SAFE_BRANCH.test(branch)) return undefined
+    const kept = pullRequests.get(folder)
+    if (kept !== undefined && kept.branch === branch && Date.now() - kept.at < 60_000) return kept.found
+    const remote = await remoteOf(folder, branch)
+    let found: FolderPullRequest | undefined
+    if (remote?.pullRequests === true && branch !== remote.defaultBranch) {
+      // No pull request for the branch is an error from gh; it is an answer here.
+      found = await runNetwork('gh', ['pr', 'view', branch, '--json', PULL_REQUEST_FIELDS], folder).then(pullRequestOf, () => undefined)
+    }
+    pullRequests.set(folder, { at: Date.now(), branch, found })
+    return found
+  }
+
+  /** After a sign-in in Settings, the next look asks gh again rather than its answer from before. */
+  const forgetSignIn = (): void => {
+    signedIn = undefined
+    pullRequests.clear()
+  }
+
+  return { changes, commit, forgetSignIn, pullRequest }
 }
 
 export type FolderCommits = ReturnType<typeof createFolderCommits>

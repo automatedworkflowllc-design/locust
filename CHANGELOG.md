@@ -13,6 +13,15 @@ heading: the home screen then shows it once, as a splash.
 
 ## 0.719.0 - 2026-10-10
 
+### New
+
+- **Connect your GitHub.** Settings › Connectors starts with GitHub: who you are signed in as, with GitHub's mark. Sign in with GitHub needs no terminal. Locust starts the GitHub CLI's own sign-in and shows its one-time code, and one press copies the code and opens GitHub's page in your browser. Locust keeps no token; the GitHub CLI keeps the sign-in where it always does.
+- **The pull request, in the conversation's header.** While the folder's branch has a pull request on GitHub, the header shows its number, whether it is open, a draft, merged or closed, and a dot for how its checks stand. Hover for the whole line; press it to open it on GitHub.
+
+### Improved
+
+- **A teammate may close the test browser it started, found by its own profile.** Ending a browser by name is still refused. A command that finds the browser by name and narrows it to the teammate's own command line, such as its own profile folder, now runs when every window it matches is one a teammate started. If the filter also matches one of yours, it is refused and the teammate is told which.
+
 ### Fixed
 
 A sweep through Locust's code turned up 24 mistakes; each is fixed and has a test so it stays fixed.

@@ -203,8 +203,10 @@ export const SETTINGS_PAGES: readonly SettingsPage[] = [
     label: 'Connectors',
     group: 'Agents',
     icon: 'plug',
-    headings: ['Connectors', 'Add a connector'],
+    headings: ['GitHub', 'Connectors', 'Add a connector'],
     alsoKnownAs: {
+      // 0.720: the GitHub CLI's own account.
+      GitHub: ['gh', 'git hub', 'sign in to github', 'github account', 'pull request', 'pull requests', 'push', 'source control'],
       Connectors: ['mcp', 'tools', 'server'],
       // 0.716: one connector, to every agent at once.
       'Add a connector': ['add mcp', 'mcp server', 'every agent', 'all agents']

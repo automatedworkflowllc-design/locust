@@ -18,6 +18,8 @@ export type { MemoryScope } from './memory.js'
 import type { Spend } from './spend.js'
 import type { UsageRange, UsageSummary } from './usage.js'
 import type { ConnectorAddRequest, ConnectorAddResponse, ConnectorAgent } from './connector-add.js'
+import type { GithubAccount, GithubSignInCode, GithubSignInResult } from './github-account.js'
+import type { FolderPullRequest } from './pull-request.js'
 import type { OfficeDocument } from './office-document.js'
 import type { Workbook } from './sheet.js'
 import type { AboutYouSuggestion } from './about-you.js'
@@ -3657,6 +3659,8 @@ export interface DesktopApi {
   undoTurn(runId: string): Promise<TurnUndoState>
   /** Commit (0.680): what the open folder has uncommitted, and whether it can be pushed or proposed. */
   folderChanges(): Promise<FolderChanges>
+  /** The pull request for the branch the open folder is on, read with the person's own gh (0.720). */
+  folderPullRequest(): Promise<FolderPullRequest | undefined>
   /** Commit it all as the person, then push or open a pull request when asked. */
   commitFolder(message: string, then: CommitThen, shown: readonly string[]): Promise<CommitResult>
   /** Background turns (W10): Claude Code runs them, Locust watches. */
@@ -3761,6 +3765,12 @@ export interface DesktopApi {
   addConnector(request: ConnectorAddRequest): Promise<ConnectorAddResponse>
   /** Undo an add: each agent's own `mcp remove` (0.716). */
   removeConnector(name: string, agents: readonly ConnectorAgent[]): Promise<ConnectorAddResponse>
+  /** Who the GitHub CLI is signed in as, if anyone (0.720). */
+  githubAccount(): Promise<GithubAccount>
+  /** `gh auth login --web`: answers when GitHub says yes, or it stops; the code arrives through `onGithubSignInCode`. */
+  githubSignIn(): Promise<GithubSignInResult>
+  githubSignInCancel(): Promise<void>
+  onGithubSignInCode(listener: (code: GithubSignInCode) => void): () => void
   /**
    * Attach one thing from the clipboard. `bytes` is the file's contents; the
    * name is a suggestion the host sanitises and may change to avoid a
