@@ -16,6 +16,7 @@ export type { RoutineInput, RoutineInputKind } from './routine-inputs.js'
 import type { MemoryScope } from './memory.js'
 export type { MemoryScope } from './memory.js'
 import type { Spend } from './spend.js'
+import type { UsageRange, UsageSummary } from './usage.js'
 import type { OfficeDocument } from './office-document.js'
 import type { Workbook } from './sheet.js'
 import type { AboutYouSuggestion } from './about-you.js'
@@ -1051,6 +1052,26 @@ export const WORKSPACE_PASTE_CHANNEL = 'workspace:paste'
 export const WORKSPACE_ATTACH_CHANNEL = 'workspace:attach'
 /** The project's files, for `@` in the composer (0.436, main/workspace-files.ts). */
 export const WORKSPACE_FILES_CHANNEL = 'workspace:files'
+
+/**
+ * Usage across every agent and model (0.714, shared/usage.ts): the host adds
+ * up every turn the ledger holds for the range asked, on this machine's clock.
+ */
+/**
+ * An attached PDF's pages, as Locust drew them for the agent (0.714,
+ * main/pdf-reading.ts): the chat's file card shows the first, and the viewer
+ * shows them all. A PDF not read yet -- one attached before 0.713 -- is read
+ * on the way. Folder-relative paths.
+ */
+export const PDF_PAGES_CHANNEL = 'pdf:pages'
+export type PdfPagesResponse =
+  | { readonly ok: true; readonly pages: number; readonly pictures: readonly string[]; readonly text?: string }
+  | { readonly ok: false; readonly message: string }
+
+export const USAGE_READ_CHANNEL = 'usage:read'
+export type UsageReadResponse =
+  | { readonly ok: true; readonly summary: UsageSummary }
+  | { readonly ok: false; readonly message: string }
 export type WorkspaceFilesResponse =
   | { readonly ok: true; readonly paths: readonly string[]; readonly truncated: boolean }
   | { readonly ok: false; readonly message: string }
@@ -3727,6 +3748,10 @@ export interface DesktopApi {
   attachFiles(): Promise<AttachFilesResponse>
   /** The project's files, workspace-relative, for `@` in the composer (0.436). */
   workspaceFiles(): Promise<WorkspaceFilesResponse>
+  /** Usage across every agent and model over a range (0.714). */
+  readUsage(range: UsageRange): Promise<UsageReadResponse>
+  /** An attached PDF's page pictures, folder-relative (0.714); read on the way when it has none yet. */
+  pdfPages(path: string, folder?: string): Promise<PdfPagesResponse>
   /**
    * Attach one thing from the clipboard. `bytes` is the file's contents; the
    * name is a suggestion the host sanitises and may change to avoid a

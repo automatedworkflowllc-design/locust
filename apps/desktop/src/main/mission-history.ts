@@ -7,6 +7,7 @@ import { EVENT_WINDOW, windowEvents } from '../shared/event-window.js'
 import { joinMessageFragments } from '../shared/messageFragments.js'
 import { isOwnModel, monthOf, moneyOfRun, sumSpend, unpricedRunAt } from '../shared/spend.js'
 import type { RunMoney, Spend } from '../shared/spend.js'
+import type { UsageTurn } from '../shared/usage.js'
 import type { MissionLedger, RecoveredMission, Workroom, WorkroomMessage } from '@teammate/mission-store'
 import type { MissionReadResponse,
   MissionDeleteResponse,
@@ -530,6 +531,8 @@ interface CachedLedgerFile {
   readonly money?: RunMoney
   /** When a run on a model of the person's own ended with tokens and no price (0.689). */
   readonly unpricedAt?: string
+  /** What the turn counts for in Usage (0.714): its receipt, and the turn it continues. */
+  readonly turn?: UsageTurnRead
   /** The whole record, kept only while it is among the newest. */
   full?: RecoveredMission
 }
@@ -592,6 +595,7 @@ async function refreshedLedger(ledger: MissionLedger): Promise<{
     }
     const money = moneyOfRun(mission.events)
     const unpricedAt = unpricedRunAt(mission.events, isOwnModel(mission.metadata.runtime, mission.metadata.model))
+    const turn = usageTurnOf(mission)
     cache.set(missionId, {
       missionId,
       stamp,
@@ -601,6 +605,7 @@ async function refreshedLedger(ledger: MissionLedger): Promise<{
       eventsTruncated: joinMessageFragments(mission.events).length > MAX_HISTORY_EVENTS,
       ...(money === undefined ? {} : { money }),
       ...(unpricedAt === undefined ? {} : { unpricedAt }),
+      turn,
       full: mission
     })
   }
@@ -613,6 +618,74 @@ async function refreshedLedger(ledger: MissionLedger): Promise<{
     return entry === undefined ? [] : [entry]
   })
   return { cache, entries, listingIssues: listing.issues.length, readMission, totalFiles: listing.totalFiles ?? listing.files.length }
+}
+
+/** A turn's usage as its file was read: everything but which conversation it is in, found from the whole ledger. */
+type UsageTurnRead = Omit<UsageTurn, 'conversation'> & { readonly continues?: string }
+
+function tokenCount(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined
+}
+
+/**
+ * What one turn counts for in Usage (0.714): when it ended, which model ran
+ * it -- the one its run reported, where it reported one (Claude Code says
+ * `claude-opus-4-6` for `opus`) -- and its receipt's tokens and money, read
+ * by the same rule as the cost line (`moneyOfUsage`, through moneyOfRun). A
+ * turn with no receipt still counts, at the last moment its record moved.
+ */
+export function usageTurnOf(mission: RecoveredMission): UsageTurnRead {
+  const completed = mission.events.find((event) => event.type === 'run.completed')
+  const payload = (completed?.payload ?? {}) as { readonly usage?: unknown; readonly resolvedModel?: unknown }
+  const usage = typeof payload.usage === 'object' && payload.usage !== null ? (payload.usage as Record<string, unknown>) : {}
+  const reported = typeof payload.resolvedModel === 'string' && payload.resolvedModel.length > 0 ? payload.resolvedModel : undefined
+  const money = moneyOfRun(mission.events)
+  const plan = usage.billing === 'subscription'
+  const counted = (key: string): Partial<Record<string, number>> => {
+    const value = tokenCount(usage[key])
+    return value === undefined ? {} : { [key]: value }
+  }
+  return {
+    at: completed?.occurredAt ?? mission.lastUpdatedAt,
+    runtime: mission.metadata.runtime,
+    model: reported ?? mission.metadata.model,
+    ...counted('inputTokens'),
+    ...counted('outputTokens'),
+    ...counted('cacheReadTokens'),
+    ...counted('cacheWriteTokens'),
+    ...(money?.usd === undefined ? {} : { usd: money.usd }),
+    ...(money?.premiumRequests === undefined ? {} : { premiumRequests: money.premiumRequests }),
+    ...(plan ? { plan: true as const } : {}),
+    ...(mission.metadata.continuesFrom === undefined ? {} : { continues: mission.metadata.continuesFrom.missionId })
+  }
+}
+
+/**
+ * EVERY TURN THE LEDGER HOLDS, FOR USAGE (0.714): read through the same cache
+ * as the history and the monthly spend, so after the first read it is a pass
+ * over a few hundred small entries. Each turn names its conversation by the
+ * conversation's first turn, found by following `continuesFrom` back. Undefined
+ * when the ledger cannot be listed file by file.
+ */
+export async function usageTurns(ledger: MissionLedger): Promise<readonly UsageTurn[] | undefined> {
+  const refreshed = await refreshedLedger(ledger)
+  if (refreshed === undefined) return undefined
+  const read = new Map<string, UsageTurnRead>()
+  for (const entry of refreshed.entries) if (entry.turn !== undefined) read.set(entry.missionId, entry.turn)
+  const rootOf = (missionId: string): string => {
+    let at = missionId
+    // Bounded, so a loop a damaged record makes cannot hang the host.
+    for (let hops = 0; hops < 10_000; hops += 1) {
+      const before = read.get(at)?.continues
+      if (before === undefined || !read.has(before)) return at
+      at = before
+    }
+    return at
+  }
+  return [...read.entries()].map(([missionId, turn]) => {
+    const { continues: _continues, ...counted } = turn
+    return { ...counted, conversation: rootOf(missionId) }
+  })
 }
 
 /**

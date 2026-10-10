@@ -20185,3 +20185,653 @@ textarea {
 .lc-composerbeam[data-voice-beam][data-fading] {
   clip-path: inset(-100vh -2px -2px -2px round 22px);
 }
+
+/*
+ * USAGE (0.714): the line on Home and the dialog it opens (UsageLine.tsx,
+ * UsageDialog.tsx). The line is the accounts' register -- a mono label, the
+ * facts in the description size, a bar a day -- and the dialog is Claude
+ * Code's /usage and /stats for every agent: a bar per limit window in the
+ * hover card's tones, a twelve-week grid, and a table of models.
+ */
+/* The accounts row and the usage line under it, as one of Home's sections. */
+.lc-accountsblock {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lc-usageline {
+  align-items: center;
+  margin-top: 0;
+}
+
+/* Short of height (`.lc-empty.is-tight`): the block gives what the line took, so
+   Home at 1366x768 fits as it did before the line (look-usage.mjs measures it). */
+.lc-empty.is-tight .lc-accountsblock {
+  gap: 2px;
+}
+
+.lc-empty.is-tight .lc-accountsblock > .lc-agenthead.is-folded {
+  padding-top: 8px;
+}
+
+.lc-usageline__open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 1px 0;
+  border: 0;
+  border-radius: var(--lc-radius-control);
+  background: transparent;
+  color: var(--lc-text-secondary);
+  font: inherit;
+  font-size: var(--lc-text-description);
+  text-align: left;
+  cursor: pointer;
+}
+
+.lc-usageline__open:hover,
+.lc-usageline__open:focus-visible {
+  color: var(--lc-text-primary);
+}
+
+.lc-usageline__open:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 1.5px var(--lc-focus-edge);
+}
+
+.lc-usageline__facts {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+
+.lc-usageline__spark {
+  flex: none;
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 1px;
+  height: 14px;
+}
+
+.lc-usageline__bar {
+  width: 3px;
+  min-height: 2px;
+  border-radius: 1px;
+  background: var(--lc-text-faint);
+  transition: background var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-usageline__bar.is-empty {
+  height: 2px;
+  background: var(--lc-border-strong);
+}
+
+.lc-usageline__bar.is-today {
+  background: var(--lc-text-secondary);
+}
+
+.lc-usageline__open:hover .lc-usageline__bar:not(.is-empty):not(.is-today) {
+  background: var(--lc-text-muted);
+}
+
+.lc-usageline__more {
+  flex: none;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* The line folded into the accounts' row (UsageChip): drawn only where a
+   window this short has no line to give it -- by its height alone, so the
+   layout never measures itself into flipping. */
+.lc-usagechip {
+  display: none;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  padding: 1px 6px;
+  border: 0;
+  border-radius: var(--lc-radius-control);
+  background: transparent;
+  color: var(--lc-text-secondary);
+  font: inherit;
+  font-size: var(--lc-text-description);
+  cursor: pointer;
+  transition: background var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-usagechip:hover,
+.lc-usagechip:focus-visible {
+  background: var(--lc-hover-surface);
+  color: var(--lc-text-primary);
+}
+
+.lc-usagechip:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 1.5px var(--lc-focus-edge);
+}
+
+@media (max-height: 740px) {
+  .lc-usageline {
+    display: none;
+  }
+
+  .lc-usagechip {
+    display: inline-flex;
+  }
+}
+
+.lc-usage {
+  width: 800px;
+}
+
+.lc-usage__range {
+  margin-left: auto;
+}
+
+.lc-usage__range + .lc-dialog__close {
+  margin-left: 2px;
+}
+
+.lc-usage__body {
+  gap: 28px;
+  padding: 20px 22px 24px;
+}
+
+.lc-usage__section {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.lc-usage__sectionhead {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+}
+
+.lc-usage__empty {
+  margin: 0;
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+}
+
+/* Limits: an agent each, a bar a window. */
+.lc-usage__limits {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(226px, 1fr));
+  gap: 20px 28px;
+}
+
+.lc-usage__agent {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.lc-usage__agentname {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--lc-text-description);
+  font-weight: 600;
+  color: var(--lc-text-name);
+}
+
+.lc-usage__window {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lc-usage__windowhead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.lc-usage__windowname {
+  min-width: 0;
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-secondary);
+}
+
+.lc-usage__bar {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--lc-border-card);
+}
+
+.lc-usage__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--lc-text-secondary);
+}
+
+.lc-usage__window.is-pressing .lc-usage__fill {
+  background: var(--lc-amber);
+}
+
+.lc-usage__window.is-spent .lc-usage__fill {
+  background: var(--lc-red);
+}
+
+.lc-usage__percent {
+  flex: none;
+  white-space: nowrap;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--lc-text-secondary);
+}
+
+.lc-usage__resets {
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+}
+
+.lc-usage__window.is-reset .lc-usage__resets {
+  color: var(--lc-text-secondary);
+}
+
+.lc-usage__read {
+  margin-top: -2px;
+  font-size: var(--lc-text-mono-caption);
+  line-height: 1.4;
+  color: var(--lc-text-muted);
+}
+
+/* Activity: the grid, and the numbers beside it. */
+.lc-usage__activity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 22px 40px;
+}
+
+.lc-heat {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lc-heat__months {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 13px;
+  column-gap: 3px;
+  height: 12px;
+  margin-left: 30px;
+  font-family: var(--lc-font-mono);
+  font-size: 10px;
+  line-height: 12px;
+  color: var(--lc-text-muted);
+  white-space: nowrap;
+}
+
+.lc-heat__body {
+  display: flex;
+  gap: 6px;
+}
+
+.lc-heat__weekdays {
+  display: grid;
+  grid-template-rows: repeat(7, 13px);
+  row-gap: 3px;
+  width: 24px;
+  font-family: var(--lc-font-mono);
+  font-size: 9.5px;
+  line-height: 13px;
+  text-align: right;
+  color: var(--lc-text-muted);
+}
+
+.lc-heat__grid {
+  display: flex;
+  gap: 3px;
+}
+
+.lc-heat__week {
+  display: grid;
+  grid-template-rows: repeat(7, 13px);
+  row-gap: 3px;
+}
+
+.lc-heat__cell {
+  display: block;
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+  background: var(--lc-heat-0);
+}
+
+.lc-heat__cell.is-1 {
+  background: var(--lc-heat-1);
+}
+
+.lc-heat__cell.is-2 {
+  background: var(--lc-heat-2);
+}
+
+.lc-heat__cell.is-3 {
+  background: var(--lc-heat-3);
+}
+
+.lc-heat__cell.is-4 {
+  background: var(--lc-heat-4);
+}
+
+.lc-heat__cell.is-future {
+  background: transparent;
+}
+
+.lc-heat__cell.is-today {
+  box-shadow: 0 0 0 1px var(--lc-focus-edge-box);
+}
+
+.lc-heat__legend {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 30px;
+  font-family: var(--lc-font-mono);
+  font-size: 10px;
+  color: var(--lc-text-muted);
+}
+
+.lc-heat__legend > span:first-child {
+  margin-right: 4px;
+}
+
+.lc-heat__legend > span:last-child {
+  margin-left: 4px;
+}
+
+.lc-usage__stats {
+  flex: 0 1 440px;
+  min-width: 300px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 11px 28px;
+  margin: 0;
+}
+
+.lc-usage__stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.lc-usage__stats dt {
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+}
+
+.lc-usage__stats dd {
+  margin: 0;
+  overflow: hidden;
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--lc-text-primary);
+}
+
+/* Models: one row each, the share drawn, the numbers in mono. */
+.lc-usage__models {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--lc-text-description);
+}
+
+.lc-usage__models th {
+  padding: 0 12px 8px 0;
+  border-bottom: 1px solid var(--lc-border-hairline);
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-label);
+  font-weight: 400;
+  letter-spacing: var(--lc-tracking-label);
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--lc-text-muted);
+}
+
+.lc-usage__models td {
+  padding: 9px 12px 9px 0;
+  border-bottom: 1px solid var(--lc-border-hairline);
+  vertical-align: middle;
+  white-space: nowrap;
+  color: var(--lc-text-secondary);
+}
+
+.lc-usage__models tr:last-child td {
+  border-bottom: 0;
+}
+
+.lc-usage__models th:last-child,
+.lc-usage__models td:last-child {
+  padding-right: 0;
+}
+
+/* The model's column takes what is left, and its name gives way first. */
+.lc-usage__models td:first-child {
+  width: 100%;
+  max-width: 0;
+}
+
+.lc-usage__models .is-number {
+  text-align: right;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.lc-usage__model {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.lc-usage__modelname {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--lc-text-primary);
+}
+
+.lc-usage__runtime {
+  flex: none;
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+}
+
+.lc-usage__share {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lc-usage__sharebar {
+  width: 72px;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--lc-border-card);
+}
+
+.lc-usage__sharefill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--lc-text-secondary);
+}
+
+.lc-usage__sharetext {
+  min-width: 30px;
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
+  font-variant-numeric: tabular-nums;
+  color: var(--lc-text-muted);
+}
+
+.lc-usage__note {
+  min-width: 0;
+  font-size: var(--lc-text-description);
+  line-height: 1.45;
+  color: var(--lc-text-muted);
+}
+
+.lc-usage .lc-dialog__foot > .lc-button {
+  flex: none;
+  margin-left: auto;
+}
+
+/*
+ * A PDF YOU ATTACHED, AS A CARD (0.714, PdfTile.tsx): its first page, its
+ * name, how many pages. Where the other files are a quiet pill, a PDF is a
+ * document a person reads, and Codex's own app draws it as one -- the page
+ * is what tells two homework sheets apart at a glance.
+ */
+.lc-pdftile {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 200px;
+  max-width: 320px;
+  padding: 7px 14px 7px 7px;
+  border: 1px solid var(--lc-border-card);
+  border-radius: var(--lc-radius-card);
+  background: var(--lc-bg-raised);
+  color: var(--lc-text-secondary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--lc-motion-hover) var(--lc-ease), border-color var(--lc-motion-hover) var(--lc-ease);
+}
+
+.lc-pdftile:hover,
+.lc-pdftile:focus-visible {
+  border-color: var(--lc-border-strong);
+  background: var(--lc-hover-surface-strong);
+}
+
+.lc-pdftile:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 1.5px var(--lc-focus-edge);
+}
+
+/* The page at a letter sheet's proportions, white as it is printed. */
+.lc-pdftile__page {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 49px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--lc-text-primary);
+  box-shadow: 0 0 0 1px var(--lc-border-strong);
+}
+
+.lc-pdftile__page.is-waiting {
+  background: var(--lc-bg-control);
+}
+
+.lc-pdftile__page img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+
+.lc-pdftile__badge {
+  font-family: var(--lc-font-mono);
+  font-size: 9.5px;
+  letter-spacing: var(--lc-tracking-label);
+  color: var(--lc-red-text);
+}
+
+.lc-pdftile__text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lc-pdftile__name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--lc-text-description);
+  font-weight: 500;
+  color: var(--lc-text-primary);
+}
+
+.lc-pdftile__meta {
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
+  color: var(--lc-text-muted);
+}
+
+/* A PDF's pages in the viewer (0.714, PdfPages.tsx): each as printed, numbered under it. */
+.lc-pdfpages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: var(--lc-space-5) 0 var(--lc-space-6);
+}
+
+.lc-pdfpages__page {
+  width: 100%;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+}
+
+.lc-pdfpages__page img,
+.lc-pdfpages__waiting {
+  display: block;
+  width: 100%;
+  max-width: 820px;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px var(--lc-border-strong), var(--lc-shadow-pending);
+}
+
+.lc-pdfpages__waiting {
+  aspect-ratio: 8.5 / 11;
+  background: var(--lc-bg-control);
+}
+
+.lc-pdfpages__number {
+  font-family: var(--lc-font-mono);
+  font-size: var(--lc-text-mono-caption);
+  font-variant-numeric: tabular-nums;
+  color: var(--lc-text-muted);
+}
+
+.lc-pdfpages__more {
+  max-width: 46ch;
+  margin: 0;
+  text-align: center;
+  font-size: var(--lc-text-description);
+  color: var(--lc-text-muted);
+}

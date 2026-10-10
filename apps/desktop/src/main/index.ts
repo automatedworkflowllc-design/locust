@@ -122,6 +122,7 @@ import { readRuntimeArtifacts } from './runtime-artifacts.js'
 import { relative } from 'node:path'
 import { decideReveal, insideOnDisk } from './reveal-file.js'
 import { readWorkspaceImage } from './workspace-image.js'
+import { readPdfPages } from './pdf-pages.js'
 import { MAX_ATTACHMENTS } from '../shared/attachments.js'
 import { ATTACHMENT_DIR, attachmentDestination, excludeWith } from './attach-outside.js'
 import { extensionOf, isViewableText, MAX_TEXT_BYTES, viewerMode } from '../shared/text-files.js'
@@ -165,7 +166,8 @@ import { changedSince } from './memory-provenance.js'
 const ROUTINE_TICK_MS = 60_000
 const ROUTINE_FIRST_TICK_MS = 15_000
 import type { RoutineRunner } from './routine-runner.js'
-import { readOneMission, deleteMissionRecord, knownDigests, newestTurnOf, readMissionHistory, spendByTeammate, withLiveMissionIds } from './mission-history.js'
+import { readOneMission, deleteMissionRecord, knownDigests, newestTurnOf, readMissionHistory, spendByTeammate, usageTurns, withLiveMissionIds } from './mission-history.js'
+import { isUsageRange, usageSummary } from '../shared/usage.js'
 import { limitReached, limitRefusal, monthOf } from '../shared/spend.js'
 import { createOwnModelStore, OwnModelRefusal, ownModelAddress, ownModelId, testOwnEndpoint } from './own-models.js'
 import { changelogPaths, entries as changelogEntries, readChangelog, splashEntries } from './changelog.js'
@@ -333,6 +335,8 @@ import {
   REWIND_PUT_BACK_CHANNEL,
   WORKSPACE_ATTACH_CHANNEL,
   WORKSPACE_FILES_CHANNEL,
+  USAGE_READ_CHANNEL,
+  PDF_PAGES_CHANNEL,
   WORKSPACE_PASTE_CHANNEL,
   WORKSPACE_IMAGE_CHANNEL,
   WORKSPACE_REVEAL_CHANNEL,
@@ -4759,6 +4763,12 @@ if (!ownsSingleInstanceLock) {
       return readWorkspaceImage(requested, folder ?? workspacePath, [...(await workedInFolders()), ...(await teammateFolders()), compareRoot()])
     })
 
+    // An attached PDF's page pictures, for its card in the chat and the viewer (0.714, pdf-pages.ts).
+    ipcMain.handle(PDF_PAGES_CHANNEL, async (event, requested: unknown, folder: unknown) => {
+      if (!fromOwnWindow(event)) return { ok: false, message: 'That request was rejected.' } as const
+      return readPdfPages(requested, folder ?? workspacePath, [...(await workedInFolders()), ...(await teammateFolders())], pdfReadings.prepare)
+    })
+
     /*
      * THE FILE VIEWER'S READ.
      *
@@ -5278,6 +5288,20 @@ if (!ownsSingleInstanceLock) {
         const month = monthOf(new Date())
         const totals = month === undefined ? undefined : await spendByTeammate(missionLedger, await teammates.missionOwners(), month)
         return { ok: true, data: { byTeammate: Object.fromEntries(totals ?? []) } } as const
+      } catch {
+        return unavailable
+      }
+    })
+
+    // Usage across every agent and model (0.714, shared/usage.ts): every turn
+    // the ledger holds, added up for the range asked, on this machine's clock.
+    ipcMain.handle(USAGE_READ_CHANNEL, async (event, range: unknown) => {
+      const unavailable = { ok: false, message: 'Usage could not be read from the record on this machine.' } as const
+      if (!fromOwnWindow(event) || !isUsageRange(range)) return unavailable
+      try {
+        const turns = await usageTurns(missionLedger)
+        if (turns === undefined) return unavailable
+        return { ok: true, summary: usageSummary(turns, range, new Date()) } as const
       } catch {
         return unavailable
       }

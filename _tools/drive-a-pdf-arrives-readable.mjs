@@ -2,6 +2,7 @@
 //
 //   node _tools/drive-a-pdf-arrives-readable.mjs                       (a free OpenCode model)
 //   LOCUST_SPEND=1 node _tools/drive-a-pdf-arrives-readable.mjs --route codex   (Codex, its cheapest model)
+//   ... --packaged apps/desktop/release/win-unpacked/Locust.exe                    (the installed app)
 //
 // A tester attached his homework to a Codex conversation on 0.712: Codex's PDF
 // skill wanted Python packages his machine did not have, the sandbox stopped
@@ -25,6 +26,7 @@ import { pickRouteScript, say, scratchRepository, sendAndWaitScript, sleep, star
 
 const arg = (name) => (process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined)
 const route = arg('--route') ?? 'free'
+const packaged = arg('--packaged')
 if (route !== 'free' && route !== 'codex') throw new Error('--route is free or codex')
 if (route === 'codex' && process.env.LOCUST_SPEND !== '1') throw new Error('The Codex route spends: run it with LOCUST_SPEND=1.')
 
@@ -68,7 +70,8 @@ const workspace = await scratchRepository('locust-drive-pdf-ws-')
 const attachments = join(workspace, '.locust', 'attachments')
 
 const drive = await startDrive({
-  name: `a-pdf-arrives-readable-${route}`,
+  ...(packaged === undefined ? {} : { packaged }),
+  name: `a-pdf-arrives-readable-${route}${packaged === undefined ? '' : '-packaged'}`,
   port: 9871,
   workspace,
   env: { LOCUST_ATTACH_PATHS: pdfPath },
@@ -137,6 +140,26 @@ try {
   // 3. No failed commands: the footer counts them ("ran 8 commands · 4 exited non-zero").
   const footer = String(await drive.evaluate(`[...document.querySelectorAll('.lc-thread *')].map(n => n.childElementCount === 0 ? n.textContent : '').filter(t => /ran \\d+ command|exited non-zero/.test(t ?? '')).join(' | ')`))
   check('no command the agent ran exited non-zero', !/exited non-zero/.test(thread), footer.length > 0 ? footer : 'no commands counted')
+  // 4. The PDF in the chat is a card with its first page, and opens as its pages (0.714).
+  const card = String(await drive.evaluate(`(async () => {
+    for (let i = 0; i < 20 && !document.querySelector('.lc-pdftile__page img'); i += 1) await new Promise(r => setTimeout(r, 300))
+    const tile = document.querySelector('.lc-pdftile')
+    return tile ? JSON.stringify({ text: tile.innerText.replace(/\\s+/g, ' ').trim(), thumb: !!tile.querySelector('img') }) : 'NO CARD'
+  })()`))
+  check('the PDF in the chat is a card with its first page', /"thumb":true/.test(card) && /Practice sheet 3\.pdf/.test(card) && /1 page/.test(card), card)
+  const box = JSON.parse(String(await drive.evaluate(`JSON.stringify(document.querySelector('.lc-pdftile')?.getBoundingClientRect() ?? null)`)))
+  if (box !== null) {
+    const shot = await drive.send('Page.captureScreenshot', { format: 'png', clip: { x: Math.max(0, box.x - 12), y: Math.max(0, box.y - 12), width: box.width + 24, height: box.height + 24, scale: 3 } })
+    if (shot?.result?.data) await writeFile(join(drive.out, 'zoom-pdf-card.png'), Buffer.from(shot.result.data, 'base64'))
+  }
+  const viewer = String(await drive.capture('open the PDF from its card', () => drive.evaluate(`(async () => {
+    document.querySelector('.lc-pdftile')?.click()
+    for (let i = 0; i < 30 && !document.querySelector('.lc-pdfpages img'); i += 1) await new Promise(r => setTimeout(r, 300))
+    const pages = document.querySelectorAll('.lc-pdfpages img')
+    return JSON.stringify({ pages: pages.length, name: document.querySelector('.lc-viewer__name')?.textContent ?? '', number: document.querySelector('.lc-pdfpages__number')?.textContent ?? '' })
+  })()`)))
+  check('pressing it opens its pages in the viewer', /"pages":1/.test(viewer) && /1 of 1/.test(viewer), viewer)
+  await drive.evaluate(`(async () => { document.querySelector('.lc-viewer__close')?.click(); await new Promise(r => setTimeout(r, 400)); return 1 })()`)
   await drive.capture('the turn, folded open', () => drive.evaluate(`(async () => {
     const fold = [...document.querySelectorAll('.lc-thread button')].find(b => /worked|ran|read|steps?/i.test(b.innerText ?? ''))
     fold?.click()

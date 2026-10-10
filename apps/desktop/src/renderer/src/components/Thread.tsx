@@ -51,6 +51,8 @@ import { splitDiffNotes } from '../diffNotes.js'
 import type { DiffFile } from '../diff.js'
 import { TimeMarker } from './TimeMarker.js'
 import { PeerThread } from './PeerThread.js'
+import { PdfTile } from './PdfTile.js'
+import { isPdf } from '../pdfPages.js'
 import type { ThreadItem, ThreadPeerCard } from '../missionView.js'
 import type { DecisionOption } from '../../../shared/decision.js'
 
@@ -1275,7 +1277,23 @@ onResume,
         {notes.length > 0 && <SentNotes notes={notes} edited={edited?.()} workspacePath={workspacePath} />}
         {attached.length > 0 && (
           <div className="lc-sentfiles">
-            {attached.map((path) => (
+            {attached.map((path) => isPdf(path) ? (
+              // A PDF is a card with its first page, and opens in the viewer (0.714, PdfTile).
+              <PdfTile
+                key={path}
+                path={path}
+                folder={workspacePath}
+                onOpen={() => {
+                  if (onOpenFile !== undefined) {
+                    onOpenFile(path)
+                    return
+                  }
+                  const bridge = window.desktop
+                  if (bridge === undefined || workspacePath === undefined) return
+                  void bridge.revealFile(`${workspacePath}/${path}`).catch(() => undefined)
+                }}
+              />
+            ) : (
               <button
                 key={path}
                 type="button"

@@ -284,6 +284,15 @@
 
   --lc-neutral: #4a4f4f;
 
+  /* The usage heatmap's five steps (0.714, UsageDialog): the app's ivory, from
+     a quiet day's ground to the busiest, as Claude Code's /stats grid steps
+     its one colour. Monochrome, like every accent here. */
+  --lc-heat-0: rgba(255, 255, 255, 0.05);
+  --lc-heat-1: rgba(242, 239, 233, 0.2);
+  --lc-heat-2: rgba(242, 239, 233, 0.38);
+  --lc-heat-3: rgba(242, 239, 233, 0.62);
+  --lc-heat-4: rgba(242, 239, 233, 0.9);
+
   /* --- Diff --------------------------------------------------------------
    * Opaque pairs rather than alpha tints, so a row fill does not shift with
    * whatever surface it lands on and would survive a light theme without

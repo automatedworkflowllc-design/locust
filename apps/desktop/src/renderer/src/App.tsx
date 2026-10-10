@@ -144,6 +144,8 @@ import { templateAvatar } from './components/TeamTemplates.js'
 import { TEAM_TEMPLATES } from '../../shared/team-templates.js'
 import type { TeamTemplate } from '../../shared/team-templates.js'
 import { ImportDialog } from './components/ImportDialog.js'
+import { UsageDialog } from './components/UsageDialog.js'
+import type { UsageRange } from '../../shared/usage.js'
 import { SelectionAsk } from './components/SelectionAsk.js'
 import { GroupSettingsDialog } from './components/GroupSettingsDialog.js'
 import { TeammateBot } from './components/TeammateBot.js'
@@ -1472,6 +1474,8 @@ export default function App(): ReactElement {
   const [instructingGroupId, setInstructingGroupId] = useState<string>()
   // Import a conversation from Claude Code or Codex (ImportDialog, session-import.ts).
   const [importOpen, setImportOpen] = useState(false)
+  // Usage across every agent and model (UsageDialog, 0.714), opened from its line on Home.
+  const [usageOpen, setUsageOpen] = useState(false)
   // The conversation just imported, opened once the history holds it.
   const openAfterImport = useRef<string | undefined>(undefined)
   const [routines, setRoutines] = useState<readonly PublicRoutine[]>([])
@@ -1830,7 +1834,9 @@ export default function App(): ReactElement {
     readonly path: string
     /** The file's text, or a `data:` URL when the mode is `image`. */
     readonly text: string
-    readonly mode: 'markdown' | 'code' | 'image' | 'table' | 'document'
+    readonly mode: 'markdown' | 'code' | 'image' | 'table' | 'document' | 'pdf'
+    /** A PDF's page pictures, when the mode is `pdf` (0.714). */
+    readonly pdf?: { readonly pages: number; readonly pictures: readonly string[]; readonly folder: string }
     /** A web page's address in the preview frame (0.425); its text stays the source. */
     readonly pageUrl?: string
     /** A spreadsheet's cells, when the mode is `table` (0.364). */
@@ -1881,6 +1887,26 @@ export default function App(): ReactElement {
      * painted**, because an SVG is a document that can carry script. It stays
      * text, and opens as code, which is the honest way to show one.
      */
+    /*
+     * A PDF IS SHOWN AS ITS PAGES (0.714): the pictures Locust drew of it for
+     * the agent, read on the way for one attached before there were any.
+     * Pictures, so nothing in the file runs -- the viewer never launches one.
+     */
+    if (/.pdf$/i.test(full)) {
+      const folder = imageFolder ?? workspacePath
+      void bridge
+        .pdfPages(full, folder)
+        .then((answer) => {
+          if (answer.ok) {
+            setViewingFile({ path: full, text: '', mode: 'pdf', pdf: { pages: answer.pages, pictures: answer.pictures, folder } })
+            return
+          }
+          setViewingFile(undefined)
+          setViewerRefusal(answer.message)
+        })
+        .catch(() => setViewerRefusal('Locust could not read that PDF. Nothing was changed.'))
+      return
+    }
     if (imageMediaType(full) !== undefined) {
       void bridge
         .readWorkspaceImage(full, imageFolder)
@@ -7975,6 +8001,12 @@ export default function App(): ReactElement {
                 })())}
                 limitedRuntimes={limitedRuntimes}
                 usageWindows={usageWindows}
+                {...(window.desktop === undefined ? {} : {
+                  readUsage: (range: UsageRange) => window.desktop!.readUsage(range),
+                  // The record moved: a turn ended, or one was removed.
+                  usageKey: `${String(history.length)}:${history[0]?.lastUpdatedAt ?? ''}`,
+                  onOpenUsage: () => setUsageOpen(true)
+                })}
                 discoveryPhase={runtimeState.phase}
                 tube={tube}
                 swarmCalls={swarmCalls}
@@ -8874,6 +8906,7 @@ export default function App(): ReactElement {
             {...(viewingFile.workbook === undefined ? {} : { workbook: viewingFile.workbook })}
             {...(viewingFile.document === undefined ? {} : { document: viewingFile.document })}
             {...(viewingFile.pageUrl === undefined ? {} : { pageUrl: viewingFile.pageUrl })}
+            {...(viewingFile.pdf === undefined ? {} : { pdf: viewingFile.pdf })}
             onPointAt={(pick) => {
               // The picture goes the way a pasted one does (attachPasted), then
               // the quote and the picture land in the chat box together.
@@ -9194,6 +9227,9 @@ export default function App(): ReactElement {
         />
       )}
       {screen === 'workroom' && <SelectionAsk onAsk={(quote) => setQuoteIn({ quote })} />}
+      {usageOpen && window.desktop !== undefined && (
+        <UsageDialog readUsage={(range) => window.desktop!.readUsage(range)} usageWindows={usageWindows} onClose={() => setUsageOpen(false)} />
+      )}
       {importOpen && window.desktop !== undefined && (
         <ImportDialog
           onList={() => window.desktop!.listImportableSessions()}

@@ -16,6 +16,9 @@ import { TeamTemplates } from './TeamTemplates.js'
 import type { TeamTemplate } from '../../../shared/team-templates.js'
 import { Icon } from './Icon.js'
 import { SignInButton } from './SignInButton.js'
+import { UsageChip, UsageLine, useUsageSummary } from './UsageLine.js'
+import type { UsageReadResponse } from '../../../shared/ipc.js'
+import type { UsageRange } from '../../../shared/usage.js'
 
 /**
  * First run, and the empty state generally.
@@ -126,6 +129,9 @@ export function FirstLaunch({
   runtimes,
   limitedRuntimes,
   usageWindows,
+  readUsage,
+  usageKey,
+  onOpenUsage,
   discoveryPhase,
   tube,
   swarmCalls = 0,
@@ -166,6 +172,12 @@ export function FirstLaunch({
   readonly limitedRuntimes: ReadonlyMap<string, string>
   /** The latest usage reading per runtime, from what runs reported (0.388). */
   readonly usageWindows?: ReadonlyMap<string, string>
+  /** Usage across every agent and model, for the line under the accounts (0.714). */
+  readonly readUsage?: (range: UsageRange) => Promise<UsageReadResponse>
+  /** Changes when the record does, so the usage line counts the turn that just ended. */
+  readonly usageKey?: string
+  /** Opens the Usage dialog. */
+  readonly onOpenUsage?: () => void
   /**
    * Whether the no-account runtime still lists something free. Absent reads
    * as `unknown`, which keeps the promise: this is a correction on disproof,
@@ -377,6 +389,8 @@ export function FirstLaunch({
    * little of the spare height is always left as air above it, and a window
    * with none to spare draws the cover exactly as before.
    */
+  // Usage for the line under the accounts (0.714): read once, again when the record moves.
+  const usageSummary = useUsageSummary(readUsage, usageKey ?? '')
   const inner = useRef<HTMLDivElement>(null)
   const [coverGrow, setCoverGrow] = useState(1)
   // Short of height even with the smallest cover: tighter padding and gaps (0.583, `homeIsShort`).
@@ -691,6 +705,9 @@ export function FirstLaunch({
            * `installed` and not `connected`: a signed-out Codex is installed,
            * and the command that signs it in is on its row.
            */
+          // How much has been done, across every agent (0.714): under the accounts, once there is anything to count.
+          const usageLine = onOpenUsage === undefined ? null : <UsageLine summary={usageSummary} onOpen={onOpenUsage} />
+          const usageChip = onOpenUsage === undefined ? null : <UsageChip summary={usageSummary} onOpen={onOpenUsage} />
           const deferOthers = connected === 0 && !checkingAny && installing === undefined && !othersOpen
           const drawn = deferOthers
             ? shown.filter((row) => row.runtime.id === FREE_START_RUNTIME || row.runtime.installed)
@@ -725,6 +742,8 @@ export function FirstLaunch({
             const ready = shown.filter((row) => row.connected)
             return (
               <>
+              {/* The accounts and their usage, one block: the line costs no gap of Home's (0.714). */}
+              <div className="lc-accountsblock">
               <div className="lc-agenthead is-folded">
                 <span className="lc-agenthead__label">Connected accounts</span>
                 <span className="lc-agenthead__note is-green">{headNote}</span>
@@ -756,9 +775,12 @@ export function FirstLaunch({
                     )
                   })}
                 </span>
+                {usageChip}
                 <button type="button" className="lc-agenthead__more" onClick={() => setAgentsOpen(true)}>
                   Show all
                 </button>
+              </div>
+              {usageLine}
               </div>
               {/*
                 * BUILD AND COMPARE (0.448; Arena's starters, PLAN-2026-09-28-NEXT
@@ -973,6 +995,7 @@ export function FirstLaunch({
                   )}
                 </button>
               )}
+              {usageLine}
             </>
           )
         })()}

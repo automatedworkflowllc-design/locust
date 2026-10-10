@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.714.0 - 2026-10-09
+
+### New
+
+- **Usage, across every agent and model.** A line under your accounts on Home now shows the last 30 days: turns, tokens, what was spent, and a bar for each day. Press it to open Usage. Usage does what Claude Code's /stats and /usage do, for every agent at once. It shows a twelve-week grid of the days you worked, with your streaks and busiest day, and how close each account is to its limits. It also lists each model with its share of your turns, its tokens, how much came from its cache, and what paid for it: your plan, your account, a free model, or what an API key spent. Choose the last 7 days, the last 30, or all time.
+
+### Improved
+
+- **A PDF you attach shows as a page, and opens in Locust.** It was shown as the path Locust copied it to. It is now a card with its first page, its name and its page count, and pressing it shows every page beside the conversation. A PDF attached before 0.713 is read the first time you open it.
+
 ## 0.713.0 - 2026-10-09
 
 ### Improved

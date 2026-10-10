@@ -6,6 +6,7 @@ import { AgentText } from './ThreadItems.js'
 import { DiffView } from './DiffView.js'
 import { Icon } from './Icon.js'
 import { SheetView } from './SheetView.js'
+import { PdfPages } from './PdfPages.js'
 import { DocumentView } from './DocumentView.js'
 import { fileAsItWas } from '../fileVersions.js'
 import { documentChanges } from '../documentChange.js'
@@ -46,12 +47,15 @@ export function FileViewer({
   workbook,
   document: officeDocument,
   pageUrl,
-  onPointAt
+  onPointAt,
+  pdf
 }: {
   readonly path: string
   /** The file's text, or a `data:` URL when the mode is `image`. */
   readonly text: string
-  readonly mode: 'markdown' | 'code' | 'image' | 'table' | 'document'
+  readonly mode: 'markdown' | 'code' | 'image' | 'table' | 'document' | 'pdf'
+  /** A PDF's page pictures, folder-relative, when the mode is `pdf` (0.714, PdfPages). */
+  readonly pdf?: { readonly pages: number; readonly pictures: readonly string[]; readonly folder: string }
   /** A spreadsheet's cells, read by the host, when the mode is `table`. */
   readonly workbook?: Workbook
   /** A Word or PowerPoint file's words, read by the host, when the mode is `document` (0.517). */
@@ -316,6 +320,9 @@ export function FileViewer({
             src={text}
             alt={path.replace(/\\/g, '/').split('/').pop() ?? 'image'}
           />
+        ) : mode === 'pdf' && pdf !== undefined ? (
+          // Its pages as Locust drew them for the agent (0.714): pictures, never the file run.
+          <PdfPages name={fileName} pages={pdf.pages} pictures={pdf.pictures} folder={pdf.folder} />
         ) : mode === 'table' && workbook !== undefined ? (
           // Read, never run: cells as escaped text (shared/sheet.ts).
           <SheetView workbook={workbook} />

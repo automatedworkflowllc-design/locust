@@ -16,6 +16,7 @@ import {
 import { QUEUED_MESSAGES_READ_CHANNEL, QUEUED_MESSAGES_WRITE_CHANNEL } from '../shared/queued-messages.js'
 import type { QueuedMessagesResponse, SavedQueuedMessage } from '../shared/queued-messages.js'
 import type { CompareSlotId } from '../shared/compare.js'
+import type { UsageRange } from '../shared/usage.js'
 import {
   CODEX_MISSION_CANCEL_CHANNEL,
   CODEX_MISSION_START_CHANNEL,
@@ -104,6 +105,8 @@ import {
   REWIND_PUT_BACK_CHANNEL,
   WORKSPACE_ATTACH_CHANNEL,
   WORKSPACE_FILES_CHANNEL,
+  USAGE_READ_CHANNEL,
+  PDF_PAGES_CHANNEL,
   WORKSPACE_PASTE_CHANNEL,
   WORKSPACE_IMAGE_CHANNEL,
   WORKSPACE_REVEAL_CHANNEL,
@@ -255,6 +258,8 @@ import type {
   PagePickRequest,
   PagePickResponse,
   WorkspaceFilesResponse,
+  UsageReadResponse,
+  PdfPagesResponse,
   OpenLinkResponse,
   MacReleaseAnswer,
   ApprovalRulesResponse,
@@ -624,6 +629,8 @@ const desktopApi: DesktopApi = {
     ipcRenderer.invoke(WORKSPACE_IMAGE_CHANNEL, path, folder) as Promise<WorkspaceImageResponse>,
   attachFiles: () => ipcRenderer.invoke(WORKSPACE_ATTACH_CHANNEL) as Promise<AttachFilesResponse>,
   workspaceFiles: () => ipcRenderer.invoke(WORKSPACE_FILES_CHANNEL) as Promise<WorkspaceFilesResponse>,
+  readUsage: (range: UsageRange) => ipcRenderer.invoke(USAGE_READ_CHANNEL, range) as Promise<UsageReadResponse>,
+  pdfPages: (path: string, folder?: string) => ipcRenderer.invoke(PDF_PAGES_CHANNEL, path, folder) as Promise<PdfPagesResponse>,
   attachPasted: (name: string, bytes: Uint8Array) =>
     ipcRenderer.invoke(WORKSPACE_PASTE_CHANNEL, { name, bytes }) as Promise<AttachFilesResponse>,
   pickInPage: (request: PagePickRequest) => ipcRenderer.invoke(PAGE_PICK_CHANNEL, request) as Promise<PagePickResponse>,
