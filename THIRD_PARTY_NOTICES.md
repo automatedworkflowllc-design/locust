@@ -14,6 +14,17 @@ the installer. Their MIT notices are kept alongside the downloaded files in
 - Whisper model: MIT, Copyright (c) 2022 OpenAI.
   https://github.com/openai/whisper/blob/main/LICENSE
 
+## PDF.js
+
+- Project: https://github.com/mozilla/pdf.js
+- Licence: Apache License, Version 2.0, Copyright Mozilla Foundation.
+  https://www.apache.org/licenses/LICENSE-2.0
+- Version: `pdfjs-dist` 6.3.289, unmodified.
+- What Locust uses: the library, bundled into the page that opens an
+  attached PDF for an agent (`apps/desktop/src/renderer/pdf.html`,
+  `apps/desktop/src/renderer/src/pdfReader.ts`). It reads the PDF's text and
+  draws its pages as pictures on this machine; nothing is fetched.
+
 ## OpenPets
 
 - Project: https://github.com/OpenPetsHQ/openpets

@@ -39,10 +39,22 @@ export default defineConfig({
      */
     build: {
       minify: 'esbuild',
-      cssMinify: true
+      cssMinify: true,
+      rollupOptions: {
+        input: {
+          index: resolve('src/renderer/index.html'),
+          // The page that opens an attached PDF for the agent (0.713,
+          // src/pdfReader.ts): its own entry, so pdf.js is never in the app's
+          // bundle and the app never runs in the view that reads.
+          pdf: resolve('src/renderer/pdf.html')
+        }
+      }
     },
     esbuild: {
-      keepNames: true
+      keepNames: true,
+      // Licence notices kept in the bundle (0.713): a minified bundle dropped
+      // every one, PDF.js's Apache notice among them.
+      legalComments: 'inline'
     }
   }
 })

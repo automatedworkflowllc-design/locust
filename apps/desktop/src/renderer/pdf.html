@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      The page that reads an attached PDF (0.713, src/pdfReader.ts). Loaded in
+      a view no one sees; the PDF arrives as an argument, so it reaches
+      nothing: no network, no frames, no forms.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data: blob:"
+    />
+    <title>Locust PDF reader</title>
+  </head>
+  <body>
+    <script type="module" src="/src/pdfReader.ts"></script>
+  </body>
+</html>

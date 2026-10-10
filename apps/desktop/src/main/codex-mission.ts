@@ -116,6 +116,7 @@ import { FREE_ONLY_REFUSAL, isFreeRoute } from './free-routes.js'
 import { attachmentsForRun } from './attachments-for-run.js'
 import { longTaskFile, longTaskFilePath } from './long-task-file.js'
 import { withAttachments } from '../shared/attachments.js'
+import type { ReadablePdf } from '../shared/attachments.js'
 import { CODEX_INIT_PROMPT, commandNamed } from './runtime-commands.js'
 import type { CursorDefaultModel } from './cursor-default-model.js'
 import type { PreparedSkills } from './claude-skills.js'
@@ -475,6 +476,12 @@ interface CodexMissionServiceOptions {
    * is briefed in full, as before.
    */
   readonly briefSessions?: BriefSessions
+  /**
+   * Opens an attached PDF for the agent: its text and page pictures beside it
+   * in the run folder's `.locust/attachments` (0.713, pdf-reading.ts).
+   * Absent, a PDF is named in the message and the runtime opens it itself.
+   */
+  readonly readablePdf?: (folder: string, pdf: string, name: string) => Promise<ReadablePdf | undefined>
   /**
    * Called after a completed run posted messages to teammates, with what it
    * posted. Whatever this does -- a relay starting the recipient's run --
@@ -2128,7 +2135,8 @@ export function createCodexMissionService(options: CodexMissionServiceOptions): 
         // M16: attached files placed where this run reads, when it runs
         // anywhere but the project folder. Only what is sent changes.
         say('briefing')
-        const attached = await attachmentsForRun(prompt, runFolder, runCwd).catch(() => prompt)
+        // 0.713: and an attached PDF opened for it, its text and pages beside it.
+        const attached = await attachmentsForRun(prompt, runFolder, runCwd, options.readablePdf).catch(() => prompt)
         // Cold, not a command and not a side question: told what was said before (0.495).
         const sentPrompt = coldEarlier === undefined || bare || side !== undefined ? attached : composeColdFollowUp(coldEarlier, attached, rewind === true)
         let runtimePrompt = sentPrompt

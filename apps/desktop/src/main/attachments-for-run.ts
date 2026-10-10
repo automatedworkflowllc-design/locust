@@ -1,8 +1,10 @@
 import { copyFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, extname, isAbsolute, join, relative } from 'node:path'
 
-import { ATTACHMENT_DIR, splitAttachments, withAttachments } from '../shared/attachments.js'
+import { ATTACHMENT_DIR, readablePdfNote, splitAttachments, withAttachments } from '../shared/attachments.js'
+import type { ReadablePdf } from '../shared/attachments.js'
 import { excludeWith } from './attach-outside.js'
+import { isPdfPath } from './pdf-reading.js'
 
 /**
  * The files a message attached, placed where THIS run can read them.
@@ -27,15 +29,51 @@ import { excludeWith } from './attach-outside.js'
  * project's paths, which is what the thread's tiles open. A file that cannot
  * be placed is left as it was named: the runtime's own read then says what
  * is missing, which is more than a silent drop would.
+ *
+ * And a PDF, wherever the run is, is opened for the agent first (0.713): its
+ * text and page pictures go into the run folder's `.locust/attachments`, and
+ * a paragraph under the list says where. A PDF that cannot be read is sent
+ * as it was, and the runtime tries it its own way, as before.
  */
-export async function attachmentsForRun(prompt: string, workspacePath: string, runCwd: string): Promise<string> {
-  if (samePath(workspacePath, runCwd)) return prompt
+export async function attachmentsForRun(
+  prompt: string,
+  workspacePath: string,
+  runCwd: string,
+  /**
+   * Opens an attached PDF for the agent (0.713, pdf-reading.ts): its text and
+   * page pictures, in the run folder's `.locust/attachments`. The message
+   * then says where they are. Absent, PDFs are named and left as they were.
+   */
+  readablePdf?: (folder: string, pdf: string, name: string) => Promise<ReadablePdf | undefined>
+): Promise<string> {
   const split = splitAttachments(prompt)
   if (split.attachments.length === 0) return prompt
+  const placed = samePath(workspacePath, runCwd) ? split.attachments : await placedForRun(split.attachments, workspacePath, runCwd)
+  const readables: ReadablePdf[] = []
+  if (readablePdf !== undefined) {
+    const names = new Set<string>()
+    for (const path of placed) {
+      if (!isPdfPath(path) || !inside(runCwd, join(runCwd, path))) continue
+      const name = distinctName(basename(path), names)
+      names.add(name)
+      const readable = await readablePdf(runCwd, path, name).catch(() => undefined)
+      if (readable !== undefined) readables.push(readable)
+    }
+    // A PDF of the project's own was opened into `.locust/`: out of git, as every copy is.
+    if (readables.length > 0) await keepOutOfGit(runCwd)
+  }
+  const note = readablePdfNote(readables)
+  const moved = placed.some((path, index) => path !== split.attachments[index])
+  if (!moved && note === undefined) return prompt
+  return withAttachments(split.text, placed, note)
+}
+
+/** The message's files, placed where a run outside the project folder reads them (M16, above). */
+async function placedForRun(attachments: readonly string[], workspacePath: string, runCwd: string): Promise<readonly string[]> {
   const taken = new Set<string>()
   const placed: string[] = []
   let copied = false
-  for (const path of split.attachments) {
+  for (const path of attachments) {
     const source = join(workspacePath, path)
     if (!inside(workspacePath, source)) {
       placed.push(path)
@@ -66,7 +104,7 @@ export async function attachmentsForRun(prompt: string, workspacePath: string, r
     }
   }
   if (copied) await keepOutOfGit(runCwd)
-  return withAttachments(split.text, placed)
+  return placed
 }
 
 const samePath = (a: string, b: string): boolean =>

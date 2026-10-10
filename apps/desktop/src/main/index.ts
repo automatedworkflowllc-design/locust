@@ -427,6 +427,29 @@ import type {
 import { ROUTINE_RECOVERY_CHANNEL } from '../shared/routine-recovery.js'
 import { decideRoutineRecovery } from './routine-recovery-ipc.js'
 import { parsedMissionMode } from './mission-mode.js'
+import { createPdfReadings, isPdfPath } from './pdf-reading.js'
+import { createViewPdfReader } from './pdf-window.js'
+
+/*
+ * AN ATTACHED PDF IS OPENED FOR THE AGENT (0.713, pdf-reading.ts): its text
+ * and page pictures, read in a view no one sees from Locust's own page.
+ * Started when the file is attached, so it is usually done by Send.
+ */
+const pdfReadings = createPdfReadings(
+  createViewPdfReader({
+    load: async (contents) => {
+      if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) await contents.loadURL(`${process.env.ELECTRON_RENDERER_URL}/pdf.html`)
+      else await contents.loadFile(join(__dirname, '../renderer/pdf.html'))
+    }
+  })
+)
+
+/** Starts opening the attached PDFs among `paths` (folder-relative), and lets Send wait for it. */
+function readAttachedPdfs(folder: string, paths: readonly string[]): void {
+  for (const path of paths) {
+    if (isPdfPath(path)) void pdfReadings.prepare(folder, path, basename(path)).catch(() => undefined)
+  }
+}
 
 /**
  * How large a single paste may be.
@@ -2306,6 +2329,7 @@ if (!ownsSingleInstanceLock) {
       memory: memoryBriefing,
       // A2.5: a resumed session is told only what changed in its brief.
       briefSessions: createBriefSessions({ rootDirectory: app.getPath('userData') }),
+      readablePdf: pdfReadings.prepare,
       onShared: (mission, posted) => runEnd.onShared(mission, posted),
       onRunEnded: (mission) => runEnd.onRunEnded(mission)
     })
@@ -5030,6 +5054,7 @@ if (!ownsSingleInstanceLock) {
         await keepAttachmentsOutOfGit(workspacePath)
         // Copied in, like any file from outside: it never was in the folder,
         // and the tile says so for the same reason.
+        readAttachedPdfs(workspacePath, [destination])
         return { ok: true, paths: [destination], copied: [destination] } as const
       } catch (error) {
         return {
@@ -5135,6 +5160,8 @@ if (!ownsSingleInstanceLock) {
               : 'Those files could not be copied into the folder your teammates work in.'
         } as const
       }
+      // A PDF starts being opened for the agent now, so Send rarely waits (0.713).
+      readAttachedPdfs(workspacePath, inside)
       return {
         ok: true,
         paths: inside,

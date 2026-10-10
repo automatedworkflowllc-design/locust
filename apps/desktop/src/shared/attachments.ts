@@ -47,10 +47,73 @@ export function attachmentPreamble(paths: readonly string[]): string | undefined
     : `Read these ${String(paths.length)} files in the workspace before you answer:\n${listed}`
 }
 
-/** The prompt actually sent: the preamble, a blank line, then what was typed. */
-export function withAttachments(prompt: string, paths: readonly string[]): string {
+/**
+ * The prompt actually sent: the preamble, a blank line, then what was typed.
+ *
+ * `note`, when given, goes between the two: what Locust did to make the files
+ * readable (`readablePdfNote`). It is said only to the runtime -- the
+ * recorded prompt never carries one, so `splitAttachments` never meets it.
+ */
+export function withAttachments(prompt: string, paths: readonly string[], note?: string): string {
   const preamble = attachmentPreamble(paths)
-  return preamble === undefined ? prompt : `${preamble}\n\n${prompt}`
+  if (preamble === undefined) return prompt
+  return note === undefined || note.length === 0 ? `${preamble}\n\n${prompt}` : `${preamble}\n\n${note}\n\n${prompt}`
+}
+
+/**
+ * A PDF, opened for the agent (0.713).
+ *
+ * What the host made of one attached PDF: its text, and a picture of each of
+ * its first pages, written into Locust's own folder (main/pdf-reading.ts).
+ * Folder-relative paths, forward slashes.
+ */
+export interface ReadablePdf {
+  /** The attachment, as the message names it. */
+  readonly pdf: string
+  /** Its text, one file; absent when no page has any (a scan). */
+  readonly text?: string
+  /** One picture per page, first page first. */
+  readonly pictures: readonly string[]
+  readonly pages: number
+}
+
+/**
+ * What the runtime is told about the PDFs Locust opened, or undefined when
+ * there are none.
+ *
+ * A tester's homework, 0.712: Codex had no PDF tool that worked on his
+ * machine and spent eight commands (four failed) decoding the file by hand.
+ * The sentence says plainly that no tool is needed, and which file holds
+ * what -- the text for reading, the pictures for what text cannot carry
+ * (an equation, a table, a chart), because a matrix pulled out of a PDF as
+ * text is a row of numbers with its brackets read as digits.
+ */
+export function readablePdfNote(readables: readonly ReadablePdf[]): string | undefined {
+  if (readables.length === 0) return undefined
+  const lines = readables.map((readable) => {
+    const parts: string[] = []
+    if (readable.text !== undefined) parts.push(`its text is in ${readable.text}`)
+    else parts.push('it has no text in it (scanned pages), so read the pictures')
+    if (readable.pictures.length > 0) {
+      const first = readable.pictures[0]!
+      const last = readable.pictures[readable.pictures.length - 1]!
+      const which =
+        readable.pictures.length === readable.pages
+          ? readable.pages === 1
+            ? 'its page is a picture'
+            : `each of its ${String(readable.pages)} pages is a picture`
+          : `its first ${String(readable.pictures.length)} of ${String(readable.pages)} pages are pictures`
+      parts.push(readable.pictures.length === 1 ? `${which}: ${first}` : `${which}, ${first} to ${last.slice(last.lastIndexOf('/') + 1)}`)
+    }
+    return `- ${readable.pdf}: ${parts.join('; ')}`
+  })
+  return [
+    readables.length === 1
+      ? 'Locust has already opened the PDF for you, so no PDF tool or package is needed:'
+      : `Locust has already opened the ${String(readables.length)} PDFs for you, so no PDF tool or package is needed:`,
+    ...lines,
+    'Read the text first. For equations, tables, charts and layout, look at the pictures: they show the page as printed, and the text may not.'
+  ].join('\n')
 }
 
 /**

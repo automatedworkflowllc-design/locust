@@ -12,5 +12,11 @@ allowBuilds:
   # Its install script only warns about version ranges; nothing needs it.
   protobufjs: false
 
+# pdf.js offers a native canvas for drawing pages under Node. Locust draws them
+# in a window of its own (main/pdf-reading.ts), so the native module is never
+# needed and never installed.
+ignoredOptionalDependencies:
+  - '@napi-rs/canvas'
+
 minimumReleaseAgeExclude:
   - bot-avatars@0.1.1
