@@ -142,7 +142,7 @@ export function endedIds(command) {
   // taskkill /PID n (/PID m ...), in Windows' spelling or Git Bash's //PID
   for (const segment of command.split(/[\n;&|]+/)) {
     if (!/\b(?:taskkill|tskill)\b/i.test(segment)) continue
-    for (const m of segment.matchAll(/[\/-]{1,2}pid\s+['"]?(\d+)/gi)) add(m[1])
+    for (const m of segment.matchAll(/[/-]{1,2}pid\s+['"]?(\d+)/gi)) add(m[1])
     for (const m of segment.matchAll(/\btskill(?:\.exe)?\s+(\d+)\b/gi)) add(m[1])
   }
   // PowerShell: Stop-Process -Id n[,m] / Stop-Process n / Get-Process -Id n | Stop-Process / .Kill()
