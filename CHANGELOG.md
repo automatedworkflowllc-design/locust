@@ -11,6 +11,13 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.734.0 - 2026-10-10
+
+### Fixed
+
+- **The Changes panel opens fast in a folder with many new files.** It now reads them all at once: 0.8 seconds where it took 7.7 in a folder with hundreds of new files.
+- **A setting you can't change says why on the control itself**, such as Start Locust when you sign in on a copy that isn't installed.
+
 ## 0.733.0 - 2026-10-10
 
 ### Improved
