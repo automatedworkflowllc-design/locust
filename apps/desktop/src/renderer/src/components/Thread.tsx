@@ -188,6 +188,7 @@ export function ThreadItems({
   workspacePath,
   decision,
   onOpenFile,
+  onDraft,
   planMode = false,
   faces = true,
   busyModel
@@ -209,6 +210,8 @@ export function ThreadItems({
   readonly faces?: boolean
   /** Open a handed file in the panel beside the conversation. */
   readonly onOpenFile?: (path: string, folder?: string) => void
+  /** Words for the conversation's box, for the person to send (0.733: a status chip changed). */
+  readonly onDraft?: (text: string) => void
   /** The turn was sent in Plan mode; see `Thread`'s prop of the same name. */
   readonly planMode?: boolean
   readonly owner: PublicTeammate | undefined
@@ -267,7 +270,7 @@ export function ThreadItems({
   // A finished footer line takes Copy at its end (it measured 66px under DONE as its own row, 0.545).
   const footTakesCopy = items.some((one) => one.type === 'activity' && one.finished)
   return (
-    <ThreadImagesContext.Provider value={{ folder: workspacePath, onOpenFile: onOpenFile === undefined ? undefined : (path) => onOpenFile(path, workspacePath) }}>
+    <ThreadImagesContext.Provider value={{ folder: workspacePath, onOpenFile: onOpenFile === undefined ? undefined : (path) => onOpenFile(path, workspacePath), onDraft }}>
       {items.map((item, index) => {
         if (item.type === 'agent-message') {
           return (
@@ -783,6 +786,8 @@ export interface ThreadProps {
   /** Open the run a peer message reached; undefined for one nothing received yet. */
   /** Open a handed file in the panel beside the conversation. */
   readonly onOpenFile?: (path: string) => void
+  /** Words for the box, for the person to send (0.733). */
+  readonly onDraft?: (text: string) => void
   readonly onOpenPeerRun: (messageId: string) => (() => void) | undefined
   /**
    * Earlier turns of the same conversation, oldest first, each with the words
@@ -1003,6 +1008,7 @@ export function Thread({
   startedBy,
   runMode,
   onOpenFile,
+  onDraft,
   onOpenPeerRun,
   earlierTurns,
   planMode = false,
@@ -1583,6 +1589,7 @@ onResume,
            */
           key={restoredMission?.missionId ?? events.find((event) => event.missionId !== undefined)?.missionId ?? 'starting'}
           {...(onOpenFile === undefined ? {} : { onOpenFile })}
+          {...(onDraft === undefined ? {} : { onDraft })}
           items={items}
           owner={peers.self}
           activity={liveActivityOf(events, running)}

@@ -18,6 +18,10 @@ import { Icon } from './Icon.js'
 import { ThreadImage } from './ThreadImage.js'
 import { ReplyPage } from './ReplyPage.js'
 import { statusColumnOf, statusToneOf } from '../statusChips.js'
+import { StatusChip } from './StatusChip.js'
+
+/** A table cell's words without its marks, to name its row by. */
+const plainCell = (cell: string): string => cell.replace(/[*_`~]/g, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').trim().slice(0, 80) || 'this row'
 import { isWholePage } from '../../../shared/reply-page.js'
 
 /**
@@ -404,7 +408,14 @@ export function AgentText({
                         const tone = cellIndex === statusAt ? statusToneOf(cell) : undefined
                         return (
                           <td key={`c${String(cellIndex)}`} className={alignClass(block.align[cellIndex])}>
-                            {tone === undefined ? inline(cell) : <span className={`lc-status lc-status--${tone}`}>{inline(cell)}</span>}
+                            {tone === undefined ? (
+                              inline(cell)
+                            ) : (
+                              // Changeable where the thread has a box (0.733): the row is named by its first other cell.
+                              <StatusChip tone={tone} item={plainCell(row.find((_, other) => other !== statusAt) ?? 'this row')}>
+                                {inline(cell)}
+                              </StatusChip>
+                            )}
                           </td>
                         )
                       })}

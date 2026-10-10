@@ -66,6 +66,17 @@ try {
     return 'done'
   })()`)
   say(`chips: ${String(await drive.capture('the reply, 1215', () => drive.evaluate(CHIPS)))}`)
+  // 0.733: a chip changed writes its ask into the box; nothing is sent.
+  say(`changed: ${String(await drive.capture('a chip changed', () => drive.evaluate(`(async () => {
+    const chip = [...document.querySelectorAll('button.lc-status')].find((el) => el.innerText.trim() === 'Blocked')
+    if (!chip) return 'no Blocked chip button'
+    chip.click()
+    await new Promise((r) => setTimeout(r, 300))
+    const options = [...document.querySelectorAll('.lc-statusmenu__item')].map((el) => el.innerText.trim())
+    ;[...document.querySelectorAll('.lc-statusmenu__item')].find((el) => el.innerText.trim() === 'Done')?.click()
+    await new Promise((r) => setTimeout(r, 500))
+    return 'options ' + options.join(' / ') + ' || box: ' + (document.querySelector('textarea[aria-label="Message"]')?.value ?? 'no box')
+  })()`)))}`)
   await drive.resize(860, 720)
   await sleep(800)
   await drive.capture('the reply, 860', () => drive.evaluate(CHIPS))

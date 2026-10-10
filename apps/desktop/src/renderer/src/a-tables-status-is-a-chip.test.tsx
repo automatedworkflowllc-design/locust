@@ -1,7 +1,9 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
+import { statusAsk } from './components/StatusChip.js'
 import { AgentText } from './components/ThreadItems.js'
+import { ThreadImagesContext } from './threadImages.js'
 import { statusColumnOf, statusToneOf } from './statusChips.js'
 
 /*
@@ -42,5 +44,15 @@ describe('a table’s status column', () => {
     expect(html).toContain('<span class="lc-status lc-status--red"><span>Blocked</span></span>')
     expect(html).toContain('<td><span>Halfway, see notes</span></td>')
     expect(html).toContain('<td><span>Login fix</span></td>')
+  })
+
+  it('is a chip you can change where the thread has a box, naming its row (0.733)', () => {
+    const html = renderToStaticMarkup(
+      <ThreadImagesContext.Provider value={{ folder: undefined, onOpenFile: undefined, onDraft: () => undefined }}>
+        <AgentText text={['| Task | Status |', '| --- | --- |', '| **Billing** rename | Blocked |'].join('\n')} streaming={false} />
+      </ThreadImagesContext.Provider>
+    )
+    expect(html).toContain('<button type="button" class="lc-status lc-status--red is-button" aria-haspopup="menu" aria-expanded="false" title="Change the status of Billing rename">')
+    expect(statusAsk('Billing rename', 'Done')).toBe('Mark "Billing rename" as Done in the tracker, and say what that changes.')
   })
 })

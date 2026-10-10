@@ -11,6 +11,15 @@ export type StatusTone = 'green' | 'blue' | 'amber' | 'red' | 'quiet'
 
 const HEADERS = /^(?:status|state|stage|progress)$/i
 
+/** What a chip can be changed to (0.733), one word per tone, in the order work goes. */
+export const STATUS_CHOICES: readonly { readonly label: string; readonly tone: StatusTone }[] = [
+  { label: 'Not started', tone: 'quiet' },
+  { label: 'In progress', tone: 'blue' },
+  { label: 'Waiting', tone: 'amber' },
+  { label: 'Blocked', tone: 'red' },
+  { label: 'Done', tone: 'green' }
+]
+
 /** The column a table's status is in, by its header; undefined when it has none. */
 export function statusColumnOf(header: readonly string[]): number | undefined {
   const at = header.findIndex((cell) => HEADERS.test(plainOf(cell)))

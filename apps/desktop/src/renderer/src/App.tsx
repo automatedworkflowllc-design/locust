@@ -8497,6 +8497,8 @@ export default function App(): ReactElement {
               <Thread
                 backgroundTurns={backgroundTurnIds}
                 onOpenFile={openFileInViewer}
+                // A status chip changed in a teammate's tracker writes its ask into the box (0.733).
+                onDraft={(text) => setHandBack({ text, attachments: [] })}
                 prompt={liveRun.prompt}
                 startedBy={liveRun.startedBy}
                 {...(liveRun.data?.mode === undefined ? {} : { runMode: liveRun.data.mode })}
