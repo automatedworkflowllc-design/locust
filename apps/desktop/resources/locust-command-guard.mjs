@@ -160,6 +160,17 @@ export function endedIds(command) {
   each(/\bwmic\s+process\s+(\d+)\s+(?:delete|call\s+terminate)\b/gi)
   // Win32_Process -Filter "ProcessId = n" | Invoke-CimMethod -MethodName Terminate
   each(/\bwin32_process\b[^\n;&]*?processid\s*=\s*['"]?(\d+)[^\n;&]*?\b(?:terminate|remove-ciminstance)\b/gi)
+  // Ids written out and ended through a variable (arena round B, 2026-10-10: Sonnet's
+  // `for p in 28700 30432 ...; do taskkill //F //PID $p; done` was never looked up).
+  const killsVariable = (body, name) =>
+    new RegExp(
+      `(?:\\b(?:taskkill|tskill)\\b[^\\n;&|]*?[/-]{1,2}pid\\s+["']?|(?<![\\w.-])kill\\s+(?:-\\S+\\s+)*["']?|\\b(?:stop-process|spps)\\b[^\\n;&|]*?(?:-id\\s+)?|process\\.kill\\(\\s*)\\$\\{?${name}\\b`,
+      'i'
+    ).test(body)
+  for (const m of command.matchAll(/\bfor\s+(\w+)\s+in\s+([\d\s]+?)\s*;\s*do\b([\s\S]*?)\bdone\b/gi)) if (killsVariable(m[3], m[1])) add(m[2])
+  for (const m of command.matchAll(/\bforeach\s*\(\s*\$(\w+)\s+in\s+@?\(?\s*([\d,\s]+?)\s*\)?\s*\)\s*\{([^}]*)\}/gi)) if (killsVariable(m[3], m[1])) add(m[2])
+  for (const m of command.matchAll(/(?:^|[\s;("'])@?\(?\s*(\d+(?:\s*,\s*\d+)*)\s*\)?\s*\|\s*(?:%|foreach-object|foreach)\s*\{([^}]*)\}/gi)) if (killsVariable(m[2], '_')) add(m[1])
+  each(/\b(?:echo|printf)\s+['"]?([\d\s]+?)['"]?\s*\|\s*xargs\s+(?:-\S+\s+)*(?:kill|taskkill)\b/gi)
   return [...ids]
 }
 

@@ -170,6 +170,19 @@ describe('a command that ends a process by id', () => {
     expect(endedIds('kill %1; pkill 8; taskkill //IM 9.exe')).toEqual([])
     expect(endedIds('node -e "process.kill(10)"')).toEqual([10])
   })
+
+  // Arena round B, 2026-10-10: Sonnet wrote its ids into a loop, and the guard never looked them up.
+  it('reads ids written out and ended through a variable', () => {
+    expect(endedIds('for p in 28700 30432 2888; do taskkill //F //PID $p >/dev/null 2>&1; done; sleep 1')).toEqual([28700, 30432, 2888])
+    expect(endedIds('for p in 11 12; do kill -9 "$p"; done')).toEqual([11, 12])
+    expect(endedIds('powershell -c "foreach ($p in 13,14) { Stop-Process -Id $p -Force }"')).toEqual([13, 14])
+    expect(endedIds('powershell -c "15,16 | ForEach-Object { Stop-Process -Id $_ }"')).toEqual([15, 16])
+    expect(endedIds('echo 17 18 | xargs kill')).toEqual([17, 18])
+    // A loop over ids that ends nothing is not ending them.
+    expect(endedIds('for p in 19 20; do echo $p; done')).toEqual([])
+    expect(stoppedBecause('for p in 7300 10544; do taskkill //F //T //PID $p; done', look)).toMatch(/process 10544 is Chrome, which no teammate started/)
+    expect(stoppedBecause('for p in 7300 7310 7500; do taskkill //F //T //PID $p; done', look)).toBeUndefined()
+  })
 })
 
 /*
