@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.717.0 - 2026-10-09
+
+### Improved
+
+- **No teammate closes your browser.** When some models clean up a browser they opened for a test, they end every Chrome or Edge on the computer, closing your windows too. A Claude Code teammate can no longer do that, in any mode, Auto included. Locust stops a command that ends a browser, Node, Locust or another AI agent by name before it runs, and the conversation says what was stopped. Ending what the teammate started itself, by its process id, still works.
+
 ## 0.716.0 - 2026-10-09
 
 ### New
