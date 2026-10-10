@@ -11,6 +11,17 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.715.0 - 2026-10-09
+
+### Improved
+
+- **Lists show you what needs a look.** In Conversations and on a teammate's card, a finished conversation is no longer marked in blue on every row. Only one that is running, was stopped short, or was not fully saved keeps its colour.
+- **Team cards line up.** A teammate's role stays on one line beside the card's buttons, and Last run no longer breaks over two lines, so the cards in a row are the same height.
+- **Limits in Settings are small meters.** Settings › AI agents shows each limit window as a short bar with its figure, and only a window that is close to its limit is amber. The full wording, with when each one resets, appears when you hover.
+- **A connector that works takes one line.** Settings › Connectors no longer says "Connected just now." under every connector that is working. The ones that need you still say what to do.
+- **Usage is in the command palette.** Press Ctrl K and choose Usage. The Go to list now runs in the order of its shortcuts.
+- **A chosen option in a row of options no longer has a bright edge on one side.**
+
 ## 0.714.0 - 2026-10-09
 
 ### New
