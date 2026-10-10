@@ -112,7 +112,7 @@ try {
 
   if (real) {
     const login = await ghLogin()
-    check('it names the account gh itself names', login !== undefined && first.name === login && first.line === `Signed in as ${login}. Teammates push and open pull requests as you.`, `${String(first.name)} / gh: ${String(login)}`)
+    check('it names the account gh itself names', login !== undefined && first.name === login && first.line === 'Signed in to GitHub. Teammates push and open pull requests as you.', `${String(first.name)} / gh: ${String(login)}`)
     check('it offers Open on GitHub, not a sign-in', first.buttons.includes('Open on GitHub') && !first.buttons.some((b) => /Sign in/.test(b)), first.buttons.join(', '))
     await drive.capture('Check again', () => drive.evaluate(press('/Check again/')))
     await drive.waitFor(`(() => document.querySelector('.lc-github')?.getAttribute('data-state') === 'signed-in')()`, { timeoutMs: 30_000, what: 'gh to answer again' })

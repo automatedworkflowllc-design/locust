@@ -32,7 +32,7 @@ describe('your GitHub on the Connectors page', () => {
     const shown = card({ account: { kind: 'signed-in', login: 'octo-cat', scopes: ['repo'] } })
     expect(shown).toContain('<svg class="lc-githubmark"')
     expect(shown).toContain('octo-cat')
-    expect(shown).toContain('Signed in as octo-cat.')
+    expect(shown).toContain('Signed in to GitHub.')
     expect(shown).toContain('Open on GitHub')
     expect(shown).not.toContain('Sign in with GitHub')
   })

@@ -40,7 +40,7 @@ describe('who the GitHub CLI is signed in as', () => {
   })
 
   it('says each state in a line', () => {
-    expect(githubAccountLine({ kind: 'signed-in', login: 'octo-cat', scopes: [] })).toBe('Signed in as octo-cat. Teammates push and open pull requests as you.')
+    expect(githubAccountLine({ kind: 'signed-in', login: 'octo-cat', scopes: [] })).toBe('Signed in to GitHub. Teammates push and open pull requests as you.')
     expect(githubAccountLine({ kind: 'no-cli' })).toContain('not on this computer')
     expect(githubAccountLine({ kind: 'expired', login: 'octo-cat' })).toBe('The sign-in for octo-cat no longer works. Sign in again.')
   })

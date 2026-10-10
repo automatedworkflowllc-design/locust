@@ -96,7 +96,8 @@ export function githubAccountLine(account: GithubAccount): string {
     case 'expired':
       return `${account.login === undefined ? 'Your GitHub sign-in' : `The sign-in for ${account.login}`} no longer works. Sign in again.`
     case 'signed-in':
-      return `Signed in as ${account.login}. Teammates push and open pull requests as you.`
+      // The card's name already says who: the line says what it means.
+      return 'Signed in to GitHub. Teammates push and open pull requests as you.'
     case 'unknown':
       return account.message
   }
