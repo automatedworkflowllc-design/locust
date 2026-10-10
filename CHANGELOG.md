@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.716.0 - 2026-10-09
+
+### New
+
+- **Add a connector to every agent at once.** Settings › Connectors › Add a connector takes a name and the command that starts an MCP server, or its web address, and adds it to each agent you choose: Claude Code, Codex, Gemini CLI, Copilot, OpenCode and Antigravity. Locust runs each agent's own command for it, the way you would type it, and shows what each one said. An agent that already has a connector by that name keeps its own. Undo takes it out again, except from OpenCode, which has no command for that; Locust says where its copy is. Cursor Agent has no such command yet, so add a connector to it in Cursor.
+
 ## 0.715.0 - 2026-10-09
 
 ### Improved
