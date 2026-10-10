@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.718.0 - 2026-10-10
+
+### Fixed
+
+- **No teammate closes your browser by its process id either.** 0.717 stopped a Claude Code teammate from closing every window of a browser by name. The same night, a teammate that was stopped that way looked up the browser's process ids and closed it by number instead. Locust now checks process ids too. A teammate may end only what a teammate started, such as a test browser of its own. It can never end your browser, your editor, Locust itself or another teammate's agent. The refusal also tells the teammate to give its test browser a profile of its own, since a test browser sharing your profile is usually why it wanted yours closed.
+
 ## 0.717.0 - 2026-10-09
 
 ### Improved
