@@ -172,6 +172,45 @@ describe('a command that ends a process by id', () => {
   })
 })
 
+/*
+ * Arena round B, 2026-10-10: refused by name, two models narrowed the find to
+ * the Edge they had started, by its own profile folder. That is the right
+ * shape, and it was refused too. Now each process the filter matches is
+ * looked up: it runs when every one is the run's.
+ */
+describe('a command that finds a program by name and narrows it by its command line', () => {
+  const sonnet = `powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { \\$_.Name -eq 'chrome.exe' -and \\$_.CommandLine -like '*C:\\tmp\\headed*' } | ForEach-Object { Stop-Process -Id \\$_.ProcessId -Force }"`
+  const wql = `powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \\"Name='chrome.exe' AND CommandLine LIKE '%tmp\\\\shot%'\\" | Invoke-CimMethod -MethodName Terminate"`
+
+  it('runs when every process the filter matches is one a teammate started', () => {
+    expect(stoppedBecause(sonnet, look)).toBeUndefined()
+    expect(stoppedBecause(wql, look)).toBeUndefined()
+  })
+
+  it('is stopped when the filter also matches the person’s own', () => {
+    const wide = `powershell -c "Get-CimInstance Win32_Process | Where-Object { \\$_.Name -eq 'chrome.exe' -and \\$_.CommandLine -like '*Chrome*' } | ForEach-Object { Stop-Process -Id \\$_.ProcessId }"`
+    expect(stoppedBecause(wide, look)).toMatch(/^Locust stopped this command before it ran: its command-line filter also matches process (10544|29988|12420|11000), Chrome that no teammate started/)
+  })
+
+  it('is stopped as before when the narrowing cannot be read exactly, or the table cannot be read', () => {
+    for (const command of [
+      sonnet.replace("-like '*C:\\tmp\\headed*'", "-match 'headed'"),
+      sonnet.replace("-like '*C:\\tmp\\headed*'", "-like '*[h]eaded*'"),
+      sonnet.replace(" -and ", " -or "),
+      // One narrowed find does not cover a plain one later in the same line.
+      `${sonnet}; taskkill //F //IM chrome.exe`
+    ]) {
+      expect(stoppedBecause(command, look), command).toMatch(/^Locust stopped this command before it ran: it ends Chrome by name/)
+    }
+    expect(stoppedBecause(sonnet, noTable)).toMatch(/^Locust stopped this command before it ran: it ends Chrome by name/)
+  })
+
+  it('never lets a filter reach Locust or this run’s own agent', () => {
+    const locust = `powershell -c "Get-CimInstance Win32_Process | Where-Object { \\$_.Name -eq 'Locust.exe' -and \\$_.CommandLine -like '*' } | ForEach-Object { Stop-Process -Id \\$_.ProcessId }"`
+    expect(stoppedBecause(locust, look)).toMatch(/also matches process 7000, Locust/)
+  })
+})
+
 describe('everything else', () => {
   it('runs: starting a browser, and the ordinary work of a turn', () => {
     for (const command of [

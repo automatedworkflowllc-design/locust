@@ -215,6 +215,45 @@ function windowless(table, pid) {
   return false
 }
 
+/** Every match of each, not only the first: one narrowed find must not hide a plain one later in the line. */
+const BY_NAME_ALL = BY_NAME.map((pattern) => new RegExp(pattern.source, 'gi'))
+
+/**
+ * The command-line filter a find-by-name was narrowed with, as a RegExp, or
+ * undefined: PowerShell's `$_.CommandLine -like '*profile*'` and WQL's
+ * `CommandLine LIKE '%profile%'`. Only what reads exactly the same here as
+ * there: a `[`-range or an `-or` is not narrowing, and neither is `-match`,
+ * whose .NET regex is not JavaScript's.
+ */
+function narrowedTo(text) {
+  if (/\s-or\s|\sor\s/i.test(text)) return undefined
+  const filters = [
+    ...[...text.matchAll(/commandline\s+-[ci]?like\s+\\?(['"])(.*?)\\?\1/gi)].map((m) => ({ pattern: m[2], any: '*', one: '?' })),
+    ...[...text.matchAll(/commandline\s+like\s+\\?(['"])(.*?)\\?\1/gi)].map((m) => ({ pattern: m[2], any: '%', one: '_' }))
+  ]
+  if (filters.length === 0 || filters.some(({ pattern }) => pattern.length === 0 || pattern.includes('['))) return undefined
+  const sources = filters.map(({ pattern, any, one }) =>
+    [...pattern].map((ch) => (ch === any ? '.*' : ch === one ? '.' : escape(ch))).join('')
+  )
+  // Every filter must hold (they are joined by -and, or are one WQL condition each).
+  return { test: (line) => sources.every((source) => new RegExp(`^${source}$`, 'is').test(line)) }
+}
+
+/** The first process of `entry` the filter matches that this run did not start, or undefined when there is none. */
+function notTheRuns(seen, entry, filter) {
+  const agent = seen.agent ?? seen.root
+  for (const [pid, one] of seen.table) {
+    if (!entry.names.includes(normalName(one.name))) continue
+    if (!filter.test(String(one.line ?? ''))) continue
+    // Locust, and the agent this run is, are never a teammate's to end, however they are found.
+    if (pid === seen.root || pid === agent || seen.above.includes(pid)) return pid
+    const ours = entry.agent === true ? startedUnder(seen.table, pid, agent) : startedUnder(seen.table, pid, seen.root)
+    if (ours || (entry.browser === true && windowless(seen.table, pid))) continue
+    return pid
+  }
+  return undefined
+}
+
 /**
  * Why a command is refused, in words the model reads, or undefined when it
  * may run. `look` reads the process table when the command ends something by
@@ -223,26 +262,45 @@ function windowless(table, pid) {
  */
 export function stoppedBecause(command, look = lookAtProcesses) {
   if (typeof command !== 'string' || command.length === 0) return undefined
-  for (const pattern of BY_NAME) {
-    const found = pattern.exec(command)
-    if (found === null) continue
-    const named = found.slice(1).find((group) => group !== undefined)?.toLowerCase().replace(/\s+/g, ' ')
-    const entry = ALL.find(({ name }) => name === named)?.entry
-    if (entry === undefined) continue
-    return (
-      `Locust stopped this command before it ran: it ends ${entry.what} by name, which ends every ${entry.what} ` +
-      `on this computer, ${HARM[entry.harm]} too. Leave the person's ${entry.what} running. ${tipFor(entry)}`
-    )
+  // The process table, read once and only when something needs it; null when it cannot be read.
+  let seen
+  const looked = () => {
+    if (seen === undefined) {
+      try {
+        seen = look() ?? null
+      } catch {
+        seen = null
+      }
+    }
+    return seen
+  }
+  for (const pattern of BY_NAME_ALL) {
+    for (const found of command.matchAll(pattern)) {
+      const named = found.slice(1).find((group) => group !== undefined)?.toLowerCase().replace(/\s+/g, ' ')
+      const entry = ALL.find(({ name }) => name === named)?.entry
+      if (entry === undefined) continue
+      // Found by name AND narrowed by its command line (arena round B, 2026-10-10: two models ended
+      // only the Edge they had started, matched by its own profile folder): each process the filter
+      // matches is looked up, and it may run when every one is this run's.
+      const filter = narrowedTo(found[0])
+      const table = filter === undefined ? null : looked()
+      if (filter !== undefined && table !== null) {
+        const theirs = notTheRuns(table, entry, filter)
+        if (theirs === undefined) continue
+        return (
+          `Locust stopped this command before it ran: its command-line filter also matches process ${String(theirs)}, ` +
+          `${entry.what} that no teammate started, so it is ${OWNER[entry.harm]}. Leave it running. ${tipFor(entry)}`
+        )
+      }
+      return (
+        `Locust stopped this command before it ran: it ends ${entry.what} by name, which ends every ${entry.what} ` +
+        `on this computer, ${HARM[entry.harm]} too. Leave the person's ${entry.what} running. ${tipFor(entry)}`
+      )
+    }
   }
   const ids = endedIds(command)
   if (ids.length === 0) return undefined
-  let seen
-  try {
-    seen = look()
-  } catch {
-    return undefined
-  }
-  if (seen === undefined) return undefined
+  if (looked() === null) return undefined
   for (const pid of ids) {
     const one = seen.table.get(pid)
     if (one === undefined) continue
