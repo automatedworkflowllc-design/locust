@@ -11,6 +11,12 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.722.0 - 2026-10-10
+
+### Improved
+
+- **OpenCode teammates can't close your browser either.** OpenCode teammates now get the same check as Claude Code, Codex and Copilot teammates before every command, in every mode. If a command would end a program you are running, such as your browser, it is stopped and the teammate is told why. Nothing is added to your OpenCode settings, and your own OpenCode plugins still load beside it. If Locust can't start the check, the command runs as it would have without it.
+
 ## 0.721.0 - 2026-10-10
 
 ### Improved
