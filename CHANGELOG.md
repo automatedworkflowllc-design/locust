@@ -11,6 +11,16 @@ Settings shows this file as What's new. An entry may group its changes under
 about when they arrive on it carries `<!-- big -->` on the line under its
 heading: the home screen then shows it once, as a splash.
 
+## 0.721.0 - 2026-10-10
+
+### Improved
+
+- **Copilot teammates can't close your browser either.** Copilot teammates now get the same check as Claude Code and Codex teammates before every command, in every mode, Approve each included. If a command would end a program you are running, such as your browser, it is stopped before anyone is asked. Nothing is added to your Copilot settings. If Locust can't start the check, the command runs as it would have without it, rather than every command being refused.
+
+### Fixed
+
+- **No more "Unhandled Copilot record" lines under Copilot's answers.** The newest Copilot CLI sends a few new kinds of update, and each one used to add a line under the answer. They are read quietly now.
+
 ## 0.720.0 - 2026-10-10
 
 ### Improved
